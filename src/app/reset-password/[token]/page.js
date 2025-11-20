@@ -18,16 +18,17 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     let cancelled = false;
     setStatus("");
-
+  
     (async () => {
       try {
+        // 👇 CHANGE THIS LINE - use validate-reset-token endpoint
         const res = await fetch(
-          `${API_BASE_URL}/api/auth/reset-password/${token}?_=${Date.now()}`,
+          `${API_BASE_URL}/api/auth/validate-reset-token/${token}?_=${Date.now()}`,
           { cache: "no-store" }
         );
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
-
+  
         if (res.ok && data?.success) {
           setEmailMasked(data.emailMasked || "");
           setIsInvalid(false);
@@ -41,7 +42,7 @@ export default function ResetPasswordPage() {
         }
       }
     })();
-
+  
     return () => {
       cancelled = true;
     };

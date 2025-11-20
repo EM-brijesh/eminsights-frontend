@@ -820,43 +820,47 @@ export default function KeywordsPage() {
   };
 
   const handlePauseToggle = async (row) => {
-    if (!selectedBrandData || !row?.groupName) {
-      showMessage('Invalid group data', 'warning');
+    if (!row?.groupName || !selectedBrand) {
+      showMessage("Invalid group", "warning");
       return;
     }
-
+  
     try {
-      const next = (keywordGroups || []).map((g) => (g.name === row.groupName ? { ...g, paused: !g.paused } : g));
-
-      const keywordGroupsForBackend = next.map((g) => ({
-        name: g.name || '',
-        keywords: Array.isArray(g.keywords) ? g.keywords : [],
-        includeKeywords: Array.isArray(g.includeKeywords) ? g.includeKeywords : [],
-        excludeKeywords: Array.isArray(g.excludeKeywords) ? g.excludeKeywords : [],
-        assignedUsers: Array.isArray(g.assignedUsers) ? g.assignedUsers : [],
-        platforms: Array.isArray(g.platforms) ? g.platforms : [],
-        country: Array.isArray(g.countries) && g.countries.length > 0 ? g.countries[0] : g.country,
-        language: Array.isArray(g.languages) && g.languages.length > 0 ? g.languages[0] : g.language,
-        frequency: g.frequency,
-        paused: g.paused,
-      }));
-
-      await api.brands.configure({
-        brandName: selectedBrand,
-        keywords: selectedBrandData.keywords || [],
-        platforms: getCurrentBrandPlatforms(),
-        frequency: selectedBrandData.frequency || '30m',
-        keywordGroups: keywordGroupsForBackend,
+      const action = row.paused ? "start" : "pause";  // paused → start, running → pause
+  
+      const res = await fetch("http://localhost:5050/api/search/group/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandName: selectedBrand,
+          groupName: row.groupName,
+          action
+        })
       });
-
-      persistGroups(selectedBrand, next);
-    } catch (e) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Pause toggle failed', e);
+  
+      const data = await res.json();
+      if (!data.success) {
+        showMessage(`❌ ${data.message}`, "error");
+        return;
       }
-      showMessage(`❌ Failed to update pause status: ${e?.message || 'Unknown error'}`, 'error');
+  
+      showMessage(`✔️ Group ${row.groupName} is now ${data.status}`, "success");
+  
+      // Update UI state
+      setKeywordGroups((groups) =>
+        groups.map((g) =>
+          g.groupName === row.groupName
+            ? { ...g, paused: data.paused, status: data.status }
+            : g
+        )
+      );
+  
+    } catch (e) {
+      console.error(e);
+      showMessage("Error toggling group state", "error");
     }
   };
+  
 
   const handleDuplicateGroup = async (row) => {
     if (!selectedBrandData || !row?.groupName) {
@@ -1076,9 +1080,9 @@ export default function KeywordsPage() {
               >
                 Add Keywords/Social Profiles
               </Button>
-              <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {/* <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
                 Run Search
-              </Button>
+              </Button> */}
             </div>
           </div>
         </div>
@@ -1128,13 +1132,13 @@ export default function KeywordsPage() {
                       <span
                         className={`inline-flex items-center rounded-full px-3 py-1 text-xs whitespace-nowrap border ${row.paused ? 'bg-yellow-900/30 text-yellow-300 border-yellow-700' : 'bg-green-900/30 text-green-300 border-green-700'}`}
                       >
-                        {row.paused ? 'Paused' : row.status}
+                         {row.paused ? "Paused" : "Running"}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-300 relative">
                       <div className="flex items-center gap-3">
                         <button onClick={() => handlePauseToggle(row)} className="text-gray-200 hover:text-white border border-gray-700 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-white">
-                          {row.paused ? 'Resume' : 'Pause'}
+                        {row.paused ? "Start" : "Pause"}
                         </button>
                         <button onClick={() => setOpenMenuId(openMenuId === row.id ? null : row.id)} className="text-gray-400 hover:text-white w-8 h-8 rounded-md border border-gray-700 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white">
                           ⋯

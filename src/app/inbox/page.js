@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -50,6 +50,94 @@ const PLATFORM_OPTIONS = [
   { value: 'youtube', label: 'YouTube' },
   { value: 'reddit', label: 'Reddit' },
 ];
+
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v'];
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
+const normalizeName = (value) => (value || '').toString().trim();
+
+const makeGroupId = (brandName, group) => {
+  const brandKey = normalizeName(brandName) || 'brand';
+  const groupKey = normalizeName(group?._id || group?.groupName || group?.name) || 'group';
+  return `${brandKey}::${groupKey}`;
+};
+
+const getPostKeyword = (post) => {
+  const keyword =
+    post?.keyword ||
+    post?.content?.keyword ||
+    post?.content?.tag ||
+    post?.analysis?.keyword ||
+    post?.tag ||
+    post?.topic;
+  return normalizeName(keyword).toLowerCase();
+};
+
+const flattenMediaValues = (value, bucket) => {
+  if (!value) return;
+  if (typeof value === 'string') {
+    bucket.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => flattenMediaValues(item, bucket));
+    return;
+  }
+  if (typeof value === 'object') {
+    const possibleKeys = [
+      'url',
+      'media_url',
+      'media_url_https',
+      'preview_image_url',
+      'image',
+      'imageUrl',
+      'mediaUrl',
+      'source',
+      'src',
+    ];
+    possibleKeys.forEach((key) => {
+      if (value[key]) {
+        flattenMediaValues(value[key], bucket);
+      }
+    });
+  }
+};
+
+const extractMediaAssets = (post) => {
+  const collected = [];
+  flattenMediaValues(post?.content?.mediaUrl, collected);
+  flattenMediaValues(post?.mediaUrl, collected);
+  flattenMediaValues(post?.content?.imageUrl, collected);
+  flattenMediaValues(post?.content?.mediaUrls, collected);
+  flattenMediaValues(post?.content?.media, collected);
+  flattenMediaValues(post?.media, collected);
+  flattenMediaValues(post?.attachments, collected);
+  flattenMediaValues(post?.content?.videoUrl, collected);
+  flattenMediaValues(post?.videoUrl, collected);
+  flattenMediaValues(post?.content?.videoVariants, collected);
+
+  const unique = [...new Set(collected.filter(Boolean))];
+  const videos = [];
+  const images = [];
+
+  unique.forEach((url) => {
+    const lower = url.toLowerCase();
+    if (VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+      videos.push(url);
+    } else if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+      images.push(url);
+    } else if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+      videos.push(url);
+    } else {
+      images.push(url);
+    }
+  });
+
+  return {
+    videos,
+    images,
+  };
+};
 
 function formatRelative(date) {
   if (!date) return 'NA';
@@ -108,58 +196,163 @@ function getYouTubeId(url) {
   return (match && match[2].length === 11) ? match[2] : null;
 }
 
-function MediaPreview({ post }) {
-  const platform = post?.platform?.toLowerCase();
-  const url = post?.sourceUrl;
-  const mediaUrl = post?.content?.mediaUrl || post?.mediaUrl || post?.content?.imageUrl;
-  const videoUrl =
-    post?.content?.videoUrl ||
-    (typeof mediaUrl === 'string' && mediaUrl.toLowerCase().endsWith('.mp4') ? mediaUrl : null);
+function VideoModal({ modalContent, onClose }) {
+  if (!modalContent) return null;
 
-  // YouTube Preview
-  if (platform === 'youtube' || (url && (url.includes('youtube.com') || url.includes('youtu.be')))) {
-    const videoId = getYouTubeId(url);
-    if (videoId) {
-      return (
-        <div className="relative mt-3 w-full max-w-xs overflow-hidden rounded-lg border border-white/10 bg-black">
+  const isYouTube = modalContent.type === 'youtube';
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-8">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-black/90 p-4 shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white transition hover:border-white/40"
+        >
+          Close
+        </button>
+        <div className="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+          {isYouTube ? (
+            <iframe
+              src={`https://www.youtube.com/embed/${modalContent.youtubeId}?autoplay=1`}
+              className="h-full w-full"
+              title="YouTube player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <video
+              className="h-full w-full object-contain"
+              controls
+              autoPlay
+              poster={modalContent.poster}
+            >
+              <source src={modalContent.url} type={modalContent.mimeType || 'video/mp4'} />
+              Your browser does not support the video tag.
+            </video>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MediaPreview({ post }) {
+  const [modalContent, setModalContent] = useState(null);
+  const platform = (post?.platform || '').toLowerCase();
+  const sourceUrl = post?.sourceUrl || post?.content?.url || '';
+  const youtubeId = getYouTubeId(sourceUrl);
+  const { videos, images } = useMemo(() => extractMediaAssets(post), [post]);
+
+  const youtubePreview =
+    (platform === 'youtube' || youtubeId) && youtubeId ? (
+      <div className="mt-3 w-full max-w-xs overflow-hidden rounded-lg border border-white/10 bg-black">
+        <button
+          type="button"
+          className="group relative block w-full"
+          onClick={() =>
+            setModalContent({
+              type: 'youtube',
+              youtubeId,
+            })
+          }
+        >
           <img
-            src={`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`}
+            src={`https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`}
             alt="Video thumbnail"
             className="h-auto w-full object-cover opacity-80 transition group-hover:opacity-100"
+            loading="lazy"
           />
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition group-hover:scale-110">
-              <Play className="ml-1 h-4 w-4 fill-current" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition group-hover:scale-110">
+              <Play className="ml-1 h-5 w-5 fill-current" />
             </div>
           </div>
-        </div>
-      );
-    }
-  }
-
-  // Native video preview (Twitter/Reddit/Other)
-  if (videoUrl) {
-    return (
-      <div className="mt-3 w-full max-w-xl overflow-hidden rounded-lg border border-white/10 bg-black/40">
-        <video className="w-full rounded-lg" controls preload="metadata" poster={mediaUrl === videoUrl ? undefined : mediaUrl}>
-          <source src={videoUrl} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        </button>
       </div>
+    ) : null;
+
+  if (youtubePreview) {
+    return (
+      <>
+        {youtubePreview}
+        <VideoModal modalContent={modalContent} onClose={() => setModalContent(null)} />
+      </>
     );
   }
 
-  // Image Preview (Twitter/Reddit/Other)
-  if (mediaUrl) {
+  if (videos.length > 0) {
+    const videoUrl = videos[0];
+    const videoType = VIDEO_EXTENSIONS.find((ext) => videoUrl.toLowerCase().endsWith(ext)) || '.mp4';
+    const mimeMap = {
+      '.mp4': 'video/mp4',
+      '.mov': 'video/quicktime',
+      '.webm': 'video/webm',
+      '.m4v': 'video/mp4',
+    };
     return (
-      <div className="mt-3 inline-block overflow-hidden rounded-lg border border-white/10 bg-black/20">
-        <img
-          src={mediaUrl}
-          alt="Post preview"
-          className="max-h-48 max-w-xs cursor-pointer object-contain transition hover:opacity-90"
-          loading="lazy"
-          onClick={() => window.open(mediaUrl, '_blank', 'noopener,noreferrer')}
-        />
+      <>
+        <div className="mt-3 w-full max-w-xs overflow-hidden rounded-lg border border-white/10 bg-black/40">
+          <button
+            type="button"
+            className="relative block w-full"
+            onClick={() =>
+              setModalContent({
+                type: 'video',
+                url: videoUrl,
+                poster: images.length > 0 ? images[0] : undefined,
+                mimeType: mimeMap[videoType],
+              })
+            }
+          >
+            {images.length > 0 ? (
+              <img
+                src={images[0]}
+                alt="Video poster"
+                className="h-auto w-full object-cover opacity-80 transition group-hover:opacity-100"
+                loading="lazy"
+              />
+            ) : (
+              <div className="aspect-video w-full bg-black/60" />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition group-hover:scale-110">
+                <Play className="ml-0.5 h-5 w-5 fill-current" />
+              </div>
+            </div>
+          </button>
+        </div>
+        <VideoModal modalContent={modalContent} onClose={() => setModalContent(null)} />
+      </>
+    );
+  }
+
+  if (images.length > 0) {
+    const displayImages = images.slice(0, 3);
+    return (
+      <div className="mt-3 flex flex-wrap gap-3">
+        {displayImages.map((img, index) => {
+          const remaining = images.length - displayImages.length;
+          const showOverlay = index === displayImages.length - 1 && remaining > 0;
+          return (
+            <div
+              key={`${img}-${index}`}
+              className="relative inline-block overflow-hidden rounded-lg border border-white/10 bg-black/20"
+            >
+              <img
+                src={img}
+                alt="Post preview"
+                className="max-h-48 max-w-xs cursor-pointer object-contain transition hover:opacity-90"
+                loading="lazy"
+                onClick={() => window.open(img, '_blank', 'noopener,noreferrer')}
+              />
+              {showOverlay && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-lg font-semibold text-white">
+                  +{remaining}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -272,8 +465,21 @@ function MentionCard({ post }) {
   );
 }
 
-function MultiSelect({ options, value, onChange, label }) {
+function MultiSelect({
+  options,
+  value,
+  onChange,
+  label,
+  brandDetails = [],
+  selectedKeywordGroups = [],
+  onToggleKeywordGroup = () => {},
+  selectedKeywords = [],
+  onToggleKeyword = () => {},
+  expandedGroups = {},
+  onToggleExpand = () => {},
+}) {
   const [open, setOpen] = useState(false);
+  const [activeBrand, setActiveBrand] = useState(value[0] || options[0] || '');
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -288,11 +494,23 @@ function MultiSelect({ options, value, onChange, label }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
+  useEffect(() => {
+    if (value.length === 0) {
+      setActiveBrand('');
+      return;
+    }
+    if (!value.includes(activeBrand)) {
+      setActiveBrand(value[value.length - 1]);
+    }
+  }, [value, activeBrand]);
+
   const handleToggle = (option) => {
     if (option === '__all__') {
       onChange([]);
+      setActiveBrand('');
       return;
     }
+    setActiveBrand(option);
     const exists = value.includes(option);
     if (exists) {
       onChange(value.filter((v) => v !== option));
@@ -324,56 +542,74 @@ function MultiSelect({ options, value, onChange, label }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 z-40 mt-2 w-64 rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
-          <div className="mb-2 flex items-center justify-between text-xs uppercase text-gray-500">
+        <div className="absolute left-0 z-40 mt-2 w-[min(90vw,720px)] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
+          <div className="mb-3 flex items-center justify-between text-xs uppercase text-gray-500">
             <span>Select Brands</span>
             <button
               className="text-indigo-300 transition hover:text-indigo-100"
               onClick={() => {
                 onChange([]);
-                setOpen(false);
+                setActiveBrand('');
               }}
             >
               Reset
             </button>
           </div>
-          <ul className="max-h-64 space-y-1 overflow-y-auto pr-1 text-sm">
-            <li>
-              <button
-                onClick={() => {
-                  handleToggle('__all__');
-                  setOpen(false);
-                }}
-                className={clsx(
-                  'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition',
-                  value.length === 0 ? 'bg-indigo-500/20 text-indigo-100 font-semibold' : 'hover:bg-white/5 text-gray-200',
-                )}
-              >
-                All Brands
-                {value.length === 0 && <CheckCircle2 className="h-4 w-4 text-indigo-300" />}
-              </button>
-            </li>
-            {options.map((option) => {
-              const selected = value.includes(option);
-              return (
-                <li key={option}>
-                  <button
-                    onClick={() => {
-                      handleToggle(option);
-                      setOpen(false);
-                    }}
-                    className={clsx(
-                      'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition',
-                      selected ? 'bg-indigo-500/20 text-indigo-100' : 'hover:bg-white/5 text-gray-200',
-                    )}
-                  >
-                    {option}
-                    {selected && <CheckCircle2 className="h-4 w-4 text-indigo-300" />}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="flex flex-col gap-4 md:flex-row">
+            <ul className="max-h-64 flex-1 space-y-1 overflow-y-auto pr-1 text-sm">
+              <li>
+                <button
+                  onClick={() => {
+                    handleToggle('__all__');
+                  }}
+                  className={clsx(
+                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition',
+                    value.length === 0 ? 'bg-indigo-500/20 text-indigo-100 font-semibold' : 'hover:bg-white/5 text-gray-200',
+                  )}
+                >
+                  All Brands
+                  {value.length === 0 && <CheckCircle2 className="h-4 w-4 text-indigo-300" />}
+                </button>
+              </li>
+              {options.map((option) => {
+                const selected = value.includes(option);
+                return (
+                  <li key={option}>
+                    <button
+                      onClick={() => handleToggle(option)}
+                      className={clsx(
+                        'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition',
+                        selected ? 'bg-indigo-500/20 text-indigo-100' : 'hover:bg-white/5 text-gray-200',
+                      )}
+                    >
+                      {option}
+                      {selected && <CheckCircle2 className="h-4 w-4 text-indigo-300" />}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex-1 rounded-2xl border border-white/10 bg-black/20 p-3">
+              <div className="mb-2 text-xs uppercase tracking-widest text-gray-500">
+                {activeBrand ? `${activeBrand} Keywords` : 'Select a brand to view keywords'}
+              </div>
+              {activeBrand ? (
+                <KeywordTree
+                  brandDetails={brandDetails}
+                  visibleBrands={[activeBrand]}
+                  selectedGroups={selectedKeywordGroups}
+                  onToggleGroup={onToggleKeywordGroup}
+                  selectedKeywords={selectedKeywords}
+                  onToggleKeyword={onToggleKeyword}
+                  expandedGroups={expandedGroups}
+                  onToggleExpand={onToggleExpand}
+                  className="max-h-64 border-none bg-transparent p-0"
+                />
+              ) : (
+                <p className="text-sm text-gray-400">Choose a brand to see its keyword groups.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -499,6 +735,110 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
   );
 }
 
+function KeywordTree({
+  brandDetails,
+  visibleBrands,
+  selectedGroups,
+  onToggleGroup,
+  selectedKeywords,
+  onToggleKeyword,
+  expandedGroups,
+  onToggleExpand,
+  className = '',
+}) {
+  if (!brandDetails.length) {
+    return (
+      <div className="mt-2 rounded-xl border border-white/5 bg-black/30 p-3 text-sm text-gray-400">
+        No keyword groups configured.
+      </div>
+    );
+  }
+
+  const brandSet = new Set(visibleBrands.length ? visibleBrands : brandDetails.map((b) => b.brandName));
+  const filteredBrands = brandDetails.filter((brand) =>
+    !visibleBrands.length ? true : brandSet.has(brand.brandName)
+  );
+
+  const hasGroups = filteredBrands.some((brand) => (brand?.keywordGroups || []).length);
+
+  return (
+    <div className={clsx("max-h-72 overflow-y-auto rounded-2xl border border-white/10 bg-black/30 p-3", className)}>
+      {!hasGroups && (
+        <div className="text-sm text-gray-400">No keyword groups available for the selected brands.</div>
+      )}
+      {filteredBrands.map((brand) => {
+        const groups = brand?.keywordGroups || [];
+        if (!groups.length) return null;
+        return (
+          <div key={brand._id || brand.brandName} className="mb-4 last:mb-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              {brand.brandName || brand.aiFriendlyName || 'Untitled Brand'}
+            </div>
+            <div className="mt-2 space-y-2">
+              {groups.map((group) => {
+                const groupId = makeGroupId(brand.brandName, group);
+                const expanded = expandedGroups[groupId] ?? true;
+                const keywords = group?.keywords || [];
+                const selectedGroup = selectedGroups.includes(groupId);
+
+                return (
+                  <div key={groupId} className="rounded-xl border border-white/5 bg-white/5 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-400 bg-black text-indigo-500 focus:ring-indigo-400"
+                          checked={selectedGroup}
+                          onChange={() => onToggleGroup(groupId)}
+                        />
+                        <span className="flex-1 text-white">
+                          {group.groupName || group.name || 'Keyword Group'}
+                          <span className="ml-2 text-xs text-gray-400">{keywords.length} keywords</span>
+                        </span>
+                      </label>
+                      {keywords.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleExpand(groupId)}
+                          className="rounded-full border border-white/10 px-2 py-1 text-xs text-gray-300 transition hover:border-white/30"
+                        >
+                          {expanded ? 'Hide' : 'Show'}
+                        </button>
+                      )}
+                    </div>
+                    {expanded && keywords.length > 0 && (
+                      <div className="mt-2 space-y-1 pl-6">
+                        {keywords.map((keyword) => {
+                          const keywordValue = keyword?.toLowerCase();
+                          const keywordId = `${groupId}::${keywordValue}`;
+                          return (
+                            <label
+                              key={keywordId}
+                              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-gray-200 transition hover:bg-white/5"
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-gray-400 bg-black text-indigo-500 focus:ring-indigo-400"
+                                checked={selectedKeywords.includes(keywordValue)}
+                                onChange={() => onToggleKeyword(keywordValue)}
+                              />
+                              <span className="capitalize">{keyword}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function FilterDrawer({ open, onClose }) {
   return (
     <div
@@ -604,6 +944,9 @@ export default function InboxPage() {
   const [assignedBrandDetails, setAssignedBrandDetails] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [isChannelMenuOpen, setIsChannelMenuOpen] = useState(false);
+  const [selectedKeywordGroups, setSelectedKeywordGroups] = useState([]);
+  const [selectedKeywordsFilter, setSelectedKeywordsFilter] = useState([]);
+  const [expandedKeywordGroups, setExpandedKeywordGroups] = useState({});
 
   // Refs for race condition prevention and memory leak protection
   const fetchDataCallIdRef = useRef(0);
@@ -878,6 +1221,78 @@ export default function InboxPage() {
   }, [activeTab, brands, posts.length]);
 
 
+  const visibleBrandDetails = useMemo(() => {
+    if (!assignedBrandDetails?.length) return [];
+    if (!selectedBrands.length) return assignedBrandDetails;
+    const brandSet = new Set(selectedBrands);
+    return assignedBrandDetails.filter((brand) => brandSet.has(brand.brandName));
+  }, [assignedBrandDetails, selectedBrands]);
+
+  const visibleGroupIds = useMemo(() => {
+    const groupSet = new Set();
+    visibleBrandDetails.forEach((brand) => {
+      brand?.keywordGroups?.forEach((group) => {
+        groupSet.add(makeGroupId(brand.brandName, group));
+      });
+    });
+    return groupSet;
+  }, [visibleBrandDetails]);
+
+  const visibleKeywordValues = useMemo(() => {
+    const keywordSet = new Set();
+    visibleBrandDetails.forEach((brand) => {
+      brand?.keywordGroups?.forEach((group) => {
+        group?.keywords?.forEach((keyword) => {
+          if (keyword) keywordSet.add(keyword.toLowerCase());
+        });
+      });
+    });
+    return keywordSet;
+  }, [visibleBrandDetails]);
+
+  useEffect(() => {
+    setSelectedKeywordGroups((prev) => prev.filter((id) => visibleGroupIds.has(id)));
+  }, [visibleGroupIds]);
+
+  useEffect(() => {
+    setSelectedKeywordsFilter((prev) => prev.filter((keyword) => visibleKeywordValues.has(keyword)));
+  }, [visibleKeywordValues]);
+
+  useEffect(() => {
+    setExpandedKeywordGroups((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      visibleGroupIds.forEach((id) => {
+        if (next[id] === undefined) {
+          next[id] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [visibleGroupIds]);
+
+  const handleToggleKeywordGroup = useCallback((groupId) => {
+    setSelectedKeywordGroups((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
+    );
+  }, []);
+
+  const handleToggleKeyword = useCallback((keywordValue) => {
+    const normalized = (keywordValue || '').toLowerCase();
+    if (!normalized) return;
+    setSelectedKeywordsFilter((prev) =>
+      prev.includes(normalized) ? prev.filter((k) => k !== normalized) : [...prev, normalized]
+    );
+  }, []);
+
+  const handleToggleGroupExpand = useCallback((groupId) => {
+    setExpandedKeywordGroups((prev) => ({
+      ...prev,
+      [groupId]: !(prev[groupId] ?? true),
+    }));
+  }, []);
+
   const filteredPosts = useMemo(() => {
     if (!posts?.length) return [];
     const days = Number(duration || '2');
@@ -911,14 +1326,19 @@ export default function InboxPage() {
         : true;
       const platformValue = String(post?.platform || '').toLowerCase();
       const matchesChannel = !selectedChannels.length || selectedChannels.includes(platformValue);
+      const keywordValue = getPostKeyword(post);
+      const matchesKeyword =
+        selectedKeywordsFilter.length === 0
+          ? true
+          : (keywordValue && selectedKeywordsFilter.includes(keywordValue));
 
-      if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel) return false;
+      if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel || !matchesKeyword) return false;
 
       if (activeTab === 'actionable') return (post?.analysis?.sentiment || '').toLowerCase() === 'negative';
       if (activeTab === 'non-actionable') return (post?.analysis?.sentiment || '').toLowerCase() !== 'negative';
       return true;
     });
-  }, [posts, selectedBrands, duration, searchTerm, activeTab, selectedChannels]);
+  }, [posts, selectedBrands, duration, searchTerm, activeTab, selectedChannels, timeRange, selectedKeywordsFilter]);
 
   const counts = useMemo(() => {
     const total = posts.length;
@@ -975,7 +1395,19 @@ export default function InboxPage() {
         <section className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/50 backdrop-blur-sm xl:flex-row xl:items-center xl:justify-between">
       <div className="flex flex-wrap items-center gap-4 relative z-10">
             <div className="flex flex-col gap-3">
-              <MultiSelect options={brands} value={selectedBrands} onChange={setSelectedBrands} label="Brands" />
+              <MultiSelect
+                options={brands}
+                value={selectedBrands}
+                onChange={setSelectedBrands}
+                label="Brands"
+                brandDetails={assignedBrandDetails}
+                selectedKeywordGroups={selectedKeywordGroups}
+                onToggleKeywordGroup={handleToggleKeywordGroup}
+                selectedKeywords={selectedKeywordsFilter}
+                onToggleKeyword={handleToggleKeyword}
+                expandedGroups={expandedKeywordGroups}
+                onToggleExpand={handleToggleGroupExpand}
+              />
             </div>
             <DurationPicker value={duration} onChange={setDuration} timeRange={timeRange} onTimeChange={setTimeRange} />
             <label className="flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">

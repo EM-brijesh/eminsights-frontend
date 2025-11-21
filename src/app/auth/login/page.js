@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const data = await api.auth.signin({ email, password });
       // Persist auth for Next middleware
-      const maxAge = 7 * 24 * 60 * 60; // 7 days
+      const maxAge = 120 * 60; // 2 hours auth expiry on 2 hrs
       const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
       document.cookie = `auth=${data.token}; Max-Age=${maxAge}; Path=/; SameSite=Lax${isSecure ? '; Secure' : ''}`;
       try {

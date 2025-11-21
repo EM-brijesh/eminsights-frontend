@@ -18,6 +18,7 @@ import {
   RefreshCcw,
   Search,
   Users,
+  Play,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -100,6 +101,72 @@ function PlatformBadge({ platform }) {
   );
 }
 
+function getYouTubeId(url) {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function MediaPreview({ post }) {
+  const platform = post?.platform?.toLowerCase();
+  const url = post?.sourceUrl;
+  const mediaUrl = post?.content?.mediaUrl || post?.mediaUrl || post?.content?.imageUrl;
+  const videoUrl =
+    post?.content?.videoUrl ||
+    (typeof mediaUrl === 'string' && mediaUrl.toLowerCase().endsWith('.mp4') ? mediaUrl : null);
+
+  // YouTube Preview
+  if (platform === 'youtube' || (url && (url.includes('youtube.com') || url.includes('youtu.be')))) {
+    const videoId = getYouTubeId(url);
+    if (videoId) {
+      return (
+        <div className="relative mt-3 w-full max-w-xs overflow-hidden rounded-lg border border-white/10 bg-black">
+          <img
+            src={`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`}
+            alt="Video thumbnail"
+            className="h-auto w-full object-cover opacity-80 transition group-hover:opacity-100"
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition group-hover:scale-110">
+              <Play className="ml-1 h-4 w-4 fill-current" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // Native video preview (Twitter/Reddit/Other)
+  if (videoUrl) {
+    return (
+      <div className="mt-3 w-full max-w-xl overflow-hidden rounded-lg border border-white/10 bg-black/40">
+        <video className="w-full rounded-lg" controls preload="metadata" poster={mediaUrl === videoUrl ? undefined : mediaUrl}>
+          <source src={videoUrl} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
+    );
+  }
+
+  // Image Preview (Twitter/Reddit/Other)
+  if (mediaUrl) {
+    return (
+      <div className="mt-3 inline-block overflow-hidden rounded-lg border border-white/10 bg-black/20">
+        <img
+          src={mediaUrl}
+          alt="Post preview"
+          className="max-h-48 max-w-xs cursor-pointer object-contain transition hover:opacity-90"
+          loading="lazy"
+          onClick={() => window.open(mediaUrl, '_blank', 'noopener,noreferrer')}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function MentionCard({ post }) {
   const brandName = post?.brand?.brandName || 'Unknown Brand';
   const author = post?.author?.name || post?.author?.id || 'Anonymous';
@@ -109,8 +176,8 @@ function MentionCard({ post }) {
     sentiment === 'negative'
       ? 'border-red-500/60 text-red-300'
       : sentiment === 'positive'
-      ? 'border-emerald-500/60 text-emerald-300'
-      : 'border-cyan-400/50 text-cyan-200';
+        ? 'border-emerald-500/60 text-emerald-300'
+        : 'border-cyan-400/50 text-cyan-200';
   const createdAt = post?.createdAt || post?.fetchedAt;
 
   const engagement =
@@ -148,6 +215,7 @@ function MentionCard({ post }) {
             post?.content?.description ||
             'No text content available for this mention.'}
         </p>
+        <MediaPreview post={post} />
         {post?.sourceUrl && (
           <Link
             href={post.sourceUrl}
@@ -206,7 +274,7 @@ function MentionCard({ post }) {
 
 function MultiSelect({ options, value, onChange, label }) {
   const [open, setOpen] = useState(false);
-  
+
   // Close dropdown when clicking outside
   useEffect(() => {
     if (!open) return;
@@ -219,7 +287,7 @@ function MultiSelect({ options, value, onChange, label }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
-  
+
   const handleToggle = (option) => {
     if (option === '__all__') {
       onChange([]);
@@ -237,10 +305,10 @@ function MultiSelect({ options, value, onChange, label }) {
     value.length === 0
       ? 'All Brands'
       : value.length === 1
-      ? value[0]
-      : value.length === 2
-      ? value.join(', ')
-      : `${value.length} brands selected`;
+        ? value[0]
+        : value.length === 2
+          ? value.join(', ')
+          : `${value.length} brands selected`;
 
   return (
     <div className="relative brand-multi-select">
@@ -318,7 +386,7 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
   const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
   const minutes = ['00', '15', '30', '45'];
   const ampm = ['AM', 'PM'];
-  
+
   // Close dropdown when clicking outside
   useEffect(() => {
     if (!open) return;
@@ -331,9 +399,9 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
-  
+
   return (
-    <div className="relative duration-picker">
+      <div className="relative duration-picker">
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="inline-flex min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
@@ -346,7 +414,7 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 z-50 mt-2 w-[320px] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
+        <div className="absolute right-0 z-50 mt-2 w-[320px] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
           <ul className="space-y-1 text-sm mb-3">
             {DURATION_PRESETS.map((option) => (
               <li key={option.value}>
@@ -536,12 +604,12 @@ export default function InboxPage() {
   const [assignedBrandDetails, setAssignedBrandDetails] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [isChannelMenuOpen, setIsChannelMenuOpen] = useState(false);
-  
+
   // Refs for race condition prevention and memory leak protection
   const fetchDataCallIdRef = useRef(0);
   const brandActivityCallIdRef = useRef(0);
   const isMountedRef = useRef(true);
-  
+
   // Track component mount/unmount for memory leak prevention
   useEffect(() => {
     isMountedRef.current = true;
@@ -581,26 +649,26 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (loadings) return;
-    
+
     if (!user?.email) {
       router.push('/login'); // Fixed: redirect to proper login page
       return;
     }
-    
+
     // Increment call ID to track this specific fetch
     const currentCallId = ++fetchDataCallIdRef.current;
-    
+
     const fetchData = async () => {
       try {
         setLoading(true);
         setError('');
-        
+
         // Determine role with robust fallback
         let role = user?.role;
         try {
           const raw = localStorage.getItem('user');
           if (!role && raw) role = (JSON.parse(raw)?.role);
-        } catch {}
+        } catch { }
 
         // Check if still current before proceeding
         if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
@@ -612,16 +680,16 @@ export default function InboxPage() {
         let usedAdminAll = false;
         let assignedDetails = [];
         let allBrandsData = [];
-        
+
         if (role === 'admin') {
           try {
             const all = await api.brands.getAll();
-            
+
             // Check again after async operation
             if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
               return;
             }
-            
+
             allBrandsData = all?.brands || [];
             brandNames = allBrandsData.map((b) => b.brandName).filter(Boolean);
             if (brandNames.length) usedAdminAll = true;
@@ -631,37 +699,37 @@ export default function InboxPage() {
             }
           }
         }
-        
+
         // Fetch assigned brands
         try {
           const assignedRes = await api.brands.getAssigned(user.email);
-          
+
           if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
             return;
           }
-          
+
           assignedDetails = assignedRes?.brands || [];
         } catch (assignedErr) {
           if (process.env.NODE_ENV !== 'production') {
             console.warn('getAssigned failed:', assignedErr?.message);
           }
         }
-        
+
         if ((!assignedDetails || !assignedDetails.length) && allBrandsData.length) {
           assignedDetails = allBrandsData;
         }
-        
+
         const assignedNames = assignedDetails.map((b) => b.brandName).filter(Boolean);
-        
+
         if (!brandNames.length) {
           brandNames = assignedNames.slice();
         }
-        
+
         // Check before state updates
         if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
           return;
         }
-        
+
         setAssignedBrandDetails(assignedDetails);
         setAssignedBrandNames(assignedNames);
         setBrands(brandNames);
@@ -673,11 +741,11 @@ export default function InboxPage() {
           if (!usedAdminAll && role !== 'admin') {
             try {
               const postRes = await api.data.userPosts({ email: user.email, limit: 200, sort: 'desc' });
-              
+
               if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
                 return;
               }
-              
+
               postData = Array.isArray(postRes?.data) ? postRes.data : [];
             } catch (postErr) {
               if (process.env.NODE_ENV !== 'production') {
@@ -705,11 +773,11 @@ export default function InboxPage() {
                 }
               })
             );
-            
+
             if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
               return;
             }
-            
+
             postData = perBrandResponses
               .filter(result => result.status === 'fulfilled')
               .flatMap(result => result.value);
@@ -726,13 +794,13 @@ export default function InboxPage() {
         if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
           return;
         }
-        
+
         setPosts(postData);
       } catch (err) {
         if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
           return;
         }
-        
+
         if (process.env.NODE_ENV !== 'production') {
           console.error('Failed to load inbox data', err);
         }
@@ -744,7 +812,7 @@ export default function InboxPage() {
         }
       }
     };
-    
+
     fetchData();
   }, [loadings, router, user?.email, reloadKey]);
 
@@ -754,14 +822,14 @@ export default function InboxPage() {
     if (activeTab !== 'brand') return;
     if (posts.length > 0) return;
     if (!brands || brands.length === 0) return;
-    
+
     // Increment call ID to track this specific fetch
     const currentCallId = ++brandActivityCallIdRef.current;
-    
+
     const loadIfNeeded = async () => {
       try {
         setLoading(true);
-        
+
         // Use allSettled to handle failures gracefully
         const perBrandResponses = await Promise.allSettled(
           brands.map(async (brandName) => {
@@ -777,12 +845,12 @@ export default function InboxPage() {
             }
           })
         );
-        
+
         // Check if still current after async operation
         if (currentCallId !== brandActivityCallIdRef.current || !isMountedRef.current) {
           return;
         }
-        
+
         const merged = perBrandResponses
           .filter(result => result.status === 'fulfilled')
           .flatMap(result => result.value)
@@ -791,7 +859,7 @@ export default function InboxPage() {
             const bDate = new Date(b?.createdAt || b?.fetchedAt || 0).getTime();
             return bDate - aDate;
           });
-          
+
         if (merged.length > 0 && currentCallId === brandActivityCallIdRef.current && isMountedRef.current) {
           setPosts(merged);
         }
@@ -805,7 +873,7 @@ export default function InboxPage() {
         }
       }
     };
-    
+
     loadIfNeeded();
   }, [activeTab, brands, posts.length]);
 
@@ -892,8 +960,8 @@ export default function InboxPage() {
                     activeTab === key
                       ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 shadow-lg shadow-indigo-500/20'
                       : isClickable
-                      ? 'border-white/10 bg-white/5 text-gray-300 hover:border-white/20 hover:bg-white/10 hover:text-white'
-                      : 'border-white/10 bg-white/5 text-gray-300',
+                        ? 'border-white/10 bg-white/5 text-gray-300 hover:border-white/20 hover:bg-white/10 hover:text-white'
+                        : 'border-white/10 bg-white/5 text-gray-300',
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -905,7 +973,7 @@ export default function InboxPage() {
         </header>
 
         <section className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/50 backdrop-blur-sm xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4 relative z-10">
             <div className="flex flex-col gap-3">
               <MultiSelect options={brands} value={selectedBrands} onChange={setSelectedBrands} label="Brands" />
             </div>
@@ -925,17 +993,17 @@ export default function InboxPage() {
               onClick={async () => {
                 // Guard: prevent multiple simultaneous refreshes
                 if (manualRefreshLoading) return;
-                
+
                 try {
                   setManualRefreshLoading(true);
                   setFreqMessage('Refreshing data…');
                   setError('');
-                  
+
                   const targets = selectedBrands.length ? selectedBrands : brands;
-                  
+
                   if (targets.length === 0) {
                     // No brands selected, fetch all user data
-                    await api.data.getData({ 
+                    await api.data.getData({
                       email: user?.email,
                       limit: 100
                     });
@@ -943,21 +1011,21 @@ export default function InboxPage() {
                     // Fetch data for each brand using allSettled
                     const results = await Promise.allSettled(
                       targets.map((brandName) =>
-                        api.data.getData({ 
+                        api.data.getData({
                           email: user?.email,
                           brandName,
                           limit: 100
                         })
                       )
                     );
-                    
+
                     // Check for failures
                     const failures = results.filter(r => r.status === 'rejected');
                     if (failures.length > 0 && process.env.NODE_ENV !== 'production') {
                       console.warn(`${failures.length} brand(s) failed to refresh`);
                     }
                   }
-                  
+
                   setReloadKey((k) => k + 1);
                   setFreqMessage('Latest monitoring data fetched.');
                 } catch (err) {
@@ -1049,47 +1117,47 @@ export default function InboxPage() {
                           onClick={async () => {
                             // Guard: prevent multiple simultaneous updates
                             if (savingFreq) return;
-                            
+
                             try {
                               setSavingFreq(true);
                               setFreqMessage('');
                               setError('');
-                              
+
                               const targets = selectedBrands.length ? selectedBrands : brands;
-                              
+
                               if (targets.length === 0) {
                                 setFreqMessage('No brands available to configure');
                                 return;
                               }
-                              
+
                               // Update frequency for each target brand using allSettled
                               const configResults = await Promise.allSettled(
                                 targets.map((brandName) =>
                                   api.brands.configure({ brandName, frequency: value })
                                 )
                               );
-                              
+
                               const configFailures = configResults.filter(r => r.status === 'rejected');
                               if (configFailures.length > 0) {
                                 if (process.env.NODE_ENV !== 'production') {
                                   console.warn(`${configFailures.length} brand(s) failed to configure`);
                                 }
                               }
-                              
+
                               setFreqMessage(`Monitoring set to ${label.toLowerCase()}${selectedBrands.length ? '' : ' for all brands'}. Refreshing data…`);
-                              
+
                               // Re-run search for updated brands
                               try {
                                 const refreshTargets = selectedBrands.length ? selectedBrands : brands;
                                 if (refreshTargets.length === 0) {
-                                  await api.data.getData({ 
+                                  await api.data.getData({
                                     email: user?.email,
                                     limit: 100
                                   });
                                 } else {
                                   await Promise.allSettled(
                                     refreshTargets.map((b) =>
-                                      api.data.getData({ 
+                                      api.data.getData({
                                         email: user?.email,
                                         brandName: b,
                                         limit: 100
@@ -1102,7 +1170,7 @@ export default function InboxPage() {
                                   console.warn('Post-frequency refresh failed:', refreshErr);
                                 }
                               }
-                              
+
                               setReloadKey((k) => k + 1);
                               setIsFreqOpen(false);
                             } catch (e) {
@@ -1118,7 +1186,7 @@ export default function InboxPage() {
                         </button>
                       </li>
                     ))}
-            </ul>
+                  </ul>
                   <div className="mt-2 px-2">
                     <button
                       onClick={() => { setIsFreqOpen(false); setIsFilterDrawerOpen(true); }}

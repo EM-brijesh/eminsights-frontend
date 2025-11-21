@@ -250,6 +250,24 @@ export const api = {
         body: JSON.stringify(data),
       }),
   },
+
+  sentiment: {
+    analyze: (posts) =>
+      apiRequest("/api/sentiment/analyze", {
+        method: "POST",
+        body: JSON.stringify({ posts }),
+      }),
+    save: (posts) =>
+      apiRequest("/api/sentiment/save", {
+        method: "POST",
+        body: JSON.stringify({ posts }),
+      }),
+    check: (posts) =>
+      apiRequest("/api/sentiment/check", {
+        method: "POST",
+        body: JSON.stringify({ posts }),
+      }),
+  },
 };
 
 export default api;

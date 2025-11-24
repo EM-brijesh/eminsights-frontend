@@ -15,11 +15,12 @@ import COUNTRIES from '@/lib/countries';
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] });
 
-const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit'];
+const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google'];
 const PLATFORM_LABELS = {
   twitter: 'Twitter',
   youtube: 'YouTube',
   reddit: 'Reddit',
+  google: 'Google',
 };
 
 const MESSAGE_VARIANTS = {
@@ -87,6 +88,21 @@ const PlatformIcon = ({ platform, isSelected, onClick }) => {
       bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
       hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
       name: 'Reddit',
+    },
+    google: {
+      component: (
+        <Image
+          src="/google-logo.svg"
+          alt="Google"
+          width={48}
+          height={48}
+          className="object-contain"
+          style={{ filter: 'grayscale(0.2) brightness(0.9)' }}
+        />
+      ),
+      bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
+      hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
+      name: 'Google',
     },
   };
 
@@ -540,7 +556,8 @@ export default function KeywordsPage() {
       const platformsBackend = (configPlatforms || []).map((k) => {
         if (k === 'youtube') return 'youtube';
         if (k === 'reddit' || k === 'quora') return 'reddit';
-        return 'twitter'; // default mapping
+        if (k === 'google') return 'google';
+        return 'twitter';
       });
 
       const requestBody = {
@@ -568,17 +585,17 @@ export default function KeywordsPage() {
       const backendGroups =
         Array.isArray(updatedBrand.keywordGroups) && updatedBrand.keywordGroups.length > 0
           ? updatedBrand.keywordGroups.map((group) => ({
-              name: group.name || '',
-              keywords: Array.isArray(group.keywords) ? group.keywords : [],
-              includeKeywords: Array.isArray(group.includeKeywords) ? group.includeKeywords : [],
-              excludeKeywords: Array.isArray(group.excludeKeywords) ? group.excludeKeywords : [],
-              assignedUsers: Array.isArray(group.assignedUsers) ? group.assignedUsers : [],
-              platforms: Array.isArray(group.platforms) && group.platforms.length > 0 ? group.platforms : updatedBrand.platforms || [],
-              countries: group.country ? [group.country] : [],
-              languages: group.language ? [group.language] : [],
-              frequency: group.frequency || updatedBrand.frequency || '30m',
-              paused: !!group.paused,
-            }))
+            name: group.name || '',
+            keywords: Array.isArray(group.keywords) ? group.keywords : [],
+            includeKeywords: Array.isArray(group.includeKeywords) ? group.includeKeywords : [],
+            excludeKeywords: Array.isArray(group.excludeKeywords) ? group.excludeKeywords : [],
+            assignedUsers: Array.isArray(group.assignedUsers) ? group.assignedUsers : [],
+            platforms: Array.isArray(group.platforms) && group.platforms.length > 0 ? group.platforms : updatedBrand.platforms || [],
+            countries: group.country ? [group.country] : [],
+            languages: group.language ? [group.language] : [],
+            frequency: group.frequency || updatedBrand.frequency || '30m',
+            paused: !!group.paused,
+          }))
           : [];
 
       setSelectedBrandData(updatedBrand);
@@ -658,10 +675,10 @@ export default function KeywordsPage() {
       setStatus('done');
 
       const summary = response.summary || {};
-      const totalPosts = (summary.youtube || 0) + (summary.twitter || 0) + (summary.reddit || 0);
+      const totalPosts = (summary.youtube || 0) + (summary.twitter || 0) + (summary.reddit || 0 + (summary.google || 0));
 
       showMessage(
-        `✅ Search completed!\nFound ${totalPosts} posts:\n• YouTube: ${summary.youtube || 0}\n• Twitter: ${summary.twitter || 0}\n• Reddit: ${summary.reddit || 0}`,
+        `✅ Search completed!\nFound ${totalPosts} posts:\n• YouTube: ${summary.youtube || 0}\n• Twitter: ${summary.twitter || 0}\n• Reddit: ${summary.reddit || 0}\n• Google: ${summary.google || 0}`,
         'success'
       );
 
@@ -684,7 +701,7 @@ export default function KeywordsPage() {
   const groupsForDisplay = hasGroups
     ? keywordGroups
     : selectedBrandData?.keywords && selectedBrandData.keywords.length > 0
-    ? [
+      ? [
         {
           name: 'Default Group',
           keywords: selectedBrandData.keywords,
@@ -692,7 +709,7 @@ export default function KeywordsPage() {
           paused: false,
         },
       ]
-    : [];
+      : [];
 
   const keywordRows = groupsForDisplay.map((g, i) => {
     const keywords = Array.isArray(g.keywords) ? g.keywords : [];
@@ -824,11 +841,11 @@ export default function KeywordsPage() {
       showMessage("Invalid group", "warning");
       return;
     }
-  
+
     try {
       const action = row.paused ? "start" : "pause";  // paused → start, running → pause
-  
-      const res = await fetch("https://api.eminsights.in/api/search/group/toggle", {
+
+      const res = await fetch("https://eminsights.in/api/search/group/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -837,15 +854,15 @@ export default function KeywordsPage() {
           action
         })
       });
-  
+
       const data = await res.json();
       if (!data.success) {
         showMessage(`❌ ${data.message}`, "error");
         return;
       }
-  
+
       showMessage(`✔️ Group ${row.groupName} is now ${data.status}`, "success");
-  
+
       // Update UI state
       setKeywordGroups((groups) =>
         groups.map((g) =>
@@ -854,13 +871,13 @@ export default function KeywordsPage() {
             : g
         )
       );
-  
+
     } catch (e) {
       console.error(e);
       showMessage("Error toggling group state", "error");
     }
   };
-  
+
 
   const handleDuplicateGroup = async (row) => {
     if (!selectedBrandData || !row?.groupName) {
@@ -930,9 +947,8 @@ export default function KeywordsPage() {
 
         {resultMessage.text && (
           <div
-            className={`mb-4 rounded-lg border px-4 py-3 text-sm flex items-start justify-between gap-4 ${
-              MESSAGE_VARIANTS[resultMessage.type] || MESSAGE_VARIANTS.info
-            }`}
+            className={`mb-4 rounded-lg border px-4 py-3 text-sm flex items-start justify-between gap-4 ${MESSAGE_VARIANTS[resultMessage.type] || MESSAGE_VARIANTS.info
+              }`}
             role="status"
             aria-live="polite"
           >
@@ -1013,6 +1029,8 @@ export default function KeywordsPage() {
                           <Image key={ch} src="/facebook-logo.svg" alt="Facebook" width={16} height={16} />
                         ) : ch === 'instagram' ? (
                           <Image key={ch} src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />
+                        ) : ch === 'google' ? (
+                          <Image key={ch} src="/google-logo.svg" alt="Google" width={16} height={16} />
                         ) : ch === 'quora' ? (
                           <Image key={ch} src="/quora-logo.svg" alt="Quora" width={16} height={16} />
                         ) : null
@@ -1034,6 +1052,7 @@ export default function KeywordsPage() {
                       { key: 'facebook', label: 'Facebook', src: '/facebook-logo.svg', wh: [16, 16] },
                       { key: 'instagram', label: 'Instagram', src: '/instagram-logo.svg', wh: [16, 16] },
                       { key: 'quora', label: 'Quora', src: '/quora-logo.svg', wh: [16, 16] },
+                      { key: 'google', label: 'Google', src: '/google-logo.svg', wh: [16, 16] },
                     ].map((p) => (
                       <label key={p.key} className="flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-800 cursor-pointer">
                         <input
@@ -1123,6 +1142,7 @@ export default function KeywordsPage() {
                             {plat === 'facebook' && <Image src="/facebook-logo.svg" alt="Facebook" width={16} height={16} />}
                             {plat === 'instagram' && <Image src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />}
                             {plat === 'quora' && <Image src="/quora-logo.svg" alt="Quora" width={16} height={16} />}
+                            {plat === 'google' && <Image src="/google-logo.svg" alt="Quora" width={16} height={16} />}
                           </span>
                         ))}
                       </div>
@@ -1132,13 +1152,13 @@ export default function KeywordsPage() {
                       <span
                         className={`inline-flex items-center rounded-full px-3 py-1 text-xs whitespace-nowrap border ${row.paused ? 'bg-yellow-900/30 text-yellow-300 border-yellow-700' : 'bg-green-900/30 text-green-300 border-green-700'}`}
                       >
-                         {row.paused ? "Paused" : "Running"}
+                        {row.paused ? "Paused" : "Running"}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-300 relative">
                       <div className="flex items-center gap-3">
                         <button onClick={() => handlePauseToggle(row)} className="text-gray-200 hover:text-white border border-gray-700 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-white">
-                        {row.paused ? "Start" : "Pause"}
+                          {row.paused ? "Start" : "Pause"}
                         </button>
                         <button onClick={() => setOpenMenuId(openMenuId === row.id ? null : row.id)} className="text-gray-400 hover:text-white w-8 h-8 rounded-md border border-gray-700 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white">
                           ⋯
@@ -1210,7 +1230,8 @@ export default function KeywordsPage() {
                           { key: 'instagram', title: 'Instagram', desc: 'Posts only', logo: '/instagram-logo.svg', size: 16 },
                           { key: 'youtube', title: 'YouTube', desc: 'Video post only', logo: '/youtube-logo.svg', size: 18 },
                           { key: 'reddit', title: 'Reddit', desc: 'Communities & comments', logo: '/reddit-logo.svg', size: 18 },
-                          { key: 'quora', title: 'Quora', desc: 'Question, Answers, Comment', logo: '/quora-logo.svg', size: 16 },
+                          { key: 'google', title: 'Google', desc: 'Web Search', logo: '/google-logo.svg', size: 16 },
+                          // { key: 'quora', title: 'Quora', desc: 'Question, Answers, Comment', logo: '/quora-logo.svg', size: 16 },
                         ].map((ch) => {
                           const active = configPlatforms.includes(ch.key);
                           return (

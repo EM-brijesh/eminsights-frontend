@@ -845,7 +845,7 @@ export default function KeywordsPage() {
     try {
       const action = row.paused ? "start" : "pause";  // paused → start, running → pause
 
-      const res = await fetch("https://eminsights.in/api/search/group/toggle", {
+      const res = await fetch("https://api.eminsights.in/api/search/group/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,3 +1,10 @@
+## 2025-11-25 - Sentiment Accuracy Enhancements
+
+- Backend: Added `data/labeled-sentiment.json` and `scripts/sentiment-benchmark.js` to capture labeled examples and generate accuracy/confusion-matrix reports (`node scripts/sentiment-benchmark.js --limit=50 --tag=pre-tuning` now emits JSON/CSV summaries plus changelog-ready metrics).
+- Backend: Reworked `services/sentiment.service.js` Gemini integration with response schemas, safety settings, richer prompts (platform/brand metadata), and lexical fallback heuristics so strongly opinionated posts no longer default to neutral. Responses now expose `sentimentConfidence`, `sentimentSource`, and fallback metadata for downstream dashboards.
+- Backend: `controllers/sentiment.controller.js` supports `includeDiagnostics`/`diagnosticsTag` on `/api/sentiment/analyze` and `/api/sentiment/batch-analyze`, returning per-request sentiment summaries, fallback ratios, and sample snippets. Diagnostics are appended to `reports/sentiment-diagnostics.log` for quick regression review.
+- Tooling: Benchmark dataset expanded with sarcasm/negation examples and the CLI now supports `--dataset`, `--reports`, and `--only-mismatches` flags for faster, scriptable QA cycles.
+
 ## 2025-11-07
 
 - Fix: Backend signin response now returns the user's `name` (and stores it in the JWT payload) so the frontend can persist it after login.

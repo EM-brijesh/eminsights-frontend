@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { RefreshCw, TrendingUp, MessageSquare, BarChart3, Smile, Frown, Meh } from 'lucide-react';
+import { RefreshCw, TrendingUp, MessageSquare, BarChart3, Smile, Frown, Meh, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
@@ -59,19 +59,24 @@ const analyzeSentimentWithCaching = async (posts) => {
     return posts.map(post => {
       const id = post._id || post.id;
       const analyzed = postMap.get(id?.toString());
+      const existingSentiment = post.sentiment;
+      const existingScore = typeof post.sentimentScore === 'number' ? post.sentimentScore : null;
+
       if (analyzed) {
         return {
           ...post,
-          sentiment: analyzed.sentiment || 'neutral',
-          sentimentScore: analyzed.sentimentScore || 0.5,
-          sentimentAnalyzedAt: analyzed.sentimentAnalyzedAt
+          sentiment: analyzed.sentiment ?? existingSentiment ?? 'pending',
+          sentimentScore: typeof analyzed.sentimentScore === 'number'
+            ? analyzed.sentimentScore
+            : existingScore,
+          sentimentAnalyzedAt: analyzed.sentimentAnalyzedAt || post.sentimentAnalyzedAt
         };
       }
-      // Post without text or analysis - return neutral
+
       return {
         ...post,
-        sentiment: 'neutral',
-        sentimentScore: 0.5
+        sentiment: existingSentiment ?? 'pending',
+        sentimentScore: existingScore
       };
     });
   } catch (error) {
@@ -79,8 +84,8 @@ const analyzeSentimentWithCaching = async (posts) => {
     // Return neutral sentiment on error
     return posts.map(p => ({
       ...p,
-      sentiment: p.sentiment || 'neutral',
-      sentimentScore: p.sentimentScore || 0.5
+      sentiment: p.sentiment ?? 'pending',
+      sentimentScore: typeof p.sentimentScore === 'number' ? p.sentimentScore : null
     }));
   }
 };
@@ -98,6 +103,9 @@ export default function AnalyticsPage() {
   const [selectedKeyword, setSelectedKeyword] = useState('all');
   const [keywordGroups, setKeywordGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState('all');
+  const [summaryData, setSummaryData] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
 
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
 
@@ -185,10 +193,40 @@ export default function AnalyticsPage() {
       const fetchedPosts = data.data || [];
       setPosts(fetchedPosts);
 
-      // Perform sentiment analysis with smart caching
+      const needsSentiment = fetchedPosts.filter(post => {
+        const hasScore = typeof post.sentimentScore === 'number';
+        return !post.sentiment || post.sentiment === 'pending' || !hasScore;
+      });
+
+      if (needsSentiment.length === 0) {
+        setAnalyzedPosts(fetchedPosts);
+        return;
+      }
+
       setAnalyzingSentiment(true);
-      const analyzed = await analyzeSentimentWithCaching(fetchedPosts);
-      setAnalyzedPosts(analyzed);
+      const analyzedSubset = await analyzeSentimentWithCaching(needsSentiment);
+      const analyzedMap = new Map();
+      analyzedSubset.forEach(post => {
+        const id = post._id || post.id;
+        if (id) analyzedMap.set(id.toString(), post);
+      });
+
+      const mergedPosts = fetchedPosts.map(post => {
+        const id = post._id || post.id;
+        if (!id) return post;
+        const updated = analyzedMap.get(id.toString());
+        if (!updated) return post;
+        const existingScore = typeof post.sentimentScore === 'number' ? post.sentimentScore : null;
+        return {
+          ...post,
+          sentiment: updated.sentiment ?? post.sentiment ?? 'pending',
+          sentimentScore: typeof updated.sentimentScore === 'number'
+            ? updated.sentimentScore
+            : existingScore,
+          sentimentAnalyzedAt: updated.sentimentAnalyzedAt || post.sentimentAnalyzedAt,
+        };
+      });
+      setAnalyzedPosts(mergedPosts);
       setAnalyzingSentiment(false);
     } catch (err) {
       console.error('Failed to load posts:', err);
@@ -200,11 +238,45 @@ export default function AnalyticsPage() {
     }
   };
 
+  const fetchSentimentSummary = useCallback(async ({ brandName, platform, keyword }) => {
+    if (!brandName) return;
+
+    setLoadingSummary(true);
+    try {
+      const params = { brandName };
+      if (platform && platform !== 'all') {
+        params.platform = platform;
+      }
+      if (keyword && keyword !== 'all') {
+        params.keyword = keyword;
+      }
+      const data = await api.sentiment.summary(params);
+      setSummaryData(data);
+      setSummaryError(null);
+    } catch (err) {
+      console.error('Failed to load sentiment summary:', err);
+      setSummaryData(null);
+      setSummaryError(err.message || 'Failed to load summary');
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, []);
+
   const handleRefresh = async () => {
     if (selectedBrand) {
       await fetchPostsAndAnalyze(selectedBrand);
     }
   };
+
+  useEffect(() => {
+    if (!selectedBrand) return;
+    const effectiveKeyword = selectedGroup === 'all' ? selectedKeyword : 'all';
+    fetchSentimentSummary({
+      brandName: selectedBrand,
+      platform: selectedPlatform,
+      keyword: effectiveKeyword,
+    });
+  }, [selectedBrand, selectedPlatform, selectedKeyword, selectedGroup, fetchSentimentSummary]);
 
   // Apply filters with useMemo for performance
   const filteredPosts = React.useMemo(() => {
@@ -239,7 +311,7 @@ export default function AnalyticsPage() {
   }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups]);
 
   // Calculate statistics with useMemo
-  const stats = useMemo(() => {
+  const clientStats = useMemo(() => {
     return {
       total: filteredPosts.length,
       byPlatform: filteredPosts.reduce((acc, post) => {
@@ -251,11 +323,71 @@ export default function AnalyticsPage() {
         return acc;
       }, {}),
       bySentiment: filteredPosts.reduce((acc, post) => {
-        acc[post.sentiment || 'neutral'] = (acc[post.sentiment || 'neutral'] || 0) + 1;
+        const sentimentKey = post.sentiment || 'pending';
+        acc[sentimentKey] = (acc[sentimentKey] || 0) + 1;
         return acc;
-      }, { positive: 0, neutral: 0, negative: 0 })
+      }, { positive: 0, neutral: 0, negative: 0, pending: 0 })
     };
   }, [filteredPosts]);
+
+  const summaryStats = useMemo(() => {
+    if (!summaryData?.success) return null;
+    const totals = summaryData.totals || {};
+    const sentiment = summaryData.sentiment || {};
+    const platforms = {};
+    (summaryData.platforms || []).forEach((entry) => {
+      if (!entry) return;
+      const key = entry.platform || 'unknown';
+      platforms[key] = entry.total || 0;
+    });
+    const keywords = {};
+    (summaryData.keywords || []).forEach((entry) => {
+      if (!entry) return;
+      const key = entry.keyword || 'unknown';
+      keywords[key] = entry.total || 0;
+    });
+    return {
+      total: totals.analyzedPosts || 0,
+      totalTracked: totals.totalPosts || 0,
+      pending: totals.pendingPosts ?? Math.max((totals.totalPosts || 0) - (totals.analyzedPosts || 0), 0),
+      lastAnalyzedAt: totals.latestAnalyzedAt || null,
+      avgSentimentScore:
+        typeof totals.avgSentimentScore === 'number' ? totals.avgSentimentScore : null,
+      byPlatform: platforms,
+      byKeyword: keywords,
+      bySentiment: {
+        positive: sentiment.positive || 0,
+        neutral: sentiment.neutral || 0,
+        negative: sentiment.negative || 0,
+        pending: sentiment.pending || Math.max((totals.totalPosts || 0) - (totals.analyzedPosts || 0), 0),
+      },
+    };
+  }, [summaryData]);
+
+  const summaryUsable = selectedGroup === 'all' && summaryData?.success;
+
+  const stats = useMemo(() => {
+    if (summaryUsable && summaryStats) {
+      return summaryStats;
+    }
+    return clientStats;
+  }, [summaryUsable, summaryStats, clientStats]);
+
+  const pendingInfo = useMemo(() => {
+    if (summaryUsable && summaryStats) {
+      return {
+        pending: summaryStats.pending || 0,
+        total: summaryStats.totalTracked || 0,
+        analyzed: summaryStats.total || 0,
+      };
+    }
+    const pendingCount = stats.bySentiment?.pending || 0;
+    return {
+      pending: pendingCount,
+      total: stats.total,
+      analyzed: stats.total - pendingCount,
+    };
+  }, [summaryUsable, summaryStats, stats]);
 
   // Chart data with useMemo
   const platformChartData = useMemo(() => Object.entries(stats.byPlatform).map(([name, value]) => ({
@@ -276,7 +408,7 @@ export default function AnalyticsPage() {
     .map(([name, value]) => ({ name, posts: value })), [stats.byKeyword]);
 
   // Timeline with sentiment
-  const timelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
+  const clientTimelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
     if (post.createdAt) {
       const date = new Date(post.createdAt).toLocaleDateString();
       if (!acc[date]) {
@@ -288,8 +420,15 @@ export default function AnalyticsPage() {
     return acc;
   }, {}), [filteredPosts]);
 
+  const combinedTimeline = useMemo(() => {
+    if (summaryUsable && Array.isArray(summaryData?.timeline) && summaryData.timeline.length > 0) {
+      return summaryData.timeline;
+    }
+    return Object.values(clientTimelineData);
+  }, [summaryUsable, summaryData, clientTimelineData]);
+
   const timelineChartData = useMemo(() => {
-    const sorted = Object.values(timelineData)
+    const sorted = [...combinedTimeline]
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(-14);
     
@@ -313,34 +452,47 @@ export default function AnalyticsPage() {
     });
     
     return withMovingAverages;
-  }, [timelineData]);
+  }, [combinedTimeline]);
 
   // Sentiment by Platform data
   const sentimentByPlatformData = useMemo(() => {
+    if (summaryUsable && Array.isArray(summaryData?.platforms) && summaryData.platforms.length > 0) {
+      return summaryData.platforms.map((entry) => {
+        const label = entry.platform || 'unknown';
+        return {
+          platform: label.charAt(0).toUpperCase() + label.slice(1),
+          positive: entry.positive || 0,
+          neutral: entry.neutral || 0,
+          negative: entry.negative || 0,
+          total: entry.total || 0,
+        };
+      });
+    }
+
     const platformSentiment = {};
-    filteredPosts.forEach(post => {
+    filteredPosts.forEach((post) => {
       const platform = post.platform || 'unknown';
       if (!platformSentiment[platform]) {
         platformSentiment[platform] = { positive: 0, neutral: 0, negative: 0 };
       }
       platformSentiment[platform][post.sentiment || 'neutral'] += 1;
     });
-    
+
     return Object.entries(platformSentiment).map(([platform, sentiments]) => ({
       platform: platform.charAt(0).toUpperCase() + platform.slice(1),
       positive: sentiments.positive,
       neutral: sentiments.neutral,
       negative: sentiments.negative,
-      total: sentiments.positive + sentiments.neutral + sentiments.negative
+      total: sentiments.positive + sentiments.neutral + sentiments.negative,
     }));
-  }, [filteredPosts]);
+  }, [summaryUsable, summaryData, filteredPosts]);
 
   // Engagement vs Sentiment data
   const engagementSentimentData = useMemo(() => {
     return filteredPosts
-      .filter(post => post.sentimentScore !== undefined && post.metrics)
+      .filter(post => typeof post.sentimentScore === 'number' && post.metrics)
       .map(post => ({
-        sentimentScore: post.sentimentScore || 0.5,
+        sentimentScore: post.sentimentScore,
         engagement: (post.metrics?.likes || 0) + (post.metrics?.comments || 0) + (post.metrics?.shares || 0),
         views: post.metrics?.views || 0,
         platform: post.platform || 'unknown',
@@ -350,15 +502,27 @@ export default function AnalyticsPage() {
 
   // Keyword Sentiment Heatmap data
   const keywordSentimentHeatmapData = useMemo(() => {
+    if (summaryUsable && Array.isArray(summaryData?.keywords) && summaryData.keywords.length > 0) {
+      return summaryData.keywords
+        .slice(0, 10)
+        .map((entry) => ({
+          keyword: entry.keyword || 'unknown',
+          positive: entry.positive || 0,
+          neutral: entry.neutral || 0,
+          negative: entry.negative || 0,
+          total: entry.total || 0,
+        }));
+    }
+
     const keywordSentiment = {};
-    filteredPosts.forEach(post => {
+    filteredPosts.forEach((post) => {
       const keyword = post.keyword || 'unknown';
       if (!keywordSentiment[keyword]) {
         keywordSentiment[keyword] = { positive: 0, neutral: 0, negative: 0 };
       }
       keywordSentiment[keyword][post.sentiment || 'neutral'] += 1;
     });
-    
+
     return Object.entries(keywordSentiment)
       .sort((a, b) => {
         const totalA = a[1].positive + a[1].neutral + a[1].negative;
@@ -371,46 +535,83 @@ export default function AnalyticsPage() {
         positive: sentiments.positive,
         neutral: sentiments.neutral,
         negative: sentiments.negative,
-        total: sentiments.positive + sentiments.neutral + sentiments.negative
+        total: sentiments.positive + sentiments.neutral + sentiments.negative,
       }));
-  }, [filteredPosts]);
+  }, [summaryUsable, summaryData, filteredPosts]);
 
   // Overall sentiment score for gauge
   const overallSentimentScore = useMemo(() => {
-    if (filteredPosts.length === 0) return 50;
-    const totalScore = filteredPosts.reduce((sum, post) => {
-      return sum + (post.sentimentScore || 0.5);
-    }, 0);
-    return Math.round((totalScore / filteredPosts.length) * 100);
-  }, [filteredPosts]);
+    if (summaryUsable && summaryStats && typeof summaryStats.avgSentimentScore === 'number') {
+      return Math.round(summaryStats.avgSentimentScore * 100);
+    }
+    const scoredPosts = filteredPosts
+      .map(post => post.sentimentScore)
+      .filter((score) => typeof score === 'number');
+    if (scoredPosts.length === 0) return null;
+    const totalScore = scoredPosts.reduce((sum, score) => sum + score, 0);
+    return Math.round((totalScore / scoredPosts.length) * 100);
+  }, [summaryUsable, summaryStats, filteredPosts]);
+
+  const gaugeScore = overallSentimentScore ?? 0;
+  const gaugeColor = gaugeScore >= 70 ? "#10b981" : gaugeScore >= 40 ? "#f59e0b" : "#ef4444";
+  const gaugeStatus =
+    overallSentimentScore === null
+      ? "No scored sentiment yet"
+      : gaugeScore >= 70
+      ? "Positive Overall Sentiment"
+      : gaugeScore >= 40
+      ? "Neutral Overall Sentiment"
+      : "Negative Overall Sentiment";
 
   // Radar chart data (sentiment by platform)
   const radarChartData = useMemo(() => {
+    if (summaryUsable && Array.isArray(summaryData?.platforms) && summaryData.platforms.length > 0) {
+      return summaryData.platforms.map((entry) => {
+        const total = entry.total || 0;
+        const label = entry.platform || 'unknown';
+        if (total === 0) {
+          return {
+            platform: label.charAt(0).toUpperCase() + label.slice(1),
+            positive: 0,
+            neutral: 0,
+            negative: 0,
+          };
+        }
+        return {
+          platform: label.charAt(0).toUpperCase() + label.slice(1),
+          positive: (entry.positive || 0) / total * 100,
+          neutral: (entry.neutral || 0) / total * 100,
+          negative: (entry.negative || 0) / total * 100,
+        };
+      });
+    }
+
     const platforms = ['twitter', 'youtube', 'reddit'];
-    return platforms.map(platform => {
-      const platformPosts = filteredPosts.filter(p => p.platform === platform);
+    return platforms.map((platform) => {
+      const platformPosts = filteredPosts.filter((p) => p.platform === platform);
       const total = platformPosts.length;
       if (total === 0) {
         return {
           platform: platform.charAt(0).toUpperCase() + platform.slice(1),
           positive: 0,
           neutral: 0,
-          negative: 0
+          negative: 0,
         };
       }
       return {
         platform: platform.charAt(0).toUpperCase() + platform.slice(1),
-        positive: (platformPosts.filter(p => p.sentiment === 'positive').length / total) * 100,
-        neutral: (platformPosts.filter(p => p.sentiment === 'neutral').length / total) * 100,
-        negative: (platformPosts.filter(p => p.sentiment === 'negative').length / total) * 100
+        positive: (platformPosts.filter((p) => p.sentiment === 'positive').length / total) * 100,
+        neutral: (platformPosts.filter((p) => p.sentiment === 'neutral').length / total) * 100,
+        negative: (platformPosts.filter((p) => p.sentiment === 'negative').length / total) * 100,
       };
     });
-  }, [filteredPosts]);
+  }, [summaryUsable, summaryData, filteredPosts]);
 
   const getSentimentIcon = (sentiment) => {
     switch (sentiment) {
       case 'positive': return <Smile className="w-4 h-4 text-green-500" />;
       case 'negative': return <Frown className="w-4 h-4 text-red-500" />;
+      case 'pending': return <Clock className="w-4 h-4 text-gray-400" />;
       default: return <Meh className="w-4 h-4 text-yellow-500" />;
     }
   };
@@ -538,6 +739,44 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {summaryError && (
+          <div className="mb-6 rounded-xl border border-red-500/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+            Failed to load stored sentiment summary. Displaying recent results from the latest fetch instead.
+          </div>
+        )}
+
+        {summaryUsable && summaryStats && !summaryError && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Analyzed Posts</p>
+              <p className="text-2xl font-bold text-white">{summaryStats.total.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">of {summaryStats.totalTracked.toLocaleString()} tracked posts</p>
+            </div>
+            <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Pending Analysis</p>
+              <p className="text-2xl font-bold text-yellow-300">{summaryStats.pending.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">Awaiting processing</p>
+            </div>
+            <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Last Sentiment Sync</p>
+              <p className="text-base font-semibold text-white">
+                {summaryStats.lastAnalyzedAt ? new Date(summaryStats.lastAnalyzedAt).toLocaleString() : 'Not available'}
+              </p>
+              {loadingSummary && (
+                <p className="text-xs text-gray-500 mt-1">Refreshing summary…</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {pendingInfo.pending > 0 && (
+          <div className="mb-6 rounded-xl border border-yellow-600/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+            {pendingInfo.pending === pendingInfo.total
+              ? 'No stored sentiment is available for this selection yet. Run a refresh or recent search to populate analytics.'
+              : `${pendingInfo.pending.toLocaleString()} of ${pendingInfo.total.toLocaleString()} posts are still awaiting sentiment analysis.`}
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
@@ -928,26 +1167,26 @@ export default function AnalyticsPage() {
                       cx="96"
                       cy="96"
                       r="80"
-                      stroke={overallSentimentScore >= 70 ? "#10b981" : overallSentimentScore >= 40 ? "#f59e0b" : "#ef4444"}
+                      stroke={gaugeColor}
                       strokeWidth="16"
                       fill="none"
                       strokeDasharray={`${2 * Math.PI * 80}`}
-                      strokeDashoffset={`${2 * Math.PI * 80 * (1 - overallSentimentScore / 100)}`}
+                      strokeDashoffset={`${2 * Math.PI * 80 * (1 - gaugeScore / 100)}`}
                       strokeLinecap="round"
                       style={{ transition: 'all 0.8s ease' }}
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="text-5xl font-bold" style={{ color: overallSentimentScore >= 70 ? "#10b981" : overallSentimentScore >= 40 ? "#f59e0b" : "#ef4444" }}>
-                        {overallSentimentScore}
+                      <div className="text-5xl font-bold" style={{ color: gaugeColor }}>
+                        {overallSentimentScore ?? '--'}
                       </div>
                       <div className="text-sm text-gray-400 mt-1">out of 100</div>
                     </div>
                   </div>
                 </div>
                 <p className="text-gray-400 text-sm mt-4 text-center">
-                  {overallSentimentScore >= 70 ? "Positive" : overallSentimentScore >= 40 ? "Neutral" : "Negative"} Overall Sentiment
+                  {gaugeStatus}
                 </p>
               </div>
             </CardContent>
@@ -1135,7 +1374,7 @@ export default function AnalyticsPage() {
                         </span>
                         <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-gray-700 border border-gray-600">
                           {getSentimentIcon(post.sentiment)}
-                          {post.sentiment || 'neutral'}
+                          {post.sentiment || 'pending'}
                         </span>
                       </div>
                     </div>

@@ -267,6 +267,10 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ posts }),
       }),
+    summary: (params) =>
+      apiRequest("/api/sentiment/summary", {
+        params,
+      }),
   },
 };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -248,6 +248,7 @@ export default function BrandsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionMessage, setActionMessage] = useState({ type: null, text: '' });
+  const actionMessageTimerRef = useRef(null);
   const [actionLoading, setActionLoading] = useState(false);
   // Finite state machine for modal: 'none' | 'create' | { type: 'edit', brandName: string }
   const [modalState, setModalState] = useState('none');
@@ -274,13 +275,35 @@ export default function BrandsPage() {
     return brandsList.find(b => compareBrandNames(b.brandName, brandName));
   };
 
-  const showActionBanner = useCallback((text, type = 'info') => {
-    setActionMessage({ type, text });
+  const clearActionBannerTimer = useCallback(() => {
+    if (actionMessageTimerRef.current) {
+      clearTimeout(actionMessageTimerRef.current);
+      actionMessageTimerRef.current = null;
+    }
   }, []);
 
   const clearActionBanner = useCallback(() => {
+    clearActionBannerTimer();
     setActionMessage({ type: null, text: '' });
-  }, []);
+  }, [clearActionBannerTimer]);
+
+  const showActionBanner = useCallback(
+    (text, type = 'info') => {
+      clearActionBannerTimer();
+      setActionMessage({ type, text });
+      actionMessageTimerRef.current = setTimeout(() => {
+        setActionMessage({ type: null, text: '' });
+        actionMessageTimerRef.current = null;
+      }, 5000);
+    },
+    [clearActionBannerTimer],
+  );
+
+  useEffect(() => {
+    return () => {
+      clearActionBannerTimer();
+    };
+  }, [clearActionBannerTimer]);
 
   // Create brand form state
   const [newBrand, setNewBrand] = useState(() => createInitialNewBrandState());

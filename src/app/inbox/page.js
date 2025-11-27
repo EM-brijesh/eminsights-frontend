@@ -779,7 +779,13 @@ function KeywordTree({
                 const groupId = makeGroupId(brand.brandName, group);
                 const expanded = expandedGroups[groupId] ?? true;
                 const keywords = group?.keywords || [];
-                const selectedGroup = selectedGroups.includes(groupId);
+                // Check if all keywords in this group are selected
+                const allKeywordsSelected = keywords.length > 0 && keywords.every((keyword) => {
+                  const keywordValue = (keyword || '').toLowerCase().trim();
+                  const keywordId = `${groupId}::${keywordValue}`;
+                  return selectedKeywords.includes(keywordId);
+                });
+                const selectedGroup = allKeywordsSelected;
 
                 return (
                   <div key={groupId} className="rounded-xl border border-white/5 bg-white/5 p-2">
@@ -809,8 +815,9 @@ function KeywordTree({
                     {expanded && keywords.length > 0 && (
                       <div className="mt-2 space-y-1 pl-6">
                         {keywords.map((keyword) => {
-                          const keywordValue = keyword?.toLowerCase();
+                          const keywordValue = (keyword || '').toLowerCase().trim();
                           const keywordId = `${groupId}::${keywordValue}`;
+                          const isKeywordSelected = selectedKeywords.includes(keywordId);
                           return (
                             <label
                               key={keywordId}
@@ -819,8 +826,8 @@ function KeywordTree({
                               <input
                                 type="checkbox"
                                 className="h-4 w-4 rounded border-gray-400 bg-black text-indigo-500 focus:ring-indigo-400"
-                                checked={selectedKeywords.includes(keywordValue)}
-                                onChange={() => onToggleKeyword(keywordValue)}
+                                checked={isKeywordSelected}
+                                onChange={() => onToggleKeyword(keywordId)}
                               />
                               <span className="capitalize">{keyword}</span>
                             </label>
@@ -1255,7 +1262,14 @@ export default function InboxPage() {
   }, [visibleGroupIds]);
 
   useEffect(() => {
-    setSelectedKeywordsFilter((prev) => prev.filter((keyword) => visibleKeywordValues.has(keyword)));
+    setSelectedKeywordsFilter((prev) => {
+      return prev.filter((compoundId) => {
+        const parts = compoundId.split('::');
+        if (parts.length !== 2) return false;
+        const keywordValue = parts[1];
+        return visibleKeywordValues.has(keywordValue);
+      });
+    });
   }, [visibleKeywordValues]);
 
   useEffect(() => {
@@ -1271,19 +1285,121 @@ export default function InboxPage() {
       return changed ? next : prev;
     });
   }, [visibleGroupIds]);
-
+  // Handler for toggling keyword groups
   const handleToggleKeywordGroup = useCallback((groupId) => {
-    setSelectedKeywordGroups((prev) =>
-      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
-    );
-  }, []);
+    // Find the group and its keywords from brandDetails
+    let groupKeywords = [];
+    assignedBrandDetails.forEach((brand) => {
+      brand?.keywordGroups?.forEach((group) => {
+        const currentGroupId = makeGroupId(brand.brandName, group);
+        if (currentGroupId === groupId) {
+          groupKeywords = (group?.keywords || []).map((k) => (k || '').toLowerCase().trim()).filter(Boolean);
+        }
+      });
+    });
 
-  const handleToggleKeyword = useCallback((keywordValue) => {
-    const normalized = (keywordValue || '').toLowerCase();
-    if (!normalized) return;
-    setSelectedKeywordsFilter((prev) =>
-      prev.includes(normalized) ? prev.filter((k) => k !== normalized) : [...prev, normalized]
-    );
+    setSelectedKeywordsFilter((prev) => {
+      // Check if all keywords in this group are currently selected
+      const allKeywordsInGroup = groupKeywords.map((kw) => `${groupId}::${kw}`);
+      const allSelected = allKeywordsInGroup.length > 0 && 
+        allKeywordsInGroup.every((id) => prev.includes(id));
+
+      if (allSelected) {
+        // Deselect all keywords in this group
+        const newKeywords = prev.filter((kw) => !kw.startsWith(`${groupId}::`));
+        // Update group state - React will batch these
+        setSelectedKeywordGroups((groupPrev) => groupPrev.filter((id) => id !== groupId));
+        return newKeywords;
+      } else {
+        // Select all keywords in this group
+        // groupKeywords are already lowercased and trimmed, so use them directly
+        const newKeywords = groupKeywords.map((keyword) => 
+          `${groupId}::${keyword}`
+        );
+        
+        // Remove any existing keywords from this group, then add all new ones
+        const updatedKeywords = [
+          ...prev.filter((kw) => !kw.startsWith(`${groupId}::`)),
+          ...newKeywords
+        ];
+        
+        // Update group state - React will batch these
+        setSelectedKeywordGroups((groupPrev) => {
+          if (!groupPrev.includes(groupId)) {
+            return [...groupPrev, groupId];
+          }
+          return groupPrev;
+        });
+        
+        return updatedKeywords;
+      }
+    });
+  }, [assignedBrandDetails]);
+
+  // Handler for toggling individual keywords
+  const handleToggleKeyword = useCallback((keywordId) => {
+    if (!keywordId || typeof keywordId !== 'string') return;
+    
+    const parts = keywordId.split('::');
+    if (parts.length !== 2) return;
+    const [groupId, keywordValue] = parts;
+    
+    if (!groupId || !keywordValue) return;
+
+    // Use functional update to ensure we have the latest state
+    setSelectedKeywordsFilter((prev) => {
+      // Check if keyword is currently selected (exact match)
+      const isSelected = prev.some((kw) => {
+        // Exact match first
+        if (kw === keywordId) return true;
+        // Also check if format matches (handle any edge cases)
+        const kwParts = kw.split('::');
+        if (kwParts.length === 2) {
+          const [kwGroupId, kwValue] = kwParts;
+          return kwGroupId === groupId && (kwValue || '').toLowerCase().trim() === (keywordValue || '').toLowerCase().trim();
+        }
+        return false;
+      });
+      
+      if (isSelected) {
+        // Remove the keyword - filter out exact match and any format variations
+        const newKeywords = prev.filter((kw) => {
+          if (kw === keywordId) return false; // Exact match
+          const kwParts = kw.split('::');
+          if (kwParts.length === 2) {
+            const [kwGroupId, kwValue] = kwParts;
+            // Don't remove if it's a different keyword (even if same group)
+            return !(kwGroupId === groupId && (kwValue || '').toLowerCase().trim() === (keywordValue || '').toLowerCase().trim());
+          }
+          return true; // Keep invalid formats
+        });
+        
+        // Check if any keywords remain in this group
+        const remainingInGroup = newKeywords.filter((kw) => kw.startsWith(`${groupId}::`));
+        
+        // Update group state - remove group if no keywords remain
+        if (remainingInGroup.length === 0) {
+          setSelectedKeywordGroups((groupPrev) => groupPrev.filter((id) => id !== groupId));
+        }
+        
+        return newKeywords;
+      } else {
+        // Add the keyword - check if it already exists to avoid duplicates
+        if (prev.includes(keywordId)) {
+          return prev; // Already exists
+        }
+        
+        // Ensure parent group is selected
+        setSelectedKeywordGroups((groupPrev) => {
+          if (!groupPrev.includes(groupId)) {
+            return [...groupPrev, groupId];
+          }
+          return groupPrev;
+        });
+        
+        return [...prev, keywordId];
+      }
+    });
   }, []);
 
   const handleToggleGroupExpand = useCallback((groupId) => {
@@ -1330,7 +1446,12 @@ export default function InboxPage() {
       const matchesKeyword =
         selectedKeywordsFilter.length === 0
           ? true
-          : (keywordValue && selectedKeywordsFilter.includes(keywordValue));
+          : (keywordValue && selectedKeywordsFilter.some((compoundId) => {
+              // Extract keyword value from compound ID (groupId::keywordValue)
+              const parts = compoundId.split('::');
+              if (parts.length !== 2) return false;
+              return parts[1] === keywordValue;
+            }));
 
       if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel || !matchesKeyword) return false;
 

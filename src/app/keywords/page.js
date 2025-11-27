@@ -170,6 +170,7 @@ export default function KeywordsPage() {
   const [selectedBrandData, setSelectedBrandData] = useState(null);
   const [status, setStatus] = useState(''); // '', 'loading', 'done'
   const [resultMessage, setResultMessage] = useState({ type: null, text: '' });
+  const messageTimerRef = useRef(null);
   const [showConfig, setShowConfig] = useState(false);
   const [brandSearchText, setBrandSearchText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -177,12 +178,35 @@ export default function KeywordsPage() {
   const [selectedFilterChannels, setSelectedFilterChannels] = useState([]); // [] = all
   const [filterOpen, setFilterOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const showMessage = useCallback((text, type = 'info') => {
-    setResultMessage({ type, text });
+  const clearMessageTimer = useCallback(() => {
+    if (messageTimerRef.current) {
+      clearTimeout(messageTimerRef.current);
+      messageTimerRef.current = null;
+    }
   }, []);
+
   const clearResultMessage = useCallback(() => {
+    clearMessageTimer();
     setResultMessage({ type: null, text: '' });
-  }, []);
+  }, [clearMessageTimer]);
+
+  const showMessage = useCallback(
+    (text, type = 'info') => {
+      clearMessageTimer();
+      setResultMessage({ type, text });
+      messageTimerRef.current = setTimeout(() => {
+        setResultMessage({ type: null, text: '' });
+        messageTimerRef.current = null;
+      }, 5000);
+    },
+    [clearMessageTimer],
+  );
+
+  useEffect(() => {
+    return () => {
+      clearMessageTimer();
+    };
+  }, [clearMessageTimer]);
 
   // Configuration state
   const [configKeywords, setConfigKeywords] = useState('');

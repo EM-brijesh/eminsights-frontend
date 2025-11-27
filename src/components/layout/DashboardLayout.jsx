@@ -92,7 +92,8 @@ export default function DashboardLayout({ children }) {
       title: 'Reports',
       icon: FileText,
       href: '/reports',
-      active: pathname?.startsWith('/collection/')
+      active: pathname?.startsWith('/collection/'),
+      disabled: true
     }
   ];
 
@@ -131,21 +132,46 @@ export default function DashboardLayout({ children }) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-6 px-2 space-y-6 flex flex-col items-center">
-          {navigationItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.title}
-              className={`flex flex-col items-center justify-center w-full py-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
-                item.active
-                  ? 'bg-white text-black'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
-            >
-              <item.icon className={`w-6 h-6 flex-shrink-0 ${item.active ? 'text-black' : 'text-gray-300'}`} />
-            <span className={`text-xs mt-2 font-medium ${item.active ? 'text-black' : 'text-gray-300'}`}>{item.title}</span>
-            </Link>
-          ))}
+          {navigationItems.map((item) => {
+            const content = (
+              <>
+                <item.icon className={`w-6 h-6 flex-shrink-0 ${item.active ? 'text-black' : 'text-gray-300'}`} />
+                <span
+                  className={`text-xs mt-2 font-medium ${
+                    item.active ? 'text-black' : 'text-gray-300'
+                  }`}
+                >
+                  {item.title}
+                </span>
+              </>
+            );
+
+            if (item.disabled) {
+              return (
+                <div
+                  key={item.title}
+                  title={`${item.title} (coming soon)`}
+                  className="flex flex-col items-center justify-center w-full py-3 rounded-lg text-gray-500 cursor-not-allowed opacity-50"
+                  aria-disabled="true"
+                >
+                  {content}
+                </div>
+              );
+            }
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.title}
+                className={`flex flex-col items-center justify-center w-full py-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
+                  item.active ? 'bg-white text-black' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                {content}
+              </Link>
+            );
+          })}
 
           {/* Settings Button with Dropdown */}
           <div className="w-full">

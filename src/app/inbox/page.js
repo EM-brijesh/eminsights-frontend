@@ -83,6 +83,21 @@ const makeGroupId = (brandName, group) => {
   return `${brandKey}::${groupKey}`;
 };
 
+const splitKeywordCompoundId = (compoundId) => {
+  if (!compoundId || typeof compoundId !== 'string') {
+    return { groupId: '', keywordValue: '' };
+  }
+  const delimiter = '::';
+  const lastIndex = compoundId.lastIndexOf(delimiter);
+  if (lastIndex === -1) {
+    return { groupId: '', keywordValue: compoundId };
+  }
+  return {
+    groupId: compoundId.slice(0, lastIndex),
+    keywordValue: compoundId.slice(lastIndex + delimiter.length),
+  };
+};
+
 const getPostKeyword = (post) => {
   const keyword =
     post?.keyword ||
@@ -1354,9 +1369,8 @@ export default function InboxPage() {
   useEffect(() => {
     setSelectedKeywordsFilter((prev) => {
       return prev.filter((compoundId) => {
-        const parts = compoundId.split('::');
-        if (parts.length !== 2) return false;
-        const keywordValue = parts[1];
+        const { keywordValue } = splitKeywordCompoundId(compoundId);
+        if (!keywordValue) return false;
         return visibleKeywordValues.has(keywordValue);
       });
     });
@@ -1429,11 +1443,8 @@ export default function InboxPage() {
   // Handler for toggling individual keywords
   const handleToggleKeyword = useCallback((keywordId) => {
     if (!keywordId || typeof keywordId !== 'string') return;
-    
-    const parts = keywordId.split('::');
-    if (parts.length !== 2) return;
-    const [groupId, keywordValue] = parts;
-    
+
+    const { groupId, keywordValue } = splitKeywordCompoundId(keywordId);
     if (!groupId || !keywordValue) return;
 
     // Use functional update to ensure we have the latest state
@@ -1443,10 +1454,9 @@ export default function InboxPage() {
         // Exact match first
         if (kw === keywordId) return true;
         // Also check if format matches (handle any edge cases)
-        const kwParts = kw.split('::');
-        if (kwParts.length === 2) {
-          const [kwGroupId, kwValue] = kwParts;
-          return kwGroupId === groupId && (kwValue || '').toLowerCase().trim() === (keywordValue || '').toLowerCase().trim();
+        const { groupId: kwGroupId, keywordValue: kwValue } = splitKeywordCompoundId(kw);
+        if (kwGroupId && kwValue) {
+          return kwGroupId === groupId && kwValue === keywordValue;
         }
         return false;
       });
@@ -1455,11 +1465,10 @@ export default function InboxPage() {
         // Remove the keyword - filter out exact match and any format variations
         const newKeywords = prev.filter((kw) => {
           if (kw === keywordId) return false; // Exact match
-          const kwParts = kw.split('::');
-          if (kwParts.length === 2) {
-            const [kwGroupId, kwValue] = kwParts;
+          const { groupId: kwGroupId, keywordValue: kwValue } = splitKeywordCompoundId(kw);
+          if (kwGroupId && kwValue) {
             // Don't remove if it's a different keyword (even if same group)
-            return !(kwGroupId === groupId && (kwValue || '').toLowerCase().trim() === (keywordValue || '').toLowerCase().trim());
+            return !(kwGroupId === groupId && kwValue === keywordValue);
           }
           return true; // Keep invalid formats
         });
@@ -1542,10 +1551,8 @@ export default function InboxPage() {
         selectedKeywordsFilter.length === 0
           ? true
           : (keywordValue && selectedKeywordsFilter.some((compoundId) => {
-              // Extract keyword value from compound ID (groupId::keywordValue)
-              const parts = compoundId.split('::');
-              if (parts.length !== 2) return false;
-              return parts[1] === keywordValue;
+              const { keywordValue: compoundKeyword } = splitKeywordCompoundId(compoundId);
+              return compoundKeyword === keywordValue;
             }));
 
       if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel || !matchesKeyword) return false;

@@ -54,6 +54,27 @@ const PLATFORM_OPTIONS = [
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v'];
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
+const DEFAULT_DURATION = '2';
+const DEFAULT_POSTS_LIMIT = 100;
+const EXTENDED_POSTS_LIMIT = 1000;
+
+const createDefaultTimeRange = () => ({
+  from: { h: '12', m: '00', ampm: 'AM' },
+  to: { h: '11', m: '59', ampm: 'PM' },
+});
+
+const isDefaultTimeRange = (range) => {
+  if (!range) return false;
+  return (
+    range.from?.h === '12' &&
+    range.from?.m === '00' &&
+    range.from?.ampm === 'AM' &&
+    range.to?.h === '11' &&
+    range.to?.m === '59' &&
+    range.to?.ampm === 'PM'
+  );
+};
+
 const normalizeName = (value) => (value || '').toString().trim();
 
 const makeGroupId = (brandName, group) => {
@@ -636,6 +657,11 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
+  const handleReset = () => {
+    onChange(DEFAULT_DURATION);
+    onTimeChange(createDefaultTimeRange());
+  };
+
   return (
       <div className="relative duration-picker">
       <button
@@ -651,6 +677,16 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
 
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-[320px] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
+          <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-widest text-gray-500">
+            <span>Duration Presets</span>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-indigo-300 transition hover:text-indigo-100"
+            >
+              Reset
+            </button>
+          </div>
           <ul className="space-y-1 text-sm mb-3">
             {DURATION_PRESETS.map((option) => (
               <li key={option.value}>
@@ -933,11 +969,8 @@ export default function InboxPage() {
   const [posts, setPosts] = useState([]);
   const [brands, setBrands] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
-  const [duration, setDuration] = useState('2');
-  const [timeRange, setTimeRange] = useState({
-    from: { h: '12', m: '00', ampm: 'AM' },
-    to: { h: '11', m: '59', ampm: 'PM' },
-  });
+  const [duration, setDuration] = useState(DEFAULT_DURATION);
+  const [timeRange, setTimeRange] = useState(() => createDefaultTimeRange());
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [error, setError] = useState('');
@@ -954,11 +987,56 @@ export default function InboxPage() {
   const [selectedKeywordGroups, setSelectedKeywordGroups] = useState([]);
   const [selectedKeywordsFilter, setSelectedKeywordsFilter] = useState([]);
   const [expandedKeywordGroups, setExpandedKeywordGroups] = useState({});
+  const [postsLimit, setPostsLimit] = useState(DEFAULT_POSTS_LIMIT);
 
   // Refs for race condition prevention and memory leak protection
   const fetchDataCallIdRef = useRef(0);
   const brandActivityCallIdRef = useRef(0);
   const isMountedRef = useRef(true);
+  const freqMessageTimerRef = useRef(null);
+  const errorMessageTimerRef = useRef(null);
+
+  const clearFreqMessageTimer = useCallback(() => {
+    if (freqMessageTimerRef.current) {
+      clearTimeout(freqMessageTimerRef.current);
+      freqMessageTimerRef.current = null;
+    }
+  }, []);
+
+  const clearErrorMessageTimer = useCallback(() => {
+    if (errorMessageTimerRef.current) {
+      clearTimeout(errorMessageTimerRef.current);
+      errorMessageTimerRef.current = null;
+    }
+  }, []);
+
+  const showFreqMessage = useCallback(
+    (message) => {
+      clearFreqMessageTimer();
+      setFreqMessage(message || '');
+      if (message) {
+        freqMessageTimerRef.current = setTimeout(() => {
+          setFreqMessage('');
+          freqMessageTimerRef.current = null;
+        }, 5000);
+      }
+    },
+    [clearFreqMessageTimer],
+  );
+
+  const showErrorMessage = useCallback(
+    (message) => {
+      clearErrorMessageTimer();
+      setError(message || '');
+      if (message) {
+        errorMessageTimerRef.current = setTimeout(() => {
+          setError('');
+          errorMessageTimerRef.current = null;
+        }, 5000);
+      }
+    },
+    [clearErrorMessageTimer],
+  );
 
   // Track component mount/unmount for memory leak prevention
   useEffect(() => {
@@ -968,8 +1046,10 @@ export default function InboxPage() {
       // Increment call IDs to invalidate any ongoing fetches
       fetchDataCallIdRef.current++;
       brandActivityCallIdRef.current++;
+      clearFreqMessageTimer();
+      clearErrorMessageTimer();
     };
-  }, []);
+  }, [clearErrorMessageTimer, clearFreqMessageTimer]);
 
   // Close channel menu when clicking outside
   useEffect(() => {
@@ -1011,7 +1091,7 @@ export default function InboxPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        setError('');
+        showErrorMessage('');
 
         // Determine role with robust fallback
         let role = user?.role;
@@ -1090,7 +1170,7 @@ export default function InboxPage() {
         if (brandNames.length > 0) {
           if (!usedAdminAll && role !== 'admin') {
             try {
-              const postRes = await api.data.userPosts({ email: user.email, limit: 200, sort: 'desc' });
+              const postRes = await api.data.userPosts({ email: user.email, sort: 'desc', limit: postsLimit });
 
               if (currentCallId !== fetchDataCallIdRef.current || !isMountedRef.current) {
                 return;
@@ -1109,7 +1189,7 @@ export default function InboxPage() {
             const perBrandResponses = await Promise.allSettled(
               brandNames.map(async (brandName) => {
                 try {
-                  const res = await api.dashboard.getPosts({ brandName, limit: 100, sort: 'desc' });
+                  const res = await api.dashboard.getPosts({ brandName, sort: 'desc', limit: postsLimit });
                   const postsForBrand = Array.isArray(res?.data) ? res.data : [];
                   return postsForBrand.map((post) => {
                     const brand = post?.brand || { brandName };
@@ -1154,7 +1234,7 @@ export default function InboxPage() {
         if (process.env.NODE_ENV !== 'production') {
           console.error('Failed to load inbox data', err);
         }
-        setError(err.message || 'Failed to load inbox data.');
+        showErrorMessage(err.message || 'Failed to load inbox data.');
       } finally {
         // Only update loading if still current
         if (currentCallId === fetchDataCallIdRef.current && isMountedRef.current) {
@@ -1164,7 +1244,7 @@ export default function InboxPage() {
     };
 
     fetchData();
-  }, [loadings, router, user?.email, reloadKey]);
+  }, [loadings, router, user?.email, reloadKey, postsLimit]);
 
   // If user switches to Brand Activity and we have brands but no posts yet,
   // try a per-brand fetch to populate the list.
@@ -1184,7 +1264,7 @@ export default function InboxPage() {
         const perBrandResponses = await Promise.allSettled(
           brands.map(async (brandName) => {
             try {
-              const res = await api.dashboard.getPosts({ brandName, limit: 100, sort: 'desc' });
+              const res = await api.dashboard.getPosts({ brandName, sort: 'desc', limit: postsLimit });
               const items = Array.isArray(res?.data) ? res.data : [];
               return items.map((post) => {
                 const brand = post?.brand || { brandName };
@@ -1225,7 +1305,17 @@ export default function InboxPage() {
     };
 
     loadIfNeeded();
-  }, [activeTab, brands, posts.length]);
+  }, [activeTab, brands, posts.length, postsLimit]);
+
+  useEffect(() => {
+    const searchActive = Boolean(searchTerm.trim());
+    const durationChanged = duration !== DEFAULT_DURATION;
+    const timeRangeChanged = !isDefaultTimeRange(timeRange);
+
+    if ((searchActive || durationChanged || timeRangeChanged) && postsLimit !== EXTENDED_POSTS_LIMIT) {
+      setPostsLimit(EXTENDED_POSTS_LIMIT);
+    }
+  }, [searchTerm, duration, timeRange, postsLimit]);
 
 
   const visibleBrandDetails = useMemo(() => {
@@ -1437,12 +1527,17 @@ export default function InboxPage() {
       const createdAt = post?.createdAt ? new Date(post.createdAt) : post?.fetchedAt ? new Date(post.fetchedAt) : null;
       const matchesDate = createdAt ? (createdAt >= lower && createdAt <= upper) : true;
       const text = `${post?.content?.text || ''} ${post?.content?.description || ''}`.toLowerCase();
-      const matchesSearch = searchTerm.trim()
-        ? text.includes(searchTerm.trim().toLowerCase()) || (brandName || '').toLowerCase().includes(searchTerm.trim().toLowerCase())
+      const authorValue = (post?.author?.name || post?.author?.id || '').toLowerCase();
+      const keywordValue = getPostKeyword(post);
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      const matchesSearch = normalizedSearch
+        ? text.includes(normalizedSearch) ||
+          authorValue.includes(normalizedSearch) ||
+          (brandName || '').toLowerCase().includes(normalizedSearch) ||
+          (keywordValue || '').includes(normalizedSearch)
         : true;
       const platformValue = String(post?.platform || '').toLowerCase();
       const matchesChannel = !selectedChannels.length || selectedChannels.includes(platformValue);
-      const keywordValue = getPostKeyword(post);
       const matchesKeyword =
         selectedKeywordsFilter.length === 0
           ? true
@@ -1549,8 +1644,8 @@ export default function InboxPage() {
 
                 try {
                   setManualRefreshLoading(true);
-                  setFreqMessage('Refreshing data…');
-                  setError('');
+                  showFreqMessage('Refreshing data…');
+                  showErrorMessage('');
 
                   const targets = selectedBrands.length ? selectedBrands : brands;
 
@@ -1558,7 +1653,6 @@ export default function InboxPage() {
                     // No brands selected, fetch all user data
                     await api.data.getData({
                       email: user?.email,
-                      limit: 100
                     });
                   } else {
                     // Fetch data for each brand using allSettled
@@ -1567,7 +1661,6 @@ export default function InboxPage() {
                         api.data.getData({
                           email: user?.email,
                           brandName,
-                          limit: 100
                         })
                       )
                     );
@@ -1580,10 +1673,10 @@ export default function InboxPage() {
                   }
 
                   setReloadKey((k) => k + 1);
-                  setFreqMessage('Latest monitoring data fetched.');
+                  showFreqMessage('Latest monitoring data fetched.');
                 } catch (err) {
-                  setFreqMessage(err?.message || 'Refresh failed');
-                  setError(err?.message || 'Refresh failed');
+                  showFreqMessage(err?.message || 'Refresh failed');
+                  showErrorMessage(err?.message || 'Refresh failed');
                 } finally {
                   setManualRefreshLoading(false);
                 }
@@ -1673,13 +1766,13 @@ export default function InboxPage() {
 
                             try {
                               setSavingFreq(true);
-                              setFreqMessage('');
-                              setError('');
+                              showFreqMessage('');
+                              showErrorMessage('');
 
                               const targets = selectedBrands.length ? selectedBrands : brands;
 
                               if (targets.length === 0) {
-                                setFreqMessage('No brands available to configure');
+                              showFreqMessage('No brands available to configure');
                                 return;
                               }
 
@@ -1697,7 +1790,7 @@ export default function InboxPage() {
                                 }
                               }
 
-                              setFreqMessage(`Monitoring set to ${label.toLowerCase()}${selectedBrands.length ? '' : ' for all brands'}. Refreshing data…`);
+                              showFreqMessage(`Monitoring set to ${label.toLowerCase()}${selectedBrands.length ? '' : ' for all brands'}. Refreshing data…`);
 
                               // Re-run search for updated brands
                               try {
@@ -1705,7 +1798,6 @@ export default function InboxPage() {
                                 if (refreshTargets.length === 0) {
                                   await api.data.getData({
                                     email: user?.email,
-                                    limit: 100
                                   });
                                 } else {
                                   await Promise.allSettled(
@@ -1713,7 +1805,6 @@ export default function InboxPage() {
                                       api.data.getData({
                                         email: user?.email,
                                         brandName: b,
-                                        limit: 100
                                       })
                                     )
                                   );
@@ -1727,8 +1818,8 @@ export default function InboxPage() {
                               setReloadKey((k) => k + 1);
                               setIsFreqOpen(false);
                             } catch (e) {
-                              setFreqMessage(e?.message || 'Failed to update frequency');
-                              setError(e?.message || 'Failed to update frequency');
+                              showFreqMessage(e?.message || 'Failed to update frequency');
+                              showErrorMessage(e?.message || 'Failed to update frequency');
                             } finally {
                               setSavingFreq(false);
                             }

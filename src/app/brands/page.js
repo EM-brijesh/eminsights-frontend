@@ -490,16 +490,11 @@ export default function BrandsPage() {
   }, [assignedUsers, newBrand, fetchBrands, showActionBanner]);
 
   const handleDeleteBrand = useCallback(async (brandName) => {
-    console.log("🔥 handleDeleteBrand triggered with:", brandName);
+    console.log("handleDeleteBrand triggered with:", brandName);
 
     if (!brandName) return;
 
-    // find brand from current state
-    let brandToDelete = null;
-    setBrands((current) => {
-      brandToDelete = findBrandByName(current, brandName);
-      return current;
-    });
+    const brandToDelete = findBrandByName(brands, brandName);
 
     if (!brandToDelete) {
       showActionBanner(`Brand "${brandName}" not found. Please refresh the page.`, 'warning');
@@ -545,7 +540,7 @@ export default function BrandsPage() {
         console.error('Refetch after delete failed:', refetchErr);
       }
     }
-  }, [fetchBrands, showActionBanner]);
+  }, [brands, fetchBrands, showActionBanner]);
 
 
   const handleConfigureBrand = useCallback(async (e, brandName) => {

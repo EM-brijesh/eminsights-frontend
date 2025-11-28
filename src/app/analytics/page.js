@@ -22,71 +22,40 @@ const SENTIMENT_COLORS = {
   negative: '#ef4444'
 };
 
-// Sentiment Analysis using Backend API with Smart Caching
-const analyzeSentimentWithCaching = async (posts) => {
-  if (!posts || posts.length === 0) {
-    return [];
-  }
+const ANALYTICS_POST_LIMIT = 1000;
+
+const analyzeMissingSentiment = async (posts) => {
+  if (!posts?.length) return [];
 
   try {
-    // Check which posts already have sentiment
-    const status = await api.sentiment.check(posts);
-    
-    // Combine posts with existing sentiment and posts that need analysis
-    let allAnalyzedPosts = [...status.postsWithSentiment];
-    
-    // Only analyze posts that don't have sentiment
-    if (status.postsToAnalyze.length > 0) {
-      const analysisResult = await api.sentiment.analyze(status.postsToAnalyze);
-      allAnalyzedPosts = [...allAnalyzedPosts, ...analysisResult.data];
-      
-      // Save analyzed posts to database
+    const result = await api.sentiment.analyze(posts);
+    const analyzed = Array.isArray(result?.data) ? result.data : [];
+
+    if (analyzed.length > 0) {
       try {
-        await api.sentiment.save(analysisResult.data);
+        await api.sentiment.save(analyzed);
       } catch (saveError) {
-        console.error('Failed to save sentiment to DB:', saveError);
-        // Continue even if save fails
+        // Save failure is not critical - data is still analyzed
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('Fallback sentiment save failed:', saveError);
+        }
       }
     }
-    
-    // Map back to original posts order
-    const postMap = new Map();
-    allAnalyzedPosts.forEach(post => {
-      const id = post._id || post.id;
-      if (id) postMap.set(id.toString(), post);
-    });
-    
-    return posts.map(post => {
-      const id = post._id || post.id;
-      const analyzed = postMap.get(id?.toString());
-      const existingSentiment = post.sentiment;
-      const existingScore = typeof post.sentimentScore === 'number' ? post.sentimentScore : null;
 
-      if (analyzed) {
-        return {
-          ...post,
-          sentiment: analyzed.sentiment ?? existingSentiment ?? 'pending',
-          sentimentScore: typeof analyzed.sentimentScore === 'number'
-            ? analyzed.sentimentScore
-            : existingScore,
-          sentimentAnalyzedAt: analyzed.sentimentAnalyzedAt || post.sentimentAnalyzedAt
-        };
-      }
-
-      return {
-        ...post,
-        sentiment: existingSentiment ?? 'pending',
-        sentimentScore: existingScore
-      };
-    });
+    return analyzed;
   } catch (error) {
-    console.error('Sentiment analysis failed:', error);
-    // Return neutral sentiment on error
-    return posts.map(p => ({
-      ...p,
-      sentiment: p.sentiment ?? 'pending',
-      sentimentScore: typeof p.sentimentScore === 'number' ? p.sentimentScore : null
-    }));
+    // Handle request cancellation and other errors gracefully
+    // Don't throw - return empty array so UI can still display posts
+    if (error?.message?.includes('aborted') || error?.name === 'AbortError') {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Sentiment analysis request was cancelled');
+      }
+    } else {
+      // Only log non-cancellation errors
+      console.error('Fallback sentiment analysis failed:', error);
+    }
+    // Return empty array instead of throwing - allows UI to continue
+    return [];
   }
 };
 
@@ -106,6 +75,7 @@ export default function AnalyticsPage() {
   const [summaryData, setSummaryData] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
+  const [sentimentWarning, setSentimentWarning] = useState('');
 
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
 
@@ -187,8 +157,9 @@ export default function AnalyticsPage() {
     if (!brandName) return;
 
     setLoadingPosts(true);
+    setSentimentWarning('');
     try {
-      const params = { brandName, limit: 100, sort: 'desc' };
+      const params = { brandName, limit: ANALYTICS_POST_LIMIT, sort: 'desc' };
       const data = await api.dashboard.getPosts(params);
       const fetchedPosts = data.data || [];
       setPosts(fetchedPosts);
@@ -199,40 +170,73 @@ export default function AnalyticsPage() {
       });
 
       if (needsSentiment.length === 0) {
+        setSentimentWarning('');
         setAnalyzedPosts(fetchedPosts);
         return;
       }
 
+      setSentimentWarning('Analyzing sentiment for newly fetched posts…');
       setAnalyzingSentiment(true);
-      const analyzedSubset = await analyzeSentimentWithCaching(needsSentiment);
-      const analyzedMap = new Map();
-      analyzedSubset.forEach(post => {
-        const id = post._id || post.id;
-        if (id) analyzedMap.set(id.toString(), post);
-      });
+      try {
+        const analyzedSubset = await analyzeMissingSentiment(needsSentiment);
+        
+        // If analysis returned empty (due to error/cancellation), use original posts
+        if (!analyzedSubset || analyzedSubset.length === 0) {
+          setAnalyzedPosts(fetchedPosts);
+          setSentimentWarning('Sentiment analysis unavailable. Showing posts without sentiment data.');
+          return;
+        }
+        
+        const analyzedMap = new Map();
+        analyzedSubset.forEach(post => {
+          const id = post._id || post.id;
+          if (id) analyzedMap.set(id.toString(), post);
+        });
 
-      const mergedPosts = fetchedPosts.map(post => {
-        const id = post._id || post.id;
-        if (!id) return post;
-        const updated = analyzedMap.get(id.toString());
-        if (!updated) return post;
-        const existingScore = typeof post.sentimentScore === 'number' ? post.sentimentScore : null;
-        return {
-          ...post,
-          sentiment: updated.sentiment ?? post.sentiment ?? 'pending',
-          sentimentScore: typeof updated.sentimentScore === 'number'
-            ? updated.sentimentScore
-            : existingScore,
-          sentimentAnalyzedAt: updated.sentimentAnalyzedAt || post.sentimentAnalyzedAt,
-        };
-      });
-      setAnalyzedPosts(mergedPosts);
-      setAnalyzingSentiment(false);
+        const mergedPosts = fetchedPosts.map(post => {
+          const id = post._id || post.id;
+          if (!id) return post;
+          const updated = analyzedMap.get(id.toString());
+          if (!updated) return post;
+          const existingScore = typeof post.sentimentScore === 'number' ? post.sentimentScore : null;
+          return {
+            ...post,
+            sentiment: updated.sentiment ?? post.sentiment ?? 'pending',
+            sentimentScore: typeof updated.sentimentScore === 'number'
+              ? updated.sentimentScore
+              : existingScore,
+            sentimentAnalyzedAt: updated.sentimentAnalyzedAt || post.sentimentAnalyzedAt,
+          };
+        });
+
+        setAnalyzedPosts(mergedPosts);
+
+        const unresolved = mergedPosts.filter((post) => {
+          const hasScore = typeof post.sentimentScore === 'number';
+          return !post.sentiment || !hasScore;
+        });
+        setSentimentWarning(
+          unresolved.length > 0
+            ? 'Some posts still lack sentiment data. Please refresh later to retry.'
+            : ''
+        );
+      } catch (analysisErr) {
+        // This catch block should rarely be hit now since analyzeMissingSentiment doesn't throw
+        // But keep it as a safety net
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Unexpected error in sentiment analysis:', analysisErr);
+        }
+        setSentimentWarning('Could not analyze some posts. Showing available data.');
+        setAnalyzedPosts(fetchedPosts);
+      } finally {
+        setAnalyzingSentiment(false);
+      }
     } catch (err) {
       console.error('Failed to load posts:', err);
       setPosts([]);
       setAnalyzedPosts([]);
       setAnalyzingSentiment(false);
+      setSentimentWarning('Failed to load sentiment data. Please retry.');
     } finally {
       setLoadingPosts(false);
     }
@@ -660,6 +664,12 @@ export default function AnalyticsPage() {
             {analyzingSentiment ? 'Analyzing...' : 'Refresh'}
           </Button>
         </div>
+
+        {sentimentWarning && (
+          <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            {sentimentWarning}
+          </div>
+        )}
 
         {/* Filters */}
         <Card className="bg-black border-white/10 mb-6">

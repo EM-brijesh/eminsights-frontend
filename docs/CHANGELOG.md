@@ -1,3 +1,10 @@
+## 2025-11-27 - Brand Delete Button Fix
+
+- Fix: `src/app/brands/page.js` now reads the latest brands state directly when deleting instead of relying on a functional `setState` noop. The previous implementation read the value before React executed the setter callback, so Delete always aborted with “Brand not found” even though the modal showed the brand.
+- UX: Admins can once again remove brands from the edit modal without refreshing the page or seeing false-warning banners.
+
+Impact: Brand deletions succeed immediately and the UI reflects the removal without confusing warnings, restoring the intended management workflow for admins.
+
 ## 2025-11-25 - Sentiment Accuracy Enhancements
 
 - Backend: Added `data/labeled-sentiment.json` and `scripts/sentiment-benchmark.js` to capture labeled examples and generate accuracy/confusion-matrix reports (`node scripts/sentiment-benchmark.js --limit=50 --tag=pre-tuning` now emits JSON/CSV summaries plus changelog-ready metrics).

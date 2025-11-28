@@ -1164,75 +1164,81 @@ export default function BrandsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-300">
-                        {/* Keywords/Topics count with accessible tooltip */}
+                        {/* Keywords/Topics count with compact transparent tooltip */}
                         <div
-                          className="relative inline-block group"
+                          className="relative inline-flex items-center group focus-within:ring-1 focus-within:ring-white/40 rounded-md"
                           tabIndex={0}
                           aria-describedby={`keywords-tooltip-${brand._id}`}
                         >
                           <span
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-white border border-white/40"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/5 text-white border border-white/30 text-xs font-semibold shadow-inner"
                             title={(() => {
                               if (!Array.isArray(brand.keywordGroups) || brand.keywordGroups.length === 0) {
-                                return "No keyword groups";
+                                return 'No keyword groups';
                               }
-
-                              // Show only group names inside title
                               const names = brand.keywordGroups
-                                .map(g => g.groupName || g.name || "Unnamed Group")
+                                .map(g => g.groupName || g.name || 'Unnamed Group')
                                 .filter(Boolean);
-
                               return (
-                                names.slice(0, 5).join(", ") +
-                                (names.length > 5 ? ` and ${names.length - 5} more` : "")
+                                names.slice(0, 5).join(', ') +
+                                (names.length > 5 ? ` and ${names.length - 5} more` : '')
                               );
                             })()}
                           >
                             {Array.isArray(brand.keywordGroups) ? brand.keywordGroups.length : 0}
                           </span>
 
-
                           <div
                             id={`keywords-tooltip-${brand._id}`}
                             role="tooltip"
-                            className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-150 transform -translate-y-1 group-hover:translate-y-0 group-focus:translate-y-0 absolute left-1/2 -translate-x-1/2 mt-2 w-72 max-w-[80vw] bg-gray-900 border border-white/10 text-sm text-gray-200 rounded shadow-lg p-3 z-20"
+                            className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition duration-150 absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20"
                             style={{ pointerEvents: 'auto' }}
                           >
-                            {(() => {
-                              if (!Array.isArray(brand.keywordGroups) || brand.keywordGroups.length === 0) {
+                            <div className="w-56 max-w-[70vw] bg-black/60 border border-white/10 rounded-xl backdrop-blur-md shadow-xl p-3">
+                              {(() => {
+                                if (!Array.isArray(brand.keywordGroups) || brand.keywordGroups.length === 0) {
+                                  return (
+                                    <div className="text-xs text-gray-300 text-center">
+                                      No keyword groups configured yet.
+                                    </div>
+                                  );
+                                }
+
                                 return (
-                                  <div className="text-xs text-gray-400">
-                                    No keyword groups configured for this brand.
+                                  <div className="space-y-2 max-h-56 overflow-auto pr-1">
+                                    {brand.keywordGroups.map((group, index) => (
+                                      <div key={index} className="border border-white/5 rounded-lg p-2 bg-white/5">
+                                        <div className="text-xs font-semibold text-white mb-1 flex justify-between">
+                                          <span>{group.groupName || group.name || 'Unnamed Group'}</span>
+                                          <span className="text-[10px] text-gray-300">
+                                            {Array.isArray(group.keywords) ? group.keywords.length : 0}
+                                          </span>
+                                        </div>
+                                        {Array.isArray(group.keywords) && group.keywords.length > 0 ? (
+                                          <div className="flex flex-wrap gap-1">
+                                            {group.keywords.slice(0, 6).map((kw, i) => (
+                                              <span
+                                                key={i}
+                                                className="text-[10px] tracking-wide px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-gray-100"
+                                              >
+                                                {String(kw).trim()}
+                                              </span>
+                                            ))}
+                                            {group.keywords.length > 6 && (
+                                              <span className="text-[10px] text-gray-300">
+                                                +{group.keywords.length - 6} more
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="text-[11px] text-gray-400">No keywords</div>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 );
-                              }
-
-                              return (
-                                <div className="space-y-3 max-h-64 overflow-auto">
-                                  {brand.keywordGroups.map((group, index) => (
-                                    <div key={index} className="border-b border-white/10 pb-2 last:border-none">
-                                      <div className="text-xs font-semibold mb-1">
-                                        {group.groupName || group.name || "Unnamed Group"}
-                                        {" "}
-                                        ({Array.isArray(group.keywords) ? group.keywords.length : 0})
-                                      </div>
-
-                                      {Array.isArray(group.keywords) && group.keywords.length > 0 ? (
-                                        <ul className="space-y-0.5 pl-3">
-                                          {group.keywords.map((kw, i) => (
-                                            <li key={i} className="text-xs leading-snug break-words">
-                                              • {String(kw).trim()}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      ) : (
-                                        <div className="text-xs text-gray-400 pl-3">No keywords</div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })()}
+                              })()}
+                            </div>
                           </div>
                         </div>
                       </td>

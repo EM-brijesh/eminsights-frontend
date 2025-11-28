@@ -32,29 +32,28 @@ const DURATION_PRESETS = [
   { label: 'Last 7 Days', value: '7' },
   { label: 'Last 14 Days', value: '14' },
   { label: 'Last 30 Days', value: '30' },
-  { label: 'Last 60 Days', value: '60' },
-  { label: 'Last 90 Days', value: '90' },
 ];
 
 const TABS = [
-  { key: 'tickets', label: 'Tickets', icon: Inbox },
+//  { key: 'tickets', label: 'Tickets', icon: Inbox },
   { key: 'all', label: 'All Mentions', icon: ActivitySquare },
-  { key: 'user', label: 'User Activity', icon: Users },
-  { key: 'brand', label: 'Brand Activity', icon: ActivitySquare },
-  { key: 'actionable', label: 'Actionable', icon: CheckCircle2 },
-  { key: 'non-actionable', label: 'Non Actionable', icon: Circle },
+ // { key: 'user', label: 'User Activity', icon: Users },
+ // { key: 'brand', label: 'Brand Activity', icon: ActivitySquare },
+ // { key: 'actionable', label: 'Actionable', icon: CheckCircle2 },
+  //{ key: 'non-actionable', label: 'Non Actionable', icon: Circle },
 ];
 
 const PLATFORM_OPTIONS = [
   { value: 'twitter', label: 'X (Twitter)' },
   { value: 'youtube', label: 'YouTube' },
   { value: 'reddit', label: 'Reddit' },
+  { value: 'google', label: 'Google' },
 ];
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v'];
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
-const DEFAULT_DURATION = '2';
+const DEFAULT_DURATION = '1';
 const DEFAULT_POSTS_LIMIT = 100;
 const EXTENDED_POSTS_LIMIT = 1000;
 
@@ -242,7 +241,7 @@ function VideoModal({ modalContent, onClose }) {
       <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-black/90 p-4 shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white transition hover:border-white/40"
+          className="absolute right-2 top-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white transition hover:border-white/40"
         >
           Close
         </button>
@@ -565,10 +564,10 @@ function MultiSelect({
           : `${value.length} brands selected`;
 
   return (
-    <div className="relative brand-multi-select">
+    <div className="relative brand-multi-select w-full sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+        className="inline-flex w-full min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
       >
         <span className="flex flex-col items-start leading-tight">
           <span className="text-xs uppercase tracking-widest text-gray-400">{label}</span>
@@ -578,7 +577,7 @@ function MultiSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-40 mt-2 w-[min(90vw,720px)] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
+        <div className="absolute left-0 z-[200] mt-2 w-[min(90vw,720px)] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
           <div className="mb-3 flex items-center justify-between text-xs uppercase text-gray-500">
             <span>Select Brands</span>
             <button
@@ -678,10 +677,10 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
   };
 
   return (
-      <div className="relative duration-picker">
+      <div className="relative duration-picker w-full sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+        className="inline-flex w-full min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
       >
         <span className="flex flex-col items-start leading-tight">
           <span className="text-xs uppercase tracking-widest text-gray-400">Duration</span>
@@ -691,7 +690,7 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[320px] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
+        <div className="absolute right-0 z-[200] mt-2 w-[320px] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
           <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-widest text-gray-500">
             <span>Duration Presets</span>
             <button
@@ -1584,10 +1583,8 @@ export default function InboxPage() {
       <div className="relative z-10 mx-auto max-w-7xl px-6 py-10">
         <header className="mb-10 flex flex-col gap-4">
           <div>
-            <h1 className="text-4xl font-semibold tracking-tight text-white">Inbox</h1>
-            <p className="text-base text-gray-400">
-              Monitor brand mentions, collaborate with your team and triage conversations in real time.
-            </p>
+            <h1 className="text-4xl font-semibold tracking-tight text-white">INBOX</h1>
+            
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {TABS.map(({ key, label, icon: Icon }) => {
@@ -1615,8 +1612,8 @@ export default function InboxPage() {
           </div>
         </header>
 
-        <section className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/50 backdrop-blur-sm xl:flex-row xl:items-center xl:justify-between">
-      <div className="flex flex-wrap items-center gap-4 relative z-10">
+        <section className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/50 backdrop-blur-sm xl:flex-row xl:flex-wrap xl:items-start xl:justify-between">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-wrap items-center gap-4">
             <div className="flex flex-col gap-3">
               <MultiSelect
                 options={brands}
@@ -1633,17 +1630,17 @@ export default function InboxPage() {
               />
             </div>
             <DurationPicker value={duration} onChange={setDuration} timeRange={timeRange} onTimeChange={setTimeRange} />
-            <label className="flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">
+            <label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">
               <Search className="h-4 w-4 text-gray-400" />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search mentions, authors or keywords"
-                className="w-48 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-64"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-gray-500 sm:w-64 lg:w-72"
               />
             </label>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-1 flex-wrap items-center gap-3 justify-start xl:flex-none xl:justify-end">
             <button
               onClick={async () => {
                 // Guard: prevent multiple simultaneous refreshes
@@ -1838,15 +1835,8 @@ export default function InboxPage() {
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-2 px-2">
-                    <button
-                      onClick={() => { setIsFreqOpen(false); setIsFilterDrawerOpen(true); }}
-                      className="w-full rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300 hover:bg-white/5"
-                    >
-                      Advanced Filters…
-                    </button>
-                  </div>
-                </div>
+                 
+                </div> 
               )}
             </div>
           </div>

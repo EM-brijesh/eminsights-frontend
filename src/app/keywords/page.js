@@ -41,6 +41,91 @@ const formatPostDate = (value) => {
   }
 };
 
+const deriveGroupCreatedAt = (group) => {
+  if (!group) return null;
+  if (group.createdAt) return group.createdAt;
+  if (group.createdOn) return group.createdOn;
+
+  const rawId =
+    typeof group._id === 'string'
+      ? group._id
+      : group._id?.toString?.() || (typeof group.id === 'string' ? group.id : group.id?.toString?.());
+
+  if (!rawId || rawId.length < 8) {
+    return null;
+  }
+
+  try {
+    const timestamp = parseInt(rawId.substring(0, 8), 16) * 1000;
+    if (Number.isNaN(timestamp)) {
+      return null;
+    }
+    return new Date(timestamp).toISOString();
+  } catch {
+    return null;
+  }
+};
+
+const normalizeKeywordGroup = (group = {}, fallbackPlatforms = [], fallbackFrequency = '30m') => {
+  const derivedCreatedAt = deriveGroupCreatedAt(group);
+  const normalizedName = group.groupName || group.name || '';
+  const rawId = group._id || group.id || group.mongoId;
+  const stringifiedId = typeof rawId === 'string' ? rawId : rawId?.toString?.();
+  const resolvedId = stringifiedId || `${normalizedName || 'group'}-${Math.random().toString(36).slice(2, 7)}`;
+
+  return {
+    id: resolvedId,
+    mongoId: stringifiedId || null,
+    _id: stringifiedId || undefined,
+    name: group.name || group.groupName || '',
+    groupName: normalizedName,
+    keywords: Array.isArray(group.keywords) ? group.keywords : [],
+    includeKeywords: Array.isArray(group.includeKeywords) ? group.includeKeywords : [],
+    excludeKeywords: Array.isArray(group.excludeKeywords) ? group.excludeKeywords : [],
+    assignedUsers: Array.isArray(group.assignedUsers) ? group.assignedUsers : [],
+    platforms: Array.isArray(group.platforms) && group.platforms.length > 0 ? group.platforms : fallbackPlatforms,
+    countries: group.country ? [group.country] : Array.isArray(group.countries) ? group.countries : [],
+    languages: group.language ? [group.language] : Array.isArray(group.languages) ? group.languages : [],
+    frequency: group.frequency || fallbackFrequency,
+    paused: !!group.paused,
+    createdAt: derivedCreatedAt,
+    status: group.status || (group.paused ? 'paused' : 'running'),
+  };
+};
+
+const normalizeGroupsForBrand = (groups = [], fallbackPlatforms = [], fallbackFrequency = '30m') =>
+  (groups || []).map((group) => normalizeKeywordGroup(group, fallbackPlatforms, fallbackFrequency));
+
+const serializeGroupForBackend = (group, fallbackPlatforms = [], fallbackFrequency = '30m') => {
+  const normalized = normalizeKeywordGroup(group, fallbackPlatforms, fallbackFrequency);
+  const payload = {
+    _id: normalized.mongoId || undefined,
+    groupName: normalized.groupName || normalized.name || '',
+    name: normalized.groupName || normalized.name || '',
+    keywords: normalized.keywords,
+    includeKeywords: normalized.includeKeywords,
+    excludeKeywords: normalized.excludeKeywords,
+    assignedUsers: normalized.assignedUsers,
+    platforms: normalized.platforms,
+    country: normalized.countries[0],
+    language: normalized.languages[0],
+    frequency: normalized.frequency,
+    paused: normalized.paused,
+    status: normalized.paused ? 'paused' : 'running',
+  };
+
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === undefined) {
+      delete payload[key];
+    }
+  });
+
+  return payload;
+};
+
+const serializeGroupsForBackend = (groups, fallbackPlatforms = [], fallbackFrequency = '30m') =>
+  (groups || []).map((group) => serializeGroupForBackend(group, fallbackPlatforms, fallbackFrequency));
+
 // Platform icon component with tooltip
 const PlatformIcon = ({ platform, isSelected, onClick }) => {
   const icons = {
@@ -258,9 +343,11 @@ export default function KeywordsPage() {
   };
 
   // Combined persist that updates both state and localStorage
-  const persistGroups = (brand, groups) => {
-    setKeywordGroups(groups);
-    saveGroupsToLocalStorage(brand, groups);
+  const persistGroups = (brand, groups, fallbackPlatforms = [], fallbackFrequency = '30m') => {
+    const normalized = normalizeGroupsForBrand(groups, fallbackPlatforms, fallbackFrequency);
+    setKeywordGroups(normalized);
+    saveGroupsToLocalStorage(brand, normalized);
+    return normalized;
   };
 
   // Load user info once on mount
@@ -326,18 +413,7 @@ export default function KeywordsPage() {
     let groupsToUse = [];
 
     if (brand.keywordGroups && Array.isArray(brand.keywordGroups) && brand.keywordGroups.length > 0) {
-      groupsToUse = brand.keywordGroups.map((group) => ({
-        name: group.name || '',
-        keywords: Array.isArray(group.keywords) ? group.keywords : [],
-        includeKeywords: Array.isArray(group.includeKeywords) ? group.includeKeywords : [],
-        excludeKeywords: Array.isArray(group.excludeKeywords) ? group.excludeKeywords : [],
-        assignedUsers: Array.isArray(group.assignedUsers) ? group.assignedUsers : [],
-        platforms: Array.isArray(group.platforms) && group.platforms.length > 0 ? group.platforms : brand.platforms || [],
-        countries: group.country ? [group.country] : [],
-        languages: group.language ? [group.language] : [],
-        frequency: group.frequency || brand.frequency || '30m',
-        paused: !!group.paused,
-      }));
+      groupsToUse = normalizeGroupsForBrand(brand.keywordGroups, brand.platforms || [], brand.frequency || '30m');
       saveGroupsToLocalStorage(brand.brandName, groupsToUse);
     } else {
       try {
@@ -346,7 +422,7 @@ export default function KeywordsPage() {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            groupsToUse = parsed;
+            groupsToUse = normalizeGroupsForBrand(parsed, brand.platforms || [], brand.frequency || '30m');
           }
         }
       } catch (err) {
@@ -608,18 +684,7 @@ export default function KeywordsPage() {
 
       const backendGroups =
         Array.isArray(updatedBrand.keywordGroups) && updatedBrand.keywordGroups.length > 0
-          ? updatedBrand.keywordGroups.map((group) => ({
-            name: group.name || '',
-            keywords: Array.isArray(group.keywords) ? group.keywords : [],
-            includeKeywords: Array.isArray(group.includeKeywords) ? group.includeKeywords : [],
-            excludeKeywords: Array.isArray(group.excludeKeywords) ? group.excludeKeywords : [],
-            assignedUsers: Array.isArray(group.assignedUsers) ? group.assignedUsers : [],
-            platforms: Array.isArray(group.platforms) && group.platforms.length > 0 ? group.platforms : updatedBrand.platforms || [],
-            countries: group.country ? [group.country] : [],
-            languages: group.language ? [group.language] : [],
-            frequency: group.frequency || updatedBrand.frequency || '30m',
-            paused: !!group.paused,
-          }))
+          ? updatedBrand.keywordGroups.map((group) => normalizeKeywordGroup(group, updatedBrand.platforms || [], updatedBrand.frequency || '30m'))
           : [];
 
       setSelectedBrandData(updatedBrand);
@@ -739,10 +804,11 @@ export default function KeywordsPage() {
     const keywords = Array.isArray(g.keywords) ? g.keywords : [];
     const platforms = Array.isArray(g.platforms) && g.platforms.length > 0 ? g.platforms : selectedBrandData?.platforms || [];
     const assignedUsersForRow = Array.isArray(g.assignedUsers) ? g.assignedUsers : [];
+    const createdOn = g.createdAt || deriveGroupCreatedAt(g) || selectedBrandData?.updatedAt || null;
 
     return {
-      id: `${g.name || 'group'}-${i}`,
-      groupName: g.name || 'Unnamed Group',
+      id: g.id || `${g.name || 'group'}-${i}`,
+      groupName: g.groupName || g.name || 'Unnamed Group',
       keywords,
       query: keywords.length > 0 ? `(${keywords.join(' OR ')})` : '',
       channels: platforms,
@@ -750,7 +816,7 @@ export default function KeywordsPage() {
       countries: Array.isArray(g.countries) ? g.countries : [],
       languages: Array.isArray(g.languages) ? g.languages : [],
       paused: !!g.paused,
-      createdOn: selectedBrandData?.updatedAt || null,
+      createdOn,
       status: g.paused ? 'Paused' : 'Collecting data',
       assignedUsers: assignedUsersForRow,
     };
@@ -807,20 +873,13 @@ export default function KeywordsPage() {
 
     try {
       const updated = (selectedBrandData.keywords || []).filter((k) => !(row.keywords || []).includes(k));
-      const nextGroups = (keywordGroups || []).filter((g) => g.name !== row.groupName);
-
-      const keywordGroupsForBackend = nextGroups.map((g) => ({
-        name: g.name || '',
-        keywords: Array.isArray(g.keywords) ? g.keywords : [],
-        includeKeywords: Array.isArray(g.includeKeywords) ? g.includeKeywords : [],
-        excludeKeywords: Array.isArray(g.excludeKeywords) ? g.excludeKeywords : [],
-        assignedUsers: Array.isArray(g.assignedUsers) ? g.assignedUsers : [],
-        platforms: Array.isArray(g.platforms) ? g.platforms : [],
-        country: Array.isArray(g.countries) && g.countries.length > 0 ? g.countries[0] : g.country,
-        language: Array.isArray(g.languages) && g.languages.length > 0 ? g.languages[0] : g.language,
-        frequency: g.frequency,
-        paused: g.paused,
-      }));
+      const nextGroups = (keywordGroups || []).filter((g) => (g.groupName || g.name) !== row.groupName);
+      const normalizedNextGroups = normalizeGroupsForBrand(nextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
+      const keywordGroupsForBackend = serializeGroupsForBackend(
+        normalizedNextGroups,
+        getCurrentBrandPlatforms(),
+        selectedBrandData.frequency || '30m',
+      );
 
       await api.brands.configure({
         brandName: selectedBrand,
@@ -830,7 +889,7 @@ export default function KeywordsPage() {
         keywordGroups: keywordGroupsForBackend,
       });
 
-      persistGroups(selectedBrand, nextGroups);
+      persistGroups(selectedBrand, normalizedNextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
 
       await fetchBrands();
       showMessage('✅ Group deleted successfully', 'success');
@@ -890,7 +949,7 @@ export default function KeywordsPage() {
       // Update UI state
       setKeywordGroups((groups) =>
         groups.map((g) =>
-          g.groupName === row.groupName
+          (g.groupName || g.name) === row.groupName
             ? { ...g, paused: data.paused, status: data.status }
             : g
         )
@@ -913,35 +972,43 @@ export default function KeywordsPage() {
       const baseName = `${row.groupName} (copy)`;
       let newName = baseName;
       let counter = 2;
-      const names = new Set((keywordGroups || []).map((g) => g.name));
+      const names = new Set((keywordGroups || []).map((g) => g.groupName || g.name));
 
       while (names.has(newName)) {
         newName = `${baseName} ${counter++}`;
       }
 
+      const sourceGroup = (keywordGroups || []).find((g) => (g.groupName || g.name) === row.groupName);
+      const dupSource = sourceGroup
+        ? { ...sourceGroup }
+        : {
+            keywords: Array.isArray(row.keywords) ? [...row.keywords] : [],
+            includeKeywords: [],
+            excludeKeywords: [],
+            assignedUsers: [],
+            platforms: Array.isArray(row.platformKeys) ? [...row.platformKeys] : [],
+            countries: Array.isArray(row.countries) ? [...row.countries] : [],
+            languages: Array.isArray(row.languages) ? [...row.languages] : [],
+            paused: row.paused || false,
+          };
+
       const dup = {
+        ...dupSource,
+        id: `${newName}-${Date.now()}`,
+        mongoId: null,
+        _id: undefined,
         name: newName,
-        keywords: Array.isArray(row.keywords) ? [...row.keywords] : [],
-        platforms: Array.isArray(row.platformKeys) ? [...row.platformKeys] : [],
-        countries: Array.isArray(row.countries) ? [...row.countries] : [],
-        languages: Array.isArray(row.languages) ? [...row.languages] : [],
-        paused: row.paused || false,
+        groupName: newName,
+        createdAt: new Date().toISOString(),
       };
 
       const nextGroups = [...(keywordGroups || []), dup];
-
-      const keywordGroupsForBackend = nextGroups.map((g) => ({
-        name: g.name || '',
-        keywords: Array.isArray(g.keywords) ? g.keywords : [],
-        includeKeywords: Array.isArray(g.includeKeywords) ? g.includeKeywords : [],
-        excludeKeywords: Array.isArray(g.excludeKeywords) ? g.excludeKeywords : [],
-        assignedUsers: Array.isArray(g.assignedUsers) ? g.assignedUsers : [],
-        platforms: Array.isArray(g.platforms) ? g.platforms : [],
-        country: Array.isArray(g.countries) && g.countries.length > 0 ? g.countries[0] : g.country,
-        language: Array.isArray(g.languages) && g.languages.length > 0 ? g.languages[0] : g.language,
-        frequency: g.frequency,
-        paused: g.paused,
-      }));
+      const normalizedNextGroups = normalizeGroupsForBrand(nextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
+      const keywordGroupsForBackend = serializeGroupsForBackend(
+        normalizedNextGroups,
+        getCurrentBrandPlatforms(),
+        selectedBrandData.frequency || '30m',
+      );
 
       await api.brands.configure({
         brandName: selectedBrand,
@@ -951,7 +1018,7 @@ export default function KeywordsPage() {
         keywordGroups: keywordGroupsForBackend,
       });
 
-      persistGroups(selectedBrand, nextGroups);
+      persistGroups(selectedBrand, normalizedNextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
       showMessage('✅ Group duplicated successfully', 'success');
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') {

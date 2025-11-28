@@ -82,12 +82,12 @@ const axiosInstance = axios.create({
    to ANY endpoint except /add-keywordgrp
 ------------------------------------------------------------------ */
 axiosInstance.interceptors.request.use((config) => {
-  if (
-    config.data &&
-    typeof config.data === "object" &&
-    !config.url.includes("add-keywordgrp")
-  ) {
-    delete config.data.keywordGroups;
+  if (config.data && typeof config.data === "object") {
+    const allowKeywordGroupsEndpoints = ["/api/brands/configure", "/api/brands/keywordconfig"];
+    const allowsKeywordGroups = allowKeywordGroupsEndpoints.some((endpoint) => config.url?.includes(endpoint));
+    if (!allowsKeywordGroups) {
+      delete config.data.keywordGroups;
+    }
   }
   return config;
 });

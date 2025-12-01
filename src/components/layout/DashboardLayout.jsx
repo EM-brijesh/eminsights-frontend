@@ -89,7 +89,7 @@ export default function DashboardLayout({ children }) {
       active: pathname === '/analytics'
     },
     {
-      title: 'Reports',
+      title: '',
       icon: FileText,
       href: '/reports',
       active: pathname?.startsWith('/collection/'),

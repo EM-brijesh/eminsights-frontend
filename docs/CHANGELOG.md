@@ -1,3 +1,11 @@
+## 2025-11-29 - Sentiment Analysis Optimization
+
+- **Fix**: Reduced sentiment analysis chunk size from 50 to 10 in frontend (`src/app/analytics/page.js`) to prevent timeouts.
+- **Backend**: Enforced maximum limit of 15 posts per request in `/api/sentiment/analyze` to respect Gemini API free tier rate limits (15 RPM).
+- **Backend**: Reduced default batch size for `/api/sentiment/batch-analyze` to 5 for better stability.
+
+**Impact**: Eliminates HTTP timeouts during sentiment analysis and provides clearer error messages if limits are exceeded.
+
 ## 2025-11-27 - Brand Delete Button Fix
 
 - Fix: `src/app/brands/page.js` now reads the latest brands state directly when deleting instead of relying on a functional `setState` noop. The previous implementation read the value before React executed the setter callback, so Delete always aborted with “Brand not found” even though the modal showed the brand.

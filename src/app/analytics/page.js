@@ -23,33 +23,56 @@ const SENTIMENT_COLORS = {
 };
 
 const ANALYTICS_POST_LIMIT = 1000;
+const ANALYTICS_SENTIMENT_CHUNK_SIZE = 10;
+
+const buildSentimentRequestPayload = (post) => ({
+  _id: post._id || post.id,
+  platform: post.platform,
+  keyword: post.keyword,
+  brandName: post.brand?.brandName || post.brandName || post?.brand?.aiFriendlyName || 'unknown',
+  content: {
+    text:
+      post?.content?.text ||
+      post?.content?.description ||
+      post?.text ||
+      post?.summary ||
+      '',
+    title: post?.content?.title || post?.title || '',
+  },
+  sourceUrl: post.sourceUrl,
+  createdAt: post.createdAt,
+});
 
 const analyzeMissingSentiment = async (posts) => {
   if (!posts?.length) return [];
 
   try {
-    const result = await api.sentiment.analyze(posts);
-    const analyzed = Array.isArray(result?.data) ? result.data : [];
+    const analyzedResults = [];
+    for (let i = 0; i < posts.length; i += ANALYTICS_SENTIMENT_CHUNK_SIZE) {
+      const chunk = posts.slice(i, i + ANALYTICS_SENTIMENT_CHUNK_SIZE);
+      const payload = chunk.map((post) => buildSentimentRequestPayload(post));
 
-    if (analyzed.length > 0) {
-      try {
-        await api.sentiment.save(analyzed);
-      } catch (saveError) {
-        // Save failure is not critical - data is still analyzed
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('Fallback sentiment save failed:', saveError);
+      const result = await api.sentiment.analyze(payload);
+      const chunkAnalyzed = Array.isArray(result?.data) ? result.data : [];
+
+      if (chunkAnalyzed.length > 0) {
+        analyzedResults.push(...chunkAnalyzed);
+        try {
+          await api.sentiment.save(chunkAnalyzed);
+        } catch (saveError) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('Fallback sentiment save failed:', saveError);
+          }
         }
       }
     }
 
-    return analyzed;
+    return analyzedResults;
   } catch (error) {
     // Handle request cancellation and other errors gracefully
     // Don't throw - return empty array so UI can still display posts
     if (error?.message?.includes('aborted') || error?.name === 'AbortError') {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Sentiment analysis request was cancelled');
-      }
+      // Expected when a newer request supersedes the previous one; silently ignore.
     } else {
       // Only log non-cancellation errors
       console.error('Fallback sentiment analysis failed:', error);
@@ -179,14 +202,14 @@ export default function AnalyticsPage() {
       setAnalyzingSentiment(true);
       try {
         const analyzedSubset = await analyzeMissingSentiment(needsSentiment);
-        
+
         // If analysis returned empty (due to error/cancellation), use original posts
         if (!analyzedSubset || analyzedSubset.length === 0) {
           setAnalyzedPosts(fetchedPosts);
           setSentimentWarning('Sentiment analysis unavailable. Showing posts without sentiment data.');
           return;
         }
-        
+
         const analyzedMap = new Map();
         analyzedSubset.forEach(post => {
           const id = post._id || post.id;
@@ -435,26 +458,26 @@ export default function AnalyticsPage() {
     const sorted = [...combinedTimeline]
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(-14);
-    
+
     // Calculate moving averages
     const withMovingAverages = sorted.map((item, index) => {
       const window7 = sorted.slice(Math.max(0, index - 6), index + 1);
       const window14 = sorted.slice(Math.max(0, index - 13), index + 1);
-      
-      const avg7 = window7.length > 0 
-        ? window7.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window7.length 
+
+      const avg7 = window7.length > 0
+        ? window7.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window7.length
         : 0;
-      const avg14 = window14.length > 0 
-        ? window14.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window14.length 
+      const avg14 = window14.length > 0
+        ? window14.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window14.length
         : 0;
-      
+
       return {
         ...item,
         ma7: avg7,
         ma14: avg14
       };
     });
-    
+
     return withMovingAverages;
   }, [combinedTimeline]);
 
@@ -562,10 +585,10 @@ export default function AnalyticsPage() {
     overallSentimentScore === null
       ? "No scored sentiment yet"
       : gaugeScore >= 70
-      ? "Positive Overall Sentiment"
-      : gaugeScore >= 40
-      ? "Neutral Overall Sentiment"
-      : "Negative Overall Sentiment";
+        ? "Positive Overall Sentiment"
+        : gaugeScore >= 40
+          ? "Neutral Overall Sentiment"
+          : "Negative Overall Sentiment";
 
   // Radar chart data (sentiment by platform)
   const radarChartData = useMemo(() => {
@@ -590,7 +613,7 @@ export default function AnalyticsPage() {
       });
     }
 
-    const platforms = ['twitter', 'youtube', 'reddit'];
+    const platforms = ['twitter', 'youtube', 'reddit', 'google'];
     return platforms.map((platform) => {
       const platformPosts = filteredPosts.filter((p) => p.platform === platform);
       const total = platformPosts.length;
@@ -705,6 +728,7 @@ export default function AnalyticsPage() {
                   <option value="twitter">Twitter</option>
                   <option value="youtube">YouTube</option>
                   <option value="reddit">Reddit</option>
+                  <option value="google">Google</option>
                 </select>
               </div>
 
@@ -894,8 +918,8 @@ export default function AnalyticsPage() {
                           'negative': 'url(#gradientNegative)'
                         };
                         return (
-                          <Cell 
-                            key={`cell-${index}`} 
+                          <Cell
+                            key={`cell-${index}`}
                             fill={colorMap[entry.name.toLowerCase()] || SENTIMENT_COLORS[entry.name.toLowerCase()]}
                             stroke="#1f2937"
                             strokeWidth={2}
@@ -903,9 +927,9 @@ export default function AnalyticsPage() {
                         );
                       })}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1f2937',
                         border: '1px solid #374151',
                         borderRadius: '8px'
                       }}
@@ -934,20 +958,20 @@ export default function AnalyticsPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                    <XAxis 
-                      dataKey="name" 
-                      stroke="#9ca3af" 
+                    <XAxis
+                      dataKey="name"
+                      stroke="#9ca3af"
                       tick={{ fill: '#9ca3af' }}
                       axisLine={{ stroke: '#4b5563' }}
                     />
-                    <YAxis 
-                      stroke="#9ca3af" 
+                    <YAxis
+                      stroke="#9ca3af"
                       tick={{ fill: '#9ca3af' }}
                       axisLine={{ stroke: '#4b5563' }}
                     />
                     <Tooltip
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
+                      contentStyle={{
+                        backgroundColor: '#1f2937',
                         border: '1px solid #374151',
                         borderRadius: '8px',
                         padding: '12px'
@@ -956,9 +980,9 @@ export default function AnalyticsPage() {
                       formatter={(value, name) => [value, 'Posts']}
                       labelFormatter={(label) => `Platform: ${label}`}
                     />
-                    <Bar 
-                      dataKey="value" 
-                      fill="url(#gradientBar)" 
+                    <Bar
+                      dataKey="value"
+                      fill="url(#gradientBar)"
                       radius={[8, 8, 0, 0]}
                       animationDuration={800}
                       animationBegin={0}
@@ -1002,50 +1026,50 @@ export default function AnalyticsPage() {
                     contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
                   />
                   <Legend />
-                  <Area 
-                    type="monotone" 
-                    dataKey="positive" 
-                    stackId="1" 
-                    stroke="#10b981" 
+                  <Area
+                    type="monotone"
+                    dataKey="positive"
+                    stackId="1"
+                    stroke="#10b981"
                     strokeWidth={2}
-                    fillOpacity={1} 
+                    fillOpacity={1}
                     fill="url(#colorPositive)"
                     animationDuration={800}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="neutral" 
-                    stackId="1" 
-                    stroke="#f59e0b" 
+                  <Area
+                    type="monotone"
+                    dataKey="neutral"
+                    stackId="1"
+                    stroke="#f59e0b"
                     strokeWidth={2}
-                    fillOpacity={1} 
+                    fillOpacity={1}
                     fill="url(#colorNeutral)"
                     animationDuration={800}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="negative" 
-                    stackId="1" 
-                    stroke="#ef4444" 
+                  <Area
+                    type="monotone"
+                    dataKey="negative"
+                    stackId="1"
+                    stroke="#ef4444"
                     strokeWidth={2}
-                    fillOpacity={1} 
+                    fillOpacity={1}
                     fill="url(#colorNegative)"
                     animationDuration={800}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="ma7" 
-                    stroke="#60a5fa" 
+                  <Line
+                    type="monotone"
+                    dataKey="ma7"
+                    stroke="#60a5fa"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
                     name="7-Day MA"
                     legendType="line"
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="ma14" 
-                    stroke="#a78bfa" 
+                  <Line
+                    type="monotone"
+                    dataKey="ma14"
+                    stroke="#a78bfa"
                     strokeWidth={2}
                     strokeDasharray="3 3"
                     dot={false}
@@ -1112,21 +1136,21 @@ export default function AnalyticsPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                  <XAxis 
-                    type="number" 
-                    dataKey="sentimentScore" 
-                    name="Sentiment Score" 
+                  <XAxis
+                    type="number"
+                    dataKey="sentimentScore"
+                    name="Sentiment Score"
                     domain={[0, 1]}
-                    stroke="#9ca3af" 
+                    stroke="#9ca3af"
                     tick={{ fill: '#9ca3af' }}
                     axisLine={{ stroke: '#4b5563' }}
                     label={{ value: 'Sentiment Score', position: 'insideBottom', offset: -5, fill: '#9ca3af' }}
                   />
-                  <YAxis 
-                    type="number" 
-                    dataKey="engagement" 
-                    name="Engagement" 
-                    stroke="#9ca3af" 
+                  <YAxis
+                    type="number"
+                    dataKey="engagement"
+                    name="Engagement"
+                    stroke="#9ca3af"
                     tick={{ fill: '#9ca3af' }}
                     axisLine={{ stroke: '#4b5563' }}
                     label={{ value: 'Engagement (Likes + Comments + Shares)', angle: -90, position: 'insideLeft', fill: '#9ca3af' }}
@@ -1141,9 +1165,9 @@ export default function AnalyticsPage() {
                     }}
                     labelFormatter={(label) => `Platform: ${label}`}
                   />
-                  <Scatter 
-                    name="Posts" 
-                    data={engagementSentimentData} 
+                  <Scatter
+                    name="Posts"
+                    data={engagementSentimentData}
                     fill="#3b82f6"
                     fillOpacity={0.6}
                   />
@@ -1257,7 +1281,7 @@ export default function AnalyticsPage() {
                           <td className="p-3 font-medium">{item.keyword}</td>
                           <td className="p-3 text-center">
                             <div className="flex items-center justify-center">
-                              <div 
+                              <div
                                 className="h-6 rounded px-2 text-xs font-semibold flex items-center justify-center text-white"
                                 style={{
                                   backgroundColor: `rgba(16, 185, 129, ${0.3 + (item.positive / maxValue) * 0.7})`,
@@ -1270,7 +1294,7 @@ export default function AnalyticsPage() {
                           </td>
                           <td className="p-3 text-center">
                             <div className="flex items-center justify-center">
-                              <div 
+                              <div
                                 className="h-6 rounded px-2 text-xs font-semibold flex items-center justify-center text-white"
                                 style={{
                                   backgroundColor: `rgba(245, 158, 11, ${0.3 + (item.neutral / maxValue) * 0.7})`,
@@ -1283,7 +1307,7 @@ export default function AnalyticsPage() {
                           </td>
                           <td className="p-3 text-center">
                             <div className="flex items-center justify-center">
-                              <div 
+                              <div
                                 className="h-6 rounded px-2 text-xs font-semibold flex items-center justify-center text-white"
                                 style={{
                                   backgroundColor: `rgba(239, 68, 68, ${0.3 + (item.negative / maxValue) * 0.7})`,
@@ -1317,23 +1341,23 @@ export default function AnalyticsPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={keywordChartData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                  <XAxis 
-                    type="number" 
-                    stroke="#9ca3af" 
+                  <XAxis
+                    type="number"
+                    stroke="#9ca3af"
                     tick={{ fill: '#9ca3af' }}
                     axisLine={{ stroke: '#4b5563' }}
                   />
-                  <YAxis 
-                    type="category" 
-                    dataKey="name" 
-                    stroke="#9ca3af" 
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    stroke="#9ca3af"
                     width={120}
                     tick={{ fill: '#9ca3af', fontSize: 12 }}
                     axisLine={{ stroke: '#4b5563' }}
                   />
                   <Tooltip
-                    contentStyle={{ 
-                      backgroundColor: '#1f2937', 
+                    contentStyle={{
+                      backgroundColor: '#1f2937',
                       border: '1px solid #374151',
                       borderRadius: '8px',
                       padding: '12px'
@@ -1347,9 +1371,9 @@ export default function AnalyticsPage() {
                       <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.8} />
                     </linearGradient>
                   </defs>
-                  <Bar 
-                    dataKey="posts" 
-                    fill="url(#gradientKeyword)" 
+                  <Bar
+                    dataKey="posts"
+                    fill="url(#gradientKeyword)"
                     radius={[0, 8, 8, 0]}
                     animationDuration={800}
                     animationBegin={0}

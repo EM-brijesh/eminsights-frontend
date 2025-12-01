@@ -12,7 +12,6 @@ import { Inter } from 'next/font/google';
 import COUNTRIES from '@/lib/countries';
 
 
-
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] });
 
 const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google'];
@@ -807,6 +806,8 @@ export default function KeywordsPage() {
     const platforms = Array.isArray(g.platforms) && g.platforms.length > 0 ? g.platforms : selectedBrandData?.platforms || [];
     const assignedUsersForRow = Array.isArray(g.assignedUsers) ? g.assignedUsers : [];
     const createdOn = g.createdAt || deriveGroupCreatedAt(g) || selectedBrandData?.updatedAt || null;
+    const countryList = Array.isArray(g.countries) ? g.countries : g.country ? [g.country] : [];
+    const languageList = Array.isArray(g.languages) ? g.languages : g.language ? [g.language] : [];
 
     return {
       id: g.id || `${g.name || 'group'}-${i}`,
@@ -817,8 +818,8 @@ export default function KeywordsPage() {
       query: keywords.length > 0 ? `(${keywords.join(' OR ')})` : '',
       channels: platforms,
       platformKeys: platforms,
-      countries: Array.isArray(g.countries) ? g.countries : [],
-      languages: Array.isArray(g.languages) ? g.languages : [],
+      countries: countryList,
+      languages: languageList,
       paused: !!g.paused,
       createdOn,
       status: g.paused ? 'Paused' : 'Collecting data',
@@ -919,8 +920,8 @@ export default function KeywordsPage() {
     setNotKeywords(row.excludeKeywords || []);
     const platformsToUse = row.platformKeys && row.platformKeys.length ? row.platformKeys : (configPlatforms.length > 0 ? configPlatforms : selectedBrandData?.platforms || []);
     setConfigPlatforms(platformsToUse);
-    setCountries(row.countries || []);
-    setLanguages(row.languages || []);
+    setCountries(row.countries && row.countries.length ? row.countries : row.country ? [row.country] : []);
+    setLanguages(row.languages && row.languages.length ? row.languages : row.language ? [row.language] : []);
     setConfigFrequency(row.frequency || selectedBrandData?.frequency || '30m');
     setShowConfig(true);
   };
@@ -1430,9 +1431,7 @@ export default function KeywordsPage() {
                         <button className={`px-3 py-1.5 rounded-md text-sm ${queryTab === 'basic' ? 'bg-white text-black' : 'bg-gray-800 text-gray-300'}`} onClick={() => setQueryTab('basic')}>
                           Basic Query Builder
                         </button>
-                        <button className={`px-3 py-1.5 rounded-md text-sm ${queryTab === 'advanced' ? 'bg-white text-black' : 'bg-gray-800 text-gray-300'}`} onClick={() => setQueryTab('advanced')}>
-                          Advance Query Builder
-                        </button>
+                       
                       </div>
 
                       <div className="mb-3">

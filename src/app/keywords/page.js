@@ -5,7 +5,7 @@ import { Search, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import api from '@/lib/api';
+import api, { API_BASE_URL, getAuthToken } from '@/lib/api';
 import DottedBackground from '@/components/DottedBackground';
 import Image from 'next/image';
 import { Inter } from 'next/font/google';
@@ -802,6 +802,8 @@ export default function KeywordsPage() {
 
   const keywordRows = groupsForDisplay.map((g, i) => {
     const keywords = Array.isArray(g.keywords) ? g.keywords : [];
+    const includeKeywords = Array.isArray(g.includeKeywords) ? g.includeKeywords : [];
+    const excludeKeywords = Array.isArray(g.excludeKeywords) ? g.excludeKeywords : [];
     const platforms = Array.isArray(g.platforms) && g.platforms.length > 0 ? g.platforms : selectedBrandData?.platforms || [];
     const assignedUsersForRow = Array.isArray(g.assignedUsers) ? g.assignedUsers : [];
     const createdOn = g.createdAt || deriveGroupCreatedAt(g) || selectedBrandData?.updatedAt || null;
@@ -810,6 +812,8 @@ export default function KeywordsPage() {
       id: g.id || `${g.name || 'group'}-${i}`,
       groupName: g.groupName || g.name || 'Unnamed Group',
       keywords,
+      includeKeywords,
+      excludeKeywords,
       query: keywords.length > 0 ? `(${keywords.join(' OR ')})` : '',
       channels: platforms,
       platformKeys: platforms,
@@ -911,8 +915,8 @@ export default function KeywordsPage() {
     setEditingGroup(editData);
     setGroupName(row.groupName);
     setAndKeywords(row.keywords || []);
-    setOrKeywords([]);
-    setNotKeywords([]);
+    setOrKeywords(row.includeKeywords || []);
+    setNotKeywords(row.excludeKeywords || []);
     const platformsToUse = row.platformKeys && row.platformKeys.length ? row.platformKeys : (configPlatforms.length > 0 ? configPlatforms : selectedBrandData?.platforms || []);
     setConfigPlatforms(platformsToUse);
     setCountries(row.countries || []);
@@ -930,9 +934,14 @@ export default function KeywordsPage() {
     try {
       const action = row.paused ? "start" : "pause";  // paused → start, running → pause
 
-      const res = await fetch("https://api.eminsights.in/api/search/group/toggle", {
+      const token = getAuthToken();
+
+      const res = await fetch(`${API_BASE_URL}/api/search/group/toggle`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           brandName: selectedBrand,
           groupName: row.groupName,
@@ -1212,12 +1221,51 @@ export default function KeywordsPage() {
                   <tr key={row.id} className="border-t border-gray-800 hover:bg-gray-800/40 even:bg-gray-900/40">
                     <td className="px-5 py-4 text-sm text-slate-100">{row.groupName}</td>
                     <td className="px-4 py-3 text-sm text-gray-300">
-                      <div className="flex flex-wrap gap-2">
-                        {(row.keywords || []).map((kw) => (
-                          <span key={kw} className="px-2.5 py-0.5 rounded-full bg-white/10 border border-white/30 text-white text-xs">
-                            {kw}
-                          </span>
-                        ))}
+                      <div className="space-y-2">
+                        {(row.keywords || []).length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">AND Keywords</p>
+                            <div className="flex flex-wrap gap-2">
+                              {(row.keywords || []).map((kw) => (
+                                <span key={`and-${kw}`} className="px-2.5 py-0.5 rounded-full bg-white/10 border border-white/30 text-white text-xs">
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(row.includeKeywords || []).length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">OR Keywords</p>
+                            <div className="flex flex-wrap gap-2">
+                              {(row.includeKeywords || []).map((kw) => (
+                                <span key={`or-${kw}`} className="px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-300/40 text-blue-100 text-xs">
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(row.excludeKeywords || []).length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">NOT Keywords</p>
+                            <div className="flex flex-wrap gap-2">
+                              {(row.excludeKeywords || []).map((kw) => (
+                                <span key={`not-${kw}`} className="px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-300/40 text-red-100 text-xs">
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(row.keywords || []).length === 0 &&
+                          (row.includeKeywords || []).length === 0 &&
+                          (row.excludeKeywords || []).length === 0 && (
+                            <p className="text-xs text-gray-500">No keywords configured</p>
+                          )}
                       </div>
                     </td>
                     <td className="px-5 py-3">

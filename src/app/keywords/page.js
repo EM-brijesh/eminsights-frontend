@@ -818,6 +818,7 @@ export default function KeywordsPage() {
       paused: !!g.paused,
       createdOn,
       status: g.paused ? 'Paused' : 'Collecting data',
+      frequency: g.frequency,
       assignedUsers: assignedUsersForRow,
     };
   });
@@ -916,6 +917,7 @@ export default function KeywordsPage() {
     setConfigPlatforms(platformsToUse);
     setCountries(row.countries || []);
     setLanguages(row.languages || []);
+    setConfigFrequency(row.frequency || selectedBrandData?.frequency || '30m');
     setShowConfig(true);
   };
 
@@ -982,15 +984,15 @@ export default function KeywordsPage() {
       const dupSource = sourceGroup
         ? { ...sourceGroup }
         : {
-            keywords: Array.isArray(row.keywords) ? [...row.keywords] : [],
-            includeKeywords: [],
-            excludeKeywords: [],
-            assignedUsers: [],
-            platforms: Array.isArray(row.platformKeys) ? [...row.platformKeys] : [],
-            countries: Array.isArray(row.countries) ? [...row.countries] : [],
-            languages: Array.isArray(row.languages) ? [...row.languages] : [],
-            paused: row.paused || false,
-          };
+          keywords: Array.isArray(row.keywords) ? [...row.keywords] : [],
+          includeKeywords: [],
+          excludeKeywords: [],
+          assignedUsers: [],
+          platforms: Array.isArray(row.platformKeys) ? [...row.platformKeys] : [],
+          countries: Array.isArray(row.countries) ? [...row.countries] : [],
+          languages: Array.isArray(row.languages) ? [...row.languages] : [],
+          paused: row.paused || false,
+        };
 
       const dup = {
         ...dupSource,
@@ -1115,13 +1117,7 @@ export default function KeywordsPage() {
                         ) : ch === 'twitter' ? (
                           <Image key={ch} src="/x-logo.svg" alt="X" width={14} height={14} />
                         ) : ch === 'reddit' ? (
-                          <Image key={ch} src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />
-                        ) : ch === 'facebook' ? (
-                          <Image key={ch} src="/facebook-logo.svg" alt="Facebook" width={16} height={16} />
-                        ) : ch === 'instagram' ? (
-                          <Image key={ch} src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />
-                        ) : ch === 'google' ? (
-                          <Image key={ch} src="/google-logo.svg" alt="Google" width={16} height={16} />
+                          <><Image key={ch} src="/reddit-logo.svg" alt="Reddit" width={16} height={16} /><Image key={ch} src="/google-logo.svg" alt="Google" width={16} height={16} /></>
                         ) : ch === 'quora' ? (
                           <Image key={ch} src="/quora-logo.svg" alt="Quora" width={16} height={16} />
                         ) : null
@@ -1140,9 +1136,9 @@ export default function KeywordsPage() {
                       { key: 'youtube', label: 'YouTube', src: '/youtube-logo.svg', wh: [16, 16] },
                       { key: 'twitter', label: 'X (Twitter)', src: '/x-logo.svg', wh: [14, 14] },
                       { key: 'reddit', label: 'Reddit', src: '/reddit-logo.svg', wh: [16, 16] },
-                      { key: 'facebook', label: 'Facebook', src: '/facebook-logo.svg', wh: [16, 16] },
-                      { key: 'instagram', label: 'Instagram', src: '/instagram-logo.svg', wh: [16, 16] },
-                      { key: 'quora', label: 'Quora', src: '/quora-logo.svg', wh: [16, 16] },
+                      //{ key: 'facebook', label: 'Facebook', src: '/facebook-logo.svg', wh: [16, 16] },
+                     // { key: 'instagram', label: 'Instagram', src: '/instagram-logo.svg', wh: [16, 16] },
+                     // { key: 'quora', label: 'Quora', src: '/quora-logo.svg', wh: [16, 16] },
                       { key: 'google', label: 'Google', src: '/google-logo.svg', wh: [16, 16] },
                     ].map((p) => (
                       <label key={p.key} className="flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-800 cursor-pointer">
@@ -1184,6 +1180,7 @@ export default function KeywordsPage() {
                   setConfigPlatforms([]);
                   setCountries([]);
                   setLanguages([]);
+                  setConfigFrequency(selectedBrandData?.frequency || '30m');
                   setShowConfig(true);
                 }}
                 className="bg-white text-black hover:bg-white/90 shadow"
@@ -1230,9 +1227,7 @@ export default function KeywordsPage() {
                             {plat === 'youtube' && <Image src="/youtube-logo.svg" alt="YouTube" width={16} height={16} />}
                             {plat === 'twitter' && <Image src="/x-logo.svg" alt="X" width={14} height={14} />}
                             {plat === 'reddit' && <Image src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />}
-                            {plat === 'facebook' && <Image src="/facebook-logo.svg" alt="Facebook" width={16} height={16} />}
-                            {plat === 'instagram' && <Image src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />}
-                            {plat === 'quora' && <Image src="/quora-logo.svg" alt="Quora" width={16} height={16} />}
+                            
                             {plat === 'google' && <Image src="/google-logo.svg" alt="Quora" width={16} height={16} />}
                           </span>
                         ))}
@@ -1292,6 +1287,25 @@ export default function KeywordsPage() {
                 <button className="text-gray-400 hover:text-white" onClick={() => { setShowConfig(false); setEditingGroup(null); }}>✕</button>
               </div>
               <div className="px-6 py-5">
+                {resultMessage.text && (
+                  <div
+                    className={`mb-4 rounded-lg border px-4 py-3 text-sm flex items-start justify-between gap-4 ${
+                      MESSAGE_VARIANTS[resultMessage.type] || MESSAGE_VARIANTS.info
+                    }`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <p className="whitespace-pre-line leading-5 flex-1">{resultMessage.text}</p>
+                    <button
+                      type="button"
+                      onClick={clearResultMessage}
+                      aria-label="Dismiss message"
+                      className="text-white/70 hover:text-white text-lg leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left Side */}
                   <div className="space-y-4">
@@ -1317,8 +1331,7 @@ export default function KeywordsPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {[
                           { key: 'twitter', title: 'Twitter', desc: 'Tweets, Replies, Mentions', logo: '/x-logo.svg', size: 16 },
-                          { key: 'facebook', title: 'Facebook', desc: 'Posts, Visitor Post', logo: '/facebook-logo.svg', size: 16 },
-                          { key: 'instagram', title: 'Instagram', desc: 'Posts only', logo: '/instagram-logo.svg', size: 16 },
+                          
                           { key: 'youtube', title: 'YouTube', desc: 'Video post only', logo: '/youtube-logo.svg', size: 18 },
                           { key: 'reddit', title: 'Reddit', desc: 'Communities & comments', logo: '/reddit-logo.svg', size: 18 },
                           { key: 'google', title: 'Google', desc: 'Web Search', logo: '/google-logo.svg', size: 16 },

@@ -11,7 +11,7 @@ import {
   PieChart, Pie, Cell,
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Area, AreaChart, ScatterChart, Scatter, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
+  Area, AreaChart
 } from 'recharts';
 
 // Chart colors
@@ -514,19 +514,6 @@ export default function AnalyticsPage() {
     }));
   }, [summaryUsable, summaryData, filteredPosts]);
 
-  // Engagement vs Sentiment data
-  const engagementSentimentData = useMemo(() => {
-    return filteredPosts
-      .filter(post => typeof post.sentimentScore === 'number' && post.metrics)
-      .map(post => ({
-        sentimentScore: post.sentimentScore,
-        engagement: (post.metrics?.likes || 0) + (post.metrics?.comments || 0) + (post.metrics?.shares || 0),
-        views: post.metrics?.views || 0,
-        platform: post.platform || 'unknown',
-        keyword: post.keyword || 'unknown'
-      }));
-  }, [filteredPosts]);
-
   // Keyword Sentiment Heatmap data
   const keywordSentimentHeatmapData = useMemo(() => {
     if (summaryUsable && Array.isArray(summaryData?.keywords) && summaryData.keywords.length > 0) {
@@ -564,74 +551,6 @@ export default function AnalyticsPage() {
         negative: sentiments.negative,
         total: sentiments.positive + sentiments.neutral + sentiments.negative,
       }));
-  }, [summaryUsable, summaryData, filteredPosts]);
-
-  // Overall sentiment score for gauge
-  const overallSentimentScore = useMemo(() => {
-    if (summaryUsable && summaryStats && typeof summaryStats.avgSentimentScore === 'number') {
-      return Math.round(summaryStats.avgSentimentScore * 100);
-    }
-    const scoredPosts = filteredPosts
-      .map(post => post.sentimentScore)
-      .filter((score) => typeof score === 'number');
-    if (scoredPosts.length === 0) return null;
-    const totalScore = scoredPosts.reduce((sum, score) => sum + score, 0);
-    return Math.round((totalScore / scoredPosts.length) * 100);
-  }, [summaryUsable, summaryStats, filteredPosts]);
-
-  const gaugeScore = overallSentimentScore ?? 0;
-  const gaugeColor = gaugeScore >= 70 ? "#10b981" : gaugeScore >= 40 ? "#f59e0b" : "#ef4444";
-  const gaugeStatus =
-    overallSentimentScore === null
-      ? "No scored sentiment yet"
-      : gaugeScore >= 70
-        ? "Positive Overall Sentiment"
-        : gaugeScore >= 40
-          ? "Neutral Overall Sentiment"
-          : "Negative Overall Sentiment";
-
-  // Radar chart data (sentiment by platform)
-  const radarChartData = useMemo(() => {
-    if (summaryUsable && Array.isArray(summaryData?.platforms) && summaryData.platforms.length > 0) {
-      return summaryData.platforms.map((entry) => {
-        const total = entry.total || 0;
-        const label = entry.platform || 'unknown';
-        if (total === 0) {
-          return {
-            platform: label.charAt(0).toUpperCase() + label.slice(1),
-            positive: 0,
-            neutral: 0,
-            negative: 0,
-          };
-        }
-        return {
-          platform: label.charAt(0).toUpperCase() + label.slice(1),
-          positive: (entry.positive || 0) / total * 100,
-          neutral: (entry.neutral || 0) / total * 100,
-          negative: (entry.negative || 0) / total * 100,
-        };
-      });
-    }
-
-    const platforms = ['twitter', 'youtube', 'reddit', 'google'];
-    return platforms.map((platform) => {
-      const platformPosts = filteredPosts.filter((p) => p.platform === platform);
-      const total = platformPosts.length;
-      if (total === 0) {
-        return {
-          platform: platform.charAt(0).toUpperCase() + platform.slice(1),
-          positive: 0,
-          neutral: 0,
-          negative: 0,
-        };
-      }
-      return {
-        platform: platform.charAt(0).toUpperCase() + platform.slice(1),
-        positive: (platformPosts.filter((p) => p.sentiment === 'positive').length / total) * 100,
-        neutral: (platformPosts.filter((p) => p.sentiment === 'neutral').length / total) * 100,
-        negative: (platformPosts.filter((p) => p.sentiment === 'negative').length / total) * 100,
-      };
-    });
   }, [summaryUsable, summaryData, filteredPosts]);
 
   const getSentimentIcon = (sentiment) => {
@@ -1126,134 +1045,6 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Engagement vs Sentiment */}
-        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
-          <CardHeader>
-            <CardTitle>Engagement vs Sentiment Correlation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {engagementSentimentData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                  <XAxis
-                    type="number"
-                    dataKey="sentimentScore"
-                    name="Sentiment Score"
-                    domain={[0, 1]}
-                    stroke="#9ca3af"
-                    tick={{ fill: '#9ca3af' }}
-                    axisLine={{ stroke: '#4b5563' }}
-                    label={{ value: 'Sentiment Score', position: 'insideBottom', offset: -5, fill: '#9ca3af' }}
-                  />
-                  <YAxis
-                    type="number"
-                    dataKey="engagement"
-                    name="Engagement"
-                    stroke="#9ca3af"
-                    tick={{ fill: '#9ca3af' }}
-                    axisLine={{ stroke: '#4b5563' }}
-                    label={{ value: 'Engagement (Likes + Comments + Shares)', angle: -90, position: 'insideLeft', fill: '#9ca3af' }}
-                  />
-                  <Tooltip
-                    cursor={{ strokeDasharray: '3 3' }}
-                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', padding: '12px' }}
-                    formatter={(value, name, props) => {
-                      if (name === 'sentimentScore') return [value.toFixed(2), 'Sentiment Score'];
-                      if (name === 'engagement') return [value, 'Engagement'];
-                      return [value, name];
-                    }}
-                    labelFormatter={(label) => `Platform: ${label}`}
-                  />
-                  <Scatter
-                    name="Posts"
-                    data={engagementSentimentData}
-                    fill="#3b82f6"
-                    fillOpacity={0.6}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-gray-400 text-center py-8">No data available</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Overall Sentiment Gauge */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle>Overall Sentiment Score</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="relative w-48 h-48">
-                  <svg className="transform -rotate-90" width="192" height="192">
-                    <circle
-                      cx="96"
-                      cy="96"
-                      r="80"
-                      stroke="#374151"
-                      strokeWidth="16"
-                      fill="none"
-                    />
-                    <circle
-                      cx="96"
-                      cy="96"
-                      r="80"
-                      stroke={gaugeColor}
-                      strokeWidth="16"
-                      fill="none"
-                      strokeDasharray={`${2 * Math.PI * 80}`}
-                      strokeDashoffset={`${2 * Math.PI * 80 * (1 - gaugeScore / 100)}`}
-                      strokeLinecap="round"
-                      style={{ transition: 'all 0.8s ease' }}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-5xl font-bold" style={{ color: gaugeColor }}>
-                        {overallSentimentScore ?? '--'}
-                      </div>
-                      <div className="text-sm text-gray-400 mt-1">out of 100</div>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-gray-400 text-sm mt-4 text-center">
-                  {gaugeStatus}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Radar Chart */}
-          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle>Sentiment by Platform (Radar View)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {radarChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadarChart data={radarChartData}>
-                    <PolarGrid stroke="#374151" />
-                    <PolarAngleAxis dataKey="platform" tick={{ fill: '#9ca3af', fontSize: 12 }} />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: '#9ca3af' }} />
-                    <Radar name="Positive" dataKey="positive" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
-                    <Radar name="Neutral" dataKey="neutral" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.6} />
-                    <Radar name="Negative" dataKey="negative" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
-                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', padding: '12px' }}
-                      formatter={(value) => [`${value.toFixed(1)}%`, 'Percentage']}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-gray-400 text-center py-8">No data available</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Keyword Sentiment Heatmap */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">

@@ -14,6 +14,8 @@ export default function ResetPasswordPage() {
   const [emailMasked, setEmailMasked] = useState("");
   const [isInvalid, setIsInvalid] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,8 +85,42 @@ export default function ResetPasswordPage() {
         {status && <p className="text-center text-sm text-gray-300">{status}</p>}
         {!isInvalid ? (
           <>
-            <input type="password" placeholder="New password" className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-white" value={password} onChange={(e)=>setPassword(e.target.value)} required />
-            <input type="password" placeholder="Confirm password" className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-white" value={confirm} onChange={(e)=>setConfirm(e.target.value)} required />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="New password"
+                className="w-full px-4 py-2 pr-12 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-white"
+                value={password}
+                onChange={(e)=>setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-xs text-gray-300 hover:text-white focus:outline-none"
+                tabIndex={-1}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showConfirm ? "text" : "password"}
+                placeholder="Confirm password"
+                className="w-full px-4 py-2 pr-12 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-white"
+                value={confirm}
+                onChange={(e)=>setConfirm(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm((prev) => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-xs text-gray-300 hover:text-white focus:outline-none"
+                tabIndex={-1}
+              >
+                {showConfirm ? "Hide" : "Show"}
+              </button>
+            </div>
             <button type="submit" disabled={loading} className={`w-full py-2 rounded-lg font-semibold cursor-pointer transition duration-200 shadow-md ${loading ? "bg-gray-600 cursor-not-allowed" : "bg-white text-black hover:bg-white/90"}`}>
               {loading ? "Updating..." : "Update password"}
             </button>

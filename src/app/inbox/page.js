@@ -1177,7 +1177,14 @@ export default function InboxPage() {
         setAssignedBrandDetails(assignedDetails);
         setAssignedBrandNames(assignedNames);
         setBrands(brandNames);
-        setSelectedBrands([]);
+        // Preserve previously selected brands when refreshing,
+        // but drop any that no longer exist in the latest brand list.
+        setSelectedBrands((prevSelected) => {
+          if (!prevSelected || prevSelected.length === 0) return [];
+          const brandSet = new Set(brandNames);
+          const stillValid = prevSelected.filter((name) => brandSet.has(name));
+          return stillValid;
+        });
 
         // Load mentions/posts
         let postData = [];

@@ -932,15 +932,15 @@ export default function AnalyticsPage() {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
+                        backgroundColor: '#ffffff',
+                        border: '1px solidrgb(3, 7, 14)',
                         borderRadius: '8px'
                       }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-gray-400 text-center py-8">No data available</p>
+                <p className="text-white-400 text-center py-8">No data available</p>
               )}
             </CardContent>
           </Card>

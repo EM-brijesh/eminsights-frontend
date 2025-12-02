@@ -777,6 +777,7 @@ export default function BrandsPage() {
                           />
                         </div>
                       </div>
+                      {/* 
                       <div>
                         <Label htmlFor="config-country" className="text-sm mb-1.5 inline-block">Country</Label>
                         <Input id="config-country" value={configData.country} onChange={(e) => setConfigData({ ...configData, country: e.target.value })} className="bg-gray-800 border-gray-700 text-white h-11 px-4 text-sm rounded-lg" placeholder="India" aria-label="Brand country" />
@@ -791,15 +792,15 @@ export default function BrandsPage() {
                       <div>
                         <Label htmlFor="config-keywords" className="text-sm mb-1.5 inline-block">Keywords (comma-separated)</Label>
                         <Input id="config-keywords" value={configData.keywords} onChange={(e) => setConfigData({ ...configData, keywords: e.target.value })} className="bg-gray-800 border-gray-700 text-white h-11 px-4 text-sm rounded-lg" placeholder="nike, sports, shoes" aria-label="Brand monitoring keywords" />
-                      </div>
-                      <div>
+                      </div> */}
+                      {/* <div>
                         <Label htmlFor="config-frequency" className="text-sm mb-1.5 inline-block">Monitoring Frequency</Label>
                         <select id="config-frequency" value={configData.frequency} onChange={(e) => setConfigData({ ...configData, frequency: e.target.value })} className="w-full h-11 px-4 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" aria-label="Brand monitoring frequency">
                           <option value="5m">Every 5 Minutes</option>
                           <option value="30m">Every 30 Minutes (Default)</option>
                           <option value="1h">Every 1 Hour</option>
                         </select>
-                      </div>
+                      </div> */}
                       <div>
                         <Label className="text-sm mb-1.5 inline-block">Ticket Creation</Label>
                         <div className="flex items-center gap-3">
@@ -828,13 +829,12 @@ export default function BrandsPage() {
 
                     {/* Right */}
                     <div className="space-y-4">
-                      <div>
+                      {/* <div>
                         <Label htmlFor="config-ai-name" className="text-sm mb-1.5 inline-block">AI Friendly Name</Label>
                         <div className="flex items-center gap-2">
                           <Input id="config-ai-name" value={configData.aiFriendlyName} onChange={(e) => setConfigData({ ...configData, aiFriendlyName: e.target.value })} className="flex-1 bg-gray-800 border-gray-700 text-white h-11 px-4 text-sm rounded-lg" placeholder="Brand friendly name" aria-label="AI friendly brand name" />
                           <Button type="button" onClick={() => setConfigData({ ...configData, description: `${configData.aiFriendlyName || editBrandName} is a brand.` })} className="bg-fuchsia-600 hover:bg-fuchsia-700 h-10 px-3 text-sm" aria-label="Generate brand description automatically">Generate Description</Button>
-                        </div>
-                      </div>
+                        </div> */}
                       <div>
                         <Label htmlFor="config-description" className="text-sm mb-1.5 inline-block">Brand Description</Label>
                         <div className="relative">
@@ -842,9 +842,9 @@ export default function BrandsPage() {
                           <span className="absolute right-2 bottom-2 text-xs text-gray-400" aria-live="polite">{(configData.description || '').length}/200</span>
                         </div>
                       </div>
-                      <div>
+                      {/* <div>
                         <Label className="text-sm mb-2 block">Platforms</Label>
-                        <div className="flex gap-3 flex-wrap" role="group" aria-label="Select monitoring platforms">
+                        {/* <div className="flex gap-3 flex-wrap" role="group" aria-label="Select monitoring platforms">
                           {['youtube', 'twitter', 'reddit'].map((platform) => {
                             const map = { youtube: { icon: '/youtube-logo.svg', name: 'YouTube', w: 32, h: 32 }, twitter: { icon: '/x-logo.svg', name: 'X (Twitter)', w: 28, h: 28 }, reddit: { icon: '/reddit-logo.svg', name: 'Reddit', w: 32, h: 32 } };
                             const cfg = map[platform]; const isSel = configData.platforms[platform];
@@ -864,8 +864,7 @@ export default function BrandsPage() {
                               </button>
                             );
                           })}
-                        </div>
-                      </div>
+                        </div> */}
                       {currentUser?.role === 'admin' && (
                         <div>
                           <Label className="text-sm mb-1.5 inline-block">Assign Users (by Email)</Label>

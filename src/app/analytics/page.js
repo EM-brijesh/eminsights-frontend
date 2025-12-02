@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { RefreshCw, TrendingUp, MessageSquare, BarChart3, Smile, Frown, Meh, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,6 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   Area, AreaChart
 } from 'recharts';
-
 // Chart colors
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 const SENTIMENT_COLORS = {
@@ -21,10 +19,17 @@ const SENTIMENT_COLORS = {
   neutral: '#f59e0b',
   negative: '#ef4444'
 };
-
+// Tooltip styling constant (Phase 1.1)
+const CHART_TOOLTIP_STYLE = {
+  backgroundColor: '#253e5dff',
+  border: '1px solid #374151',
+  borderRadius: '8px',
+  padding: '12px',
+  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+  color: '#ffffff'
+};
 const ANALYTICS_POST_LIMIT = 2000;
 const ANALYTICS_SENTIMENT_CHUNK_SIZE = 10;
-
 const buildSentimentRequestPayload = (post) => ({
   _id: post._id || post.id,
   platform: post.platform,
@@ -42,19 +47,15 @@ const buildSentimentRequestPayload = (post) => ({
   sourceUrl: post.sourceUrl,
   createdAt: post.createdAt,
 });
-
 const analyzeMissingSentiment = async (posts) => {
   if (!posts?.length) return [];
-
   try {
     const analyzedResults = [];
     for (let i = 0; i < posts.length; i += ANALYTICS_SENTIMENT_CHUNK_SIZE) {
       const chunk = posts.slice(i, i + ANALYTICS_SENTIMENT_CHUNK_SIZE);
       const payload = chunk.map((post) => buildSentimentRequestPayload(post));
-
       const result = await api.sentiment.analyze(payload);
       const chunkAnalyzed = Array.isArray(result?.data) ? result.data : [];
-
       if (chunkAnalyzed.length > 0) {
         analyzedResults.push(...chunkAnalyzed);
         try {
@@ -66,22 +67,26 @@ const analyzeMissingSentiment = async (posts) => {
         }
       }
     }
-
     return analyzedResults;
   } catch (error) {
-    // Handle request cancellation and other errors gracefully
-    // Don't throw - return empty array so UI can still display posts
     if (error?.message?.includes('aborted') || error?.name === 'AbortError') {
       // Expected when a newer request supersedes the previous one; silently ignore.
     } else {
-      // Only log non-cancellation errors
       console.error('Fallback sentiment analysis failed:', error);
     }
-    // Return empty array instead of throwing - allows UI to continue
     return [];
   }
 };
-
+// Empty State Component (Phase 1.4)
+const EmptyState = ({ message = "No data available", helpText }) => (
+  <div className="flex flex-col items-center justify-center py-12">
+    <BarChart3 className="w-16 h-16 text-gray-600 mb-4" />
+    <p className="text-gray-400 text-center font-medium">{message}</p>
+    {helpText && (
+      <p className="text-gray-500 text-sm text-center mt-2 max-w-md">{helpText}</p>
+    )}
+  </div>
+);
 export default function AnalyticsPage() {
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('');
@@ -99,14 +104,11 @@ export default function AnalyticsPage() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
   const [sentimentWarning, setSentimentWarning] = useState('');
-
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
-
   // Initialize
   useEffect(() => {
     fetchBrands();
   }, []);
-
   // Handle brand change
   useEffect(() => {
     if (selectedBrand && brands.length > 0) {
@@ -115,15 +117,11 @@ export default function AnalyticsPage() {
       fetchPostsAndAnalyze(selectedBrand);
     }
   }, [selectedBrand, brands]);
-
-  // Filter changes are handled automatically via useMemo for filteredPosts
-
   const fetchBrands = async () => {
     try {
       setLoading(true);
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
-
       let data;
       if (user?.role === 'admin') {
         try {
@@ -136,10 +134,8 @@ export default function AnalyticsPage() {
       } else {
         throw new Error('User not authenticated');
       }
-
       const fetchedBrands = data?.brands || [];
       setBrands(fetchedBrands);
-
       if (fetchedBrands.length > 0) {
         setSelectedBrand(fetchedBrands[0].brandName);
       }
@@ -150,13 +146,11 @@ export default function AnalyticsPage() {
       setLoading(false);
     }
   };
-
   const loadKeywordGroups = (brandName) => {
     if (!brandName || brandName === 'all') {
       setKeywordGroups([]);
       return;
     }
-
     try {
       const raw = localStorage.getItem(storageKeyForBrand(brandName));
       const groups = raw ? JSON.parse(raw) : [];
@@ -166,17 +160,14 @@ export default function AnalyticsPage() {
       setKeywordGroups([]);
     }
   };
-
   const fetchKeywords = async (brandName) => {
     if (!brandName) return;
-
     try {
       if (brandName === 'all') {
         if (!Array.isArray(brands) || brands.length === 0) {
           setBrandKeywords([]);
           return;
         }
-
         const keywordSet = new Set();
         await Promise.all(
           brands.map(async (brand) => {
@@ -193,7 +184,6 @@ export default function AnalyticsPage() {
         setBrandKeywords(Array.from(keywordSet));
         return;
       }
-
       const data = await api.dashboard.getKeywords(brandName);
       setBrandKeywords(data.keywords || []);
     } catch (err) {
@@ -201,10 +191,8 @@ export default function AnalyticsPage() {
       setBrandKeywords([]);
     }
   };
-
   const fetchPostsAndAnalyze = async (brandName) => {
     if (!brandName) return;
-
     setLoadingPosts(true);
     setSentimentWarning('');
     try {
@@ -212,23 +200,16 @@ export default function AnalyticsPage() {
         brandName === 'all'
           ? (Array.isArray(brands) ? brands.map((b) => b.brandName) : [])
           : [brandName];
-
       if (targetBrands.length === 0) {
         setPosts([]);
         setAnalyzedPosts([]);
         setSentimentWarning('No brands available for analytics.');
         return;
       }
-
-      // Relax the global cap for "All Brands":
-      // - Single brand: keep using ANALYTICS_POST_LIMIT.
-      // - All brands: fetch up to ANALYTICS_POST_LIMIT posts *per brand*,
-      //   and don't slice the merged list later.
       const perBrandLimit =
         brandName === 'all'
           ? ANALYTICS_POST_LIMIT
           : ANALYTICS_POST_LIMIT;
-
       const fetchedPosts = [];
       for (const name of targetBrands) {
         try {
@@ -243,48 +224,39 @@ export default function AnalyticsPage() {
           console.error(`Failed to load posts for ${name}:`, brandErr);
         }
       }
-
       const sortedPosts = fetchedPosts.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA;
       });
-      // Only apply the global post cap for single-brand views.
       const limitedPosts =
         brandName === 'all'
           ? sortedPosts
           : sortedPosts.slice(0, ANALYTICS_POST_LIMIT);
       setPosts(limitedPosts);
-
       const needsSentiment = limitedPosts.filter((post) => {
         const hasScore = typeof post.sentimentScore === 'number';
         return !post.sentiment || post.sentiment === 'pending' || !hasScore;
       });
-
       if (needsSentiment.length === 0) {
         setSentimentWarning('');
         setAnalyzedPosts(limitedPosts);
         return;
       }
-
       setSentimentWarning('Analyzing sentiment for newly fetched posts…');
       setAnalyzingSentiment(true);
       try {
         const analyzedSubset = await analyzeMissingSentiment(needsSentiment);
-
-        // If analysis returned empty (due to error/cancellation), use original posts
         if (!analyzedSubset || analyzedSubset.length === 0) {
           setAnalyzedPosts(limitedPosts);
           setSentimentWarning('Sentiment analysis unavailable. Showing posts without sentiment data.');
           return;
         }
-
         const analyzedMap = new Map();
         analyzedSubset.forEach((post) => {
           const id = post._id || post.id;
           if (id) analyzedMap.set(id.toString(), post);
         });
-
         const mergedPosts = limitedPosts.map((post) => {
           const id = post._id || post.id;
           if (!id) return post;
@@ -299,9 +271,7 @@ export default function AnalyticsPage() {
             sentimentAnalyzedAt: updated.sentimentAnalyzedAt || post.sentimentAnalyzedAt,
           };
         });
-
         setAnalyzedPosts(mergedPosts);
-
         const unresolved = mergedPosts.filter((post) => {
           const hasScore = typeof post.sentimentScore === 'number';
           return !post.sentiment || !hasScore;
@@ -312,8 +282,6 @@ export default function AnalyticsPage() {
             : '',
         );
       } catch (analysisErr) {
-        // This catch block should rarely be hit now since analyzeMissingSentiment doesn't throw
-        // But keep it as a safety net
         if (process.env.NODE_ENV !== 'production') {
           console.error('Unexpected error in sentiment analysis:', analysisErr);
         }
@@ -332,10 +300,8 @@ export default function AnalyticsPage() {
       setLoadingPosts(false);
     }
   };
-
   const fetchSentimentSummary = useCallback(async ({ brandName, platform, keyword }) => {
     if (!brandName) return;
-
     setLoadingSummary(true);
     try {
       const params = { brandName };
@@ -356,13 +322,11 @@ export default function AnalyticsPage() {
       setLoadingSummary(false);
     }
   }, []);
-
   const handleRefresh = async () => {
     if (selectedBrand) {
       await fetchPostsAndAnalyze(selectedBrand);
     }
   };
-
   useEffect(() => {
     if (!selectedBrand || selectedBrand === 'all') {
       setSummaryData(null);
@@ -377,10 +341,6 @@ export default function AnalyticsPage() {
       keyword: effectiveKeyword,
     });
   }, [selectedBrand, selectedPlatform, selectedKeyword, selectedGroup, fetchSentimentSummary]);
-
-  // Determine which keywords to show in the "Keyword" dropdown:
-  // - When a keyword group is selected, show that group's keywords.
-  // - Otherwise, show all brand-level keywords.
   const availableKeywords = useMemo(() => {
     if (selectedGroup !== 'all') {
       const group = keywordGroups.find((g) => g.name === selectedGroup);
@@ -388,17 +348,11 @@ export default function AnalyticsPage() {
     }
     return brandKeywords || [];
   }, [selectedGroup, keywordGroups, brandKeywords]);
-
-  // Apply filters with useMemo for performance
   const filteredPosts = React.useMemo(() => {
     let filtered = [...analyzedPosts];
-
-    // Platform filter
     if (selectedPlatform !== 'all') {
       filtered = filtered.filter(p => p.platform === selectedPlatform);
     }
-
-    // Group filter
     if (selectedGroup !== 'all') {
       const group = keywordGroups.find(g => g.name === selectedGroup);
       if (group?.keywords?.length > 0) {
@@ -410,18 +364,13 @@ export default function AnalyticsPage() {
         });
       }
     }
-
-    // Keyword filter
     if (selectedKeyword !== 'all') {
       filtered = filtered.filter(p =>
         p.keyword?.toLowerCase() === selectedKeyword.toLowerCase()
       );
     }
-
     return filtered;
   }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups]);
-
-  // Calculate statistics with useMemo
   const clientStats = useMemo(() => {
     return {
       total: filteredPosts.length,
@@ -440,7 +389,6 @@ export default function AnalyticsPage() {
       }, { positive: 0, neutral: 0, negative: 0, pending: 0 })
     };
   }, [filteredPosts]);
-
   const summaryStats = useMemo(() => {
     if (!summaryData?.success) return null;
     const totals = summaryData.totals || {};
@@ -474,16 +422,13 @@ export default function AnalyticsPage() {
       },
     };
   }, [summaryData]);
-
   const summaryUsable = selectedGroup === 'all' && summaryData?.success;
-
   const stats = useMemo(() => {
     if (summaryUsable && summaryStats) {
       return summaryStats;
     }
     return clientStats;
   }, [summaryUsable, summaryStats, clientStats]);
-
   const pendingInfo = useMemo(() => {
     if (summaryUsable && summaryStats) {
       return {
@@ -499,26 +444,22 @@ export default function AnalyticsPage() {
       analyzed: stats.total - pendingCount,
     };
   }, [summaryUsable, summaryStats, stats]);
-
-  // Chart data with useMemo
   const platformChartData = useMemo(() => Object.entries(stats.byPlatform).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value,
     percentage: ((value / stats.total) * 100).toFixed(1)
   })), [stats.byPlatform, stats.total]);
-
-  const sentimentChartData = useMemo(() => Object.entries(stats.bySentiment).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value,
-    percentage: ((value / stats.total) * 100).toFixed(1)
-  })), [stats.bySentiment, stats.total]);
-
+  const sentimentChartData = useMemo(() => Object.entries(stats.bySentiment)
+    .filter(([name]) => name !== 'pending') // Exclude pending from pie chart
+    .map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+      percentage: ((value / stats.total) * 100).toFixed(1)
+    })), [stats.bySentiment, stats.total]);
   const keywordChartData = useMemo(() => Object.entries(stats.byKeyword)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([name, value]) => ({ name, posts: value })), [stats.byKeyword]);
-
-  // Timeline with sentiment
   const clientTimelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
     if (post.createdAt) {
       const date = new Date(post.createdAt).toLocaleDateString();
@@ -530,42 +471,33 @@ export default function AnalyticsPage() {
     }
     return acc;
   }, {}), [filteredPosts]);
-
   const combinedTimeline = useMemo(() => {
     if (summaryUsable && Array.isArray(summaryData?.timeline) && summaryData.timeline.length > 0) {
       return summaryData.timeline;
     }
     return Object.values(clientTimelineData);
   }, [summaryUsable, summaryData, clientTimelineData]);
-
   const timelineChartData = useMemo(() => {
     const sorted = [...combinedTimeline]
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(-14);
-
-    // Calculate moving averages
     const withMovingAverages = sorted.map((item, index) => {
       const window7 = sorted.slice(Math.max(0, index - 6), index + 1);
       const window14 = sorted.slice(Math.max(0, index - 13), index + 1);
-
       const avg7 = window7.length > 0
         ? window7.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window7.length
         : 0;
       const avg14 = window14.length > 0
         ? window14.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window14.length
         : 0;
-
       return {
         ...item,
         ma7: avg7,
         ma14: avg14
       };
     });
-
     return withMovingAverages;
   }, [combinedTimeline]);
-
-  // Sentiment by Platform data
   const sentimentByPlatformData = useMemo(() => {
     if (summaryUsable && Array.isArray(summaryData?.platforms) && summaryData.platforms.length > 0) {
       return summaryData.platforms.map((entry) => {
@@ -579,7 +511,6 @@ export default function AnalyticsPage() {
         };
       });
     }
-
     const platformSentiment = {};
     filteredPosts.forEach((post) => {
       const platform = post.platform || 'unknown';
@@ -588,7 +519,6 @@ export default function AnalyticsPage() {
       }
       platformSentiment[platform][post.sentiment || 'neutral'] += 1;
     });
-
     return Object.entries(platformSentiment).map(([platform, sentiments]) => ({
       platform: platform.charAt(0).toUpperCase() + platform.slice(1),
       positive: sentiments.positive,
@@ -597,8 +527,6 @@ export default function AnalyticsPage() {
       total: sentiments.positive + sentiments.neutral + sentiments.negative,
     }));
   }, [summaryUsable, summaryData, filteredPosts]);
-
-  // Keyword Sentiment Heatmap data
   const keywordSentimentHeatmapData = useMemo(() => {
     if (summaryUsable && Array.isArray(summaryData?.keywords) && summaryData.keywords.length > 0) {
       return summaryData.keywords
@@ -611,7 +539,6 @@ export default function AnalyticsPage() {
           total: entry.total || 0,
         }));
     }
-
     const keywordSentiment = {};
     filteredPosts.forEach((post) => {
       const keyword = post.keyword || 'unknown';
@@ -620,7 +547,6 @@ export default function AnalyticsPage() {
       }
       keywordSentiment[keyword][post.sentiment || 'neutral'] += 1;
     });
-
     return Object.entries(keywordSentiment)
       .sort((a, b) => {
         const totalA = a[1].positive + a[1].neutral + a[1].negative;
@@ -636,7 +562,6 @@ export default function AnalyticsPage() {
         total: sentiments.positive + sentiments.neutral + sentiments.negative,
       }));
   }, [summaryUsable, summaryData, filteredPosts]);
-
   const getSentimentIcon = (sentiment) => {
     switch (sentiment) {
       case 'positive': return <Smile className="w-4 h-4 text-green-500" />;
@@ -645,7 +570,6 @@ export default function AnalyticsPage() {
       default: return <Meh className="w-4 h-4 text-yellow-500" />;
     }
   };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -654,7 +578,6 @@ export default function AnalyticsPage() {
       </div>
     );
   }
-
   if (brands.length === 0) {
     return (
       <div className="min-h-screen bg-black text-white p-6 relative">
@@ -670,7 +593,6 @@ export default function AnalyticsPage() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-black text-white p-6 relative">
       <DottedBackground />
@@ -690,13 +612,11 @@ export default function AnalyticsPage() {
             {analyzingSentiment ? 'Analyzing...' : 'Refresh'}
           </Button>
         </div>
-
         {sentimentWarning && (
           <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             {sentimentWarning}
           </div>
         )}
-
         {/* Filters */}
         <Card className="bg-black border-white/10 mb-6">
           <CardContent className="pt-6">
@@ -720,7 +640,6 @@ export default function AnalyticsPage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-2">Platform</label>
                 <select
@@ -735,7 +654,6 @@ export default function AnalyticsPage() {
                   <option value="google">Google</option>
                 </select>
               </div>
-
               {keywordGroups.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Keyword Group</label>
@@ -743,8 +661,7 @@ export default function AnalyticsPage() {
                     value={selectedGroup}
                     onChange={(e) => {
                       setSelectedGroup(e.target.value);
-                    // When switching groups, default keyword filter to "All"
-                    setSelectedKeyword('all');
+                      setSelectedKeyword('all');
                     }}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                   >
@@ -757,7 +674,6 @@ export default function AnalyticsPage() {
                   </select>
                 </div>
               )}
-
               <div>
                 <label className="block text-sm font-medium mb-2">Keyword</label>
                 <select
@@ -776,13 +692,11 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
-
         {summaryError && (
           <div className="mb-6 rounded-xl border border-red-500/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
             Failed to load stored sentiment summary. Displaying recent results from the latest fetch instead.
           </div>
         )}
-
         {summaryUsable && summaryStats && !summaryError && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
@@ -806,7 +720,6 @@ export default function AnalyticsPage() {
             </div>
           </div>
         )}
-
         {pendingInfo.pending > 0 && (
           <div className="mb-6 rounded-xl border border-yellow-600/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
             {pendingInfo.pending === pendingInfo.total
@@ -814,7 +727,6 @@ export default function AnalyticsPage() {
               : `${pendingInfo.pending.toLocaleString()} of ${pendingInfo.total.toLocaleString()} posts are still awaiting sentiment analysis.`}
           </div>
         )}
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <Card className="bg-gradient-to-br from-blue-900/50 to-blue-800/30 border-blue-700/50">
@@ -828,7 +740,6 @@ export default function AnalyticsPage() {
               <p className="text-4xl font-bold">{stats.total}</p>
             </CardContent>
           </Card>
-
           <Card className="bg-gradient-to-br from-green-900/50 to-green-800/30 border-green-700/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -843,7 +754,6 @@ export default function AnalyticsPage() {
               </p>
             </CardContent>
           </Card>
-
           <Card className="bg-gradient-to-br from-yellow-900/50 to-yellow-800/30 border-yellow-700/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -858,7 +768,6 @@ export default function AnalyticsPage() {
               </p>
             </CardContent>
           </Card>
-
           <Card className="bg-gradient-to-br from-red-900/50 to-red-800/30 border-red-700/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -874,10 +783,9 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         </div>
-
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Sentiment Distribution */}
+          {/* Sentiment Distribution - Phase 1.3: Added center text */}
           <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle>Sentiment Distribution</CardTitle>
@@ -930,21 +838,24 @@ export default function AnalyticsPage() {
                         );
                       })}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#ffffff',
-                        border: '1px solidrgb(3, 7, 14)',
-                        borderRadius: '8px'
-                      }}
-                    />
+                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                    {/* Phase 1.3: Center text showing total */}
+                    <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-white text-3xl font-bold">
+                      {stats.total.toLocaleString()}
+                    </text>
+                    <text x="50%" y="50%" dy={24} textAnchor="middle" dominantBaseline="middle" className="fill-gray-400 text-sm">
+                      Total Posts
+                    </text>
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-white-400 text-center py-8">No data available</p>
+                <EmptyState
+                  message="No sentiment data available"
+                  helpText="Try adjusting your filters or refresh the data to see sentiment distribution."
+                />
               )}
             </CardContent>
           </Card>
-
           {/* Platform Distribution */}
           <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
             <CardHeader>
@@ -963,7 +874,7 @@ export default function AnalyticsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
                     <XAxis
                       dataKey="name"
-                      stroke="#9ca3af"
+                      stroke="#6a98e8ff"
                       tick={{ fill: '#9ca3af' }}
                       axisLine={{ stroke: '#4b5563' }}
                     />
@@ -973,12 +884,7 @@ export default function AnalyticsPage() {
                       axisLine={{ stroke: '#4b5563' }}
                     />
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '8px',
-                        padding: '12px'
-                      }}
+                      contentStyle={CHART_TOOLTIP_STYLE}
                       cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
                       formatter={(value, name) => [value, 'Posts']}
                       labelFormatter={(label) => `Platform: ${label}`}
@@ -993,13 +899,15 @@ export default function AnalyticsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-gray-400 text-center py-8">No data available</p>
+                <EmptyState
+                  message="No platform data available"
+                  helpText="Posts from different platforms will appear here once data is loaded."
+                />
               )}
             </CardContent>
           </Card>
         </div>
-
-        {/* Sentiment Timeline */}
+        {/* Sentiment Timeline - Phase 1.2: Improved X-axis readability */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
           <CardHeader>
             <CardTitle>Sentiment Timeline (Last 14 Days)</CardTitle>
@@ -1023,11 +931,17 @@ export default function AnalyticsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" stroke="#9ca3af" angle={-45} textAnchor="end" height={80} />
-                  <YAxis stroke="#9ca3af" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                  {/* Phase 1.2: Improved angle and font size */}
+                  <XAxis
+                    dataKey="date"
+                    stroke="#9ca3af"
+                    angle={-30}
+                    textAnchor="end"
+                    height={80}
+                    tick={{ fill: '#9ca3af', fontSize: 12 }}
                   />
+                  <YAxis stroke="#9ca3af" />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                   <Legend />
                   <Area
                     type="monotone"
@@ -1082,11 +996,13 @@ export default function AnalyticsPage() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-gray-400 text-center py-8">No data available</p>
+              <EmptyState
+                message="No timeline data available"
+                helpText="Sentiment trends over time will appear here as data accumulates."
+              />
             )}
           </CardContent>
         </Card>
-
         {/* Sentiment by Platform */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
           <CardHeader>
@@ -1114,7 +1030,7 @@ export default function AnalyticsPage() {
                   <XAxis dataKey="platform" stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
                   <YAxis stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', padding: '12px' }}
+                    contentStyle={CHART_TOOLTIP_STYLE}
                     formatter={(value) => [value, 'Posts']}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
@@ -1124,12 +1040,13 @@ export default function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-gray-400 text-center py-8">No data available</p>
+              <EmptyState
+                message="No platform sentiment data"
+                helpText="Sentiment breakdown by platform will be displayed here."
+              />
             )}
           </CardContent>
         </Card>
-
-
         {/* Keyword Sentiment Heatmap */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
           <CardHeader>
@@ -1201,11 +1118,13 @@ export default function AnalyticsPage() {
                 </table>
               </div>
             ) : (
-              <p className="text-gray-400 text-center py-8">No data available</p>
+              <EmptyState
+                message="No keyword data available"
+                helpText="Keyword sentiment breakdown will appear here once you have tracked keywords."
+              />
             )}
           </CardContent>
         </Card>
-
         {/* Top Keywords */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
           <CardHeader>
@@ -1231,12 +1150,7 @@ export default function AnalyticsPage() {
                     axisLine={{ stroke: '#4b5563' }}
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #374151',
-                      borderRadius: '8px',
-                      padding: '12px'
-                    }}
+                    contentStyle={CHART_TOOLTIP_STYLE}
                     formatter={(value) => [value, 'Posts']}
                     labelFormatter={(label) => `Keyword: ${label}`}
                   />
@@ -1256,11 +1170,13 @@ export default function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-gray-400 text-center py-8">No data available</p>
+              <EmptyState
+                message="No keyword volume data"
+                helpText="Top performing keywords will be ranked here by post volume."
+              />
             )}
           </CardContent>
         </Card>
-
         {/* Recent Posts */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
           <CardHeader>
@@ -1268,9 +1184,12 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             {loadingPosts || analyzingSentiment ? (
-              <p className="text-gray-400 text-center py-8">
-                {analyzingSentiment ? 'Analyzing sentiment...' : 'Loading posts...'}
-              </p>
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                <p className="ml-3 text-gray-400">
+                  {analyzingSentiment ? 'Analyzing sentiment...' : 'Loading posts...'}
+                </p>
+              </div>
             ) : filteredPosts.length > 0 ? (
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {filteredPosts.slice(0, 10).map((post) => (
@@ -1299,9 +1218,10 @@ export default function AnalyticsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-gray-400 text-center py-8">
-                No posts found. Try running a search from the Keywords page.
-              </p>
+              <EmptyState
+                message="No posts found"
+                helpText="Try running a search from the Keywords page or adjusting your filters."
+              />
             )}
           </CardContent>
         </Card>

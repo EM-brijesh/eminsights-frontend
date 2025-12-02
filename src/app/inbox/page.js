@@ -624,11 +624,11 @@ function MultiSelect({
                 );
               })}
             </ul>
-            <div className="flex-1 rounded-2xl border border-white/10 bg-black/20 p-3">
-              <div className="mb-2 text-xs uppercase tracking-widest text-gray-500">
-                {activeBrand ? `${activeBrand} Keywords` : 'Select a brand to view keywords'}
-              </div>
-              {activeBrand ? (
+            {activeBrand && (
+              <div className="flex-1 rounded-2xl border border-white/10 bg-black/20 p-3">
+                <div className="mb-2 text-xs uppercase tracking-widest text-gray-500">
+                  {`${activeBrand} Keywords`}
+                </div>
                 <KeywordTree
                   brandDetails={brandDetails}
                   visibleBrands={[activeBrand]}
@@ -640,10 +640,8 @@ function MultiSelect({
                   onToggleExpand={onToggleExpand}
                   className="max-h-64 border-none bg-transparent p-0"
                 />
-              ) : (
-                <p className="text-sm text-gray-400">Choose a brand to see its keyword groups.</p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1763,13 +1761,14 @@ export default function InboxPage() {
             </div>
             <div className="relative freq-menu">
               <button
-                onClick={() => setIsFreqOpen((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+                // Monitoring frequency disabled
+                disabled
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white opacity-60 cursor-not-allowed"
               >
                 <Filter className="h-4 w-4" />
                 Filter
               </button>
-              {isFreqOpen && (
+              {false && isFreqOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-white/10 bg-[#080808] p-2 shadow-xl shadow-black/40">
                   <div className="px-2 pb-2 text-xs uppercase tracking-widest text-gray-400">Monitoring Frequency</div>
                   <ul className="space-y-1 text-sm">

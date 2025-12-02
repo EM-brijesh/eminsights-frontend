@@ -677,7 +677,7 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
   };
 
   return (
-    <div className="relative duration-picker w-full sm:w-auto">
+      <div className="relative duration-picker w-full sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="inline-flex w-full min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
@@ -727,20 +727,26 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
                 <div className="space-y-1">
                   <div className="text-xs text-gray-400">From</div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      value={timeRange.from.h}
-                      onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, h: e.target.value } })}
-                      className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
-                    >
-                      {hours.map((h) => <option key={`fh-${h}`} value={h}>{h}</option>)}
-                    </select>
-                    <select
-                      value={timeRange.from.m}
-                      onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, m: e.target.value } })}
-                      className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
-                    >
-                      {minutes.map((m) => <option key={`fm-${m}`} value={m}>{m}</option>)}
-                    </select>
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={timeRange.from.h}
+                        onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, h: e.target.value } })}
+                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                      >
+                        {hours.map((h) => <option key={`fh-${h}`} value={h}>{h}</option>)}
+                      </select>
+                      <span className="text-[10px] text-gray-400">H</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={timeRange.from.m}
+                        onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, m: e.target.value } })}
+                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                      >
+                        {minutes.map((m) => <option key={`fm-${m}`} value={m}>{m}</option>)}
+                      </select>
+                      <span className="text-[10px] text-gray-400">M</span>
+                    </div>
                     <select
                       value={timeRange.from.ampm}
                       onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, ampm: e.target.value } })}
@@ -753,20 +759,26 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
                 <div className="space-y-1">
                   <div className="text-xs text-gray-400">To</div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      value={timeRange.to.h}
-                      onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, h: e.target.value } })}
-                      className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
-                    >
-                      {hours.map((h) => <option key={`th-${h}`} value={h}>{h}</option>)}
-                    </select>
-                    <select
-                      value={timeRange.to.m}
-                      onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, m: e.target.value } })}
-                      className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
-                    >
-                      {minutes.map((m) => <option key={`tm-${m}`} value={m}>{m}</option>)}
-                    </select>
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={timeRange.to.h}
+                        onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, h: e.target.value } })}
+                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                      >
+                        {hours.map((h) => <option key={`th-${h}`} value={h}>{h}</option>)}
+                      </select>
+                      <span className="text-[10px] text-gray-400">H</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={timeRange.to.m}
+                        onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, m: e.target.value } })}
+                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                      >
+                        {minutes.map((m) => <option key={`tm-${m}`} value={m}>{m}</option>)}
+                      </select>
+                      <span className="text-[10px] text-gray-400">M</span>
+                    </div>
                     <select
                       value={timeRange.to.ampm}
                       onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, ampm: e.target.value } })}

@@ -205,7 +205,7 @@ export default function DashboardLayout({ children }) {
                   }`}
                 >
                   <Plug className="w-4 h-4 mb-1" />
-                  <span className="text-[10px] font-medium text-center">Channel</span>
+                  <span className="text-[10px] font-medium text-center">Coming Soon</span>
                 </Link>
               </div>
             )}

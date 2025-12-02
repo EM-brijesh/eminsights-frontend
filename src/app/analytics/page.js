@@ -305,6 +305,17 @@ export default function AnalyticsPage() {
     });
   }, [selectedBrand, selectedPlatform, selectedKeyword, selectedGroup, fetchSentimentSummary]);
 
+  // Determine which keywords to show in the "Keyword" dropdown:
+  // - When a keyword group is selected, show that group's keywords.
+  // - Otherwise, show all brand-level keywords.
+  const availableKeywords = useMemo(() => {
+    if (selectedGroup !== 'all') {
+      const group = keywordGroups.find((g) => g.name === selectedGroup);
+      return Array.isArray(group?.keywords) ? group.keywords : [];
+    }
+    return brandKeywords || [];
+  }, [selectedGroup, keywordGroups, brandKeywords]);
+
   // Apply filters with useMemo for performance
   const filteredPosts = React.useMemo(() => {
     let filtered = [...analyzedPosts];
@@ -328,7 +339,7 @@ export default function AnalyticsPage() {
     }
 
     // Keyword filter
-    if (selectedKeyword !== 'all' && selectedGroup === 'all') {
+    if (selectedKeyword !== 'all') {
       filtered = filtered.filter(p =>
         p.keyword?.toLowerCase() === selectedKeyword.toLowerCase()
       );
@@ -658,7 +669,8 @@ export default function AnalyticsPage() {
                     value={selectedGroup}
                     onChange={(e) => {
                       setSelectedGroup(e.target.value);
-                      if (e.target.value !== 'all') setSelectedKeyword('all');
+                    // When switching groups, default keyword filter to "All"
+                    setSelectedKeyword('all');
                     }}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                   >
@@ -678,13 +690,11 @@ export default function AnalyticsPage() {
                   value={selectedKeyword}
                   onChange={(e) => {
                     setSelectedKeyword(e.target.value);
-                    if (e.target.value !== 'all') setSelectedGroup('all');
                   }}
-                  disabled={selectedGroup !== 'all'}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md disabled:opacity-50"
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                 >
                   <option value="all">All Keywords</option>
-                  {brandKeywords.map((keyword, idx) => (
+                  {availableKeywords.map((keyword, idx) => (
                     <option key={idx} value={keyword}>{keyword}</option>
                   ))}
                 </select>

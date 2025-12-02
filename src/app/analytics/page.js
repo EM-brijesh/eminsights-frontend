@@ -21,12 +21,11 @@ const SENTIMENT_COLORS = {
 };
 // Tooltip styling constant (Phase 1.1)
 const CHART_TOOLTIP_STYLE = {
-  backgroundColor: '#253e5dff',
+  backgroundColor: '#1f2937',
   border: '1px solid #374151',
   borderRadius: '8px',
   padding: '12px',
-  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
-  color: '#ffffff'
+  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
 };
 const ANALYTICS_POST_LIMIT = 2000;
 const ANALYTICS_SENTIMENT_CHUNK_SIZE = 10;
@@ -152,9 +151,36 @@ export default function AnalyticsPage() {
       return;
     }
     try {
+      // 1) Try localStorage (preferred for already-normalized groups)
       const raw = localStorage.getItem(storageKeyForBrand(brandName));
-      const groups = raw ? JSON.parse(raw) : [];
-      setKeywordGroups(groups);
+      let groups = raw ? JSON.parse(raw) : [];
+
+      // 2) Fallback: pull groups from the in-memory brand data if none in localStorage
+      if (!Array.isArray(groups) || groups.length === 0) {
+        const brand = Array.isArray(brands)
+          ? brands.find((b) => b.brandName === brandName)
+          : null;
+        const backendGroups = Array.isArray(brand?.keywordGroups)
+          ? brand.keywordGroups
+          : [];
+
+        groups = backendGroups.map((g, idx) => ({
+          // Normalize into the simple shape analytics needs
+          name: g.groupName || g.name || `Group ${idx + 1}`,
+          keywords: Array.isArray(g.keywords) ? g.keywords : [],
+        }));
+
+        // Cache normalized version for next time
+        if (groups.length > 0) {
+          try {
+            localStorage.setItem(storageKeyForBrand(brandName), JSON.stringify(groups));
+          } catch {
+            // Non-fatal if caching fails
+          }
+        }
+      }
+
+      setKeywordGroups(Array.isArray(groups) ? groups : []);
     } catch (err) {
       console.error('Failed to load keyword groups:', err);
       setKeywordGroups([]);
@@ -343,7 +369,9 @@ export default function AnalyticsPage() {
   }, [selectedBrand, selectedPlatform, selectedKeyword, selectedGroup, fetchSentimentSummary]);
   const availableKeywords = useMemo(() => {
     if (selectedGroup !== 'all') {
-      const group = keywordGroups.find((g) => g.name === selectedGroup);
+      const group = keywordGroups.find(
+        (g) => (g.groupName || g.name) === selectedGroup,
+      );
       return Array.isArray(group?.keywords) ? group.keywords : [];
     }
     return brandKeywords || [];
@@ -354,7 +382,9 @@ export default function AnalyticsPage() {
       filtered = filtered.filter(p => p.platform === selectedPlatform);
     }
     if (selectedGroup !== 'all') {
-      const group = keywordGroups.find(g => g.name === selectedGroup);
+      const group = keywordGroups.find(
+        (g) => (g.groupName || g.name) === selectedGroup,
+      );
       if (group?.keywords?.length > 0) {
         filtered = filtered.filter(post => {
           const postKeyword = post.keyword?.toLowerCase().trim();
@@ -654,26 +684,35 @@ export default function AnalyticsPage() {
                   <option value="google">Google</option>
                 </select>
               </div>
-              {keywordGroups.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">Keyword Group</label>
-                  <select
-                    value={selectedGroup}
-                    onChange={(e) => {
-                      setSelectedGroup(e.target.value);
-                      setSelectedKeyword('all');
-                    }}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
-                  >
-                    <option value="all">All Groups</option>
-                    {keywordGroups.map((group, idx) => (
-                      <option key={idx} value={group.name}>
-                        {group.name} ({group.keywords?.length || 0})
+              <div>
+                <label className="block text-sm font-medium mb-2">Keyword Group</label>
+                <select
+                  value={selectedGroup}
+                  onChange={(e) => {
+                    setSelectedGroup(e.target.value);
+                    setSelectedKeyword('all');
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
+                  disabled={keywordGroups.length === 0}
+                >
+                  <option value="all">
+                    {keywordGroups.length === 0 ? 'No Groups Available' : 'All Groups'}
+                  </option>
+                  {keywordGroups.map((group, idx) => {
+                    const label = group.groupName || group.name || `Group ${idx + 1}`;
+                    return (
+                      <option key={idx} value={label}>
+                        {label} ({group.keywords?.length || 0})
                       </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                    );
+                  })}
+                </select>
+                {keywordGroups.length === 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Create keyword groups for this brand on the Keywords page to enable this filter.
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Keyword</label>
                 <select
@@ -838,7 +877,11 @@ export default function AnalyticsPage() {
                         );
                       })}
                     </Pie>
-                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                    <Tooltip
+                      contentStyle={{ ...CHART_TOOLTIP_STYLE, color: '#ffffff' }}
+                      itemStyle={{ color: '#ffffff' }}
+                      labelStyle={{ color: '#ffffff' }}
+                    />
                     {/* Phase 1.3: Center text showing total */}
                     <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-white text-3xl font-bold">
                       {stats.total.toLocaleString()}
@@ -874,12 +917,12 @@ export default function AnalyticsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
                     <XAxis
                       dataKey="name"
-                      stroke="#6a98e8ff"
+                      stroke="#cd1766ff"
                       tick={{ fill: '#9ca3af' }}
                       axisLine={{ stroke: '#4b5563' }}
                     />
                     <YAxis
-                      stroke="#9ca3af"
+                      stroke="#cd1496ff"
                       tick={{ fill: '#9ca3af' }}
                       axisLine={{ stroke: '#4b5563' }}
                     />
@@ -895,6 +938,7 @@ export default function AnalyticsPage() {
                       radius={[8, 8, 0, 0]}
                       animationDuration={800}
                       animationBegin={0}
+                      activeBar={false}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -1032,11 +1076,12 @@ export default function AnalyticsPage() {
                   <Tooltip
                     contentStyle={CHART_TOOLTIP_STYLE}
                     formatter={(value) => [value, 'Posts']}
+                    cursor={{ fill: 'rgba(15, 23, 42, 0.6)' }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="neutral" stackId="a" fill="url(#gradientNeu)" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="negative" stackId="a" fill="url(#gradientNeg)" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" radius={[0, 0, 0, 0]} activeBar={false} />
+                  <Bar dataKey="neutral" stackId="a" fill="url(#gradientNeu)" radius={[0, 0, 0, 0]} activeBar={false} />
+                  <Bar dataKey="negative" stackId="a" fill="url(#gradientNeg)" radius={[8, 8, 0, 0]} activeBar={false} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1153,6 +1198,7 @@ export default function AnalyticsPage() {
                     contentStyle={CHART_TOOLTIP_STYLE}
                     formatter={(value) => [value, 'Posts']}
                     labelFormatter={(label) => `Keyword: ${label}`}
+                    cursor={{ fill: 'rgba(15, 23, 42, 0.6)' }}
                   />
                   <defs>
                     <linearGradient id="gradientKeyword" x1="0" y1="0" x2="1" y2="0">
@@ -1166,6 +1212,7 @@ export default function AnalyticsPage() {
                     radius={[0, 8, 8, 0]}
                     animationDuration={800}
                     animationBegin={0}
+                    activeBar={false}
                   />
                 </BarChart>
               </ResponsiveContainer>

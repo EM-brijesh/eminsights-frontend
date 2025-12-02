@@ -31,7 +31,7 @@ export default function LoginPage() {
         localStorage.setItem('authToken', data.token);
         sessionStorage.setItem('authToken', data.token);
         window.__authToken = data.token;
-      } catch {}
+      } catch { }
       // Use replace to avoid back to login and ensure cookie is sent
       window.location.replace("/inbox");
     } catch (err) {

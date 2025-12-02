@@ -1457,53 +1457,10 @@ export default function KeywordsPage() {
                         <KeywordChips value={notKeywords} onAdd={(k) => setNotKeywords([...notKeywords, k])} onRemove={(k) => setNotKeywords(notKeywords.filter((x) => x !== k))} placeholder="Add New Keyword" />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-sm mb-2 block">Select Countries</Label>
-
-                          <div className="flex flex-wrap gap-2 mb-2 min-h-[20px]">
-                            {countries.map((code) => {
-                              const name = (COUNTRIES.find((c) => c.code === code) || {}).name || code;
-                              return (
-                                <span key={code} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-800 border border-gray-700">
-                                  {name}
-                                  <button type="button" className="text-gray-400 hover:text-white" onClick={() => removeCountry(code)}>
-                                    ×
-                                  </button>
-                                </span>
-                              );
-                            })}
-                            {countries.length === 0 && <span className="text-xs text-gray-400">No countries selected</span>}
-                          </div>
-
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              handleAddCountry(e.target.value);
-                              e.target.blur();
-                            }}
-                            className={`w-full h-11 px-3 bg-gray-800 border border-gray-700 rounded-md text-white ${inter.className}`}
-                          >
-                            <option value="" disabled className={`bg-gray-900 text-white ${inter.className}`}>
-                              Choose a country…
-                            </option>
-                            {COUNTRIES.map((c) => (
-                              <option key={c.code} value={c.code} className={`bg-gray-900 text-white ${inter.className}`}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <Label className="text-sm mb-2 block">Select Language</Label>
-                          <KeywordChips
-                            value={languages}
-                            onAdd={(v) => setLanguages([...languages, v])}
-                            onRemove={(v) => setLanguages(languages.filter((x) => x !== v))}
-                            placeholder="Type a language (e.g., English, Hindi) and press Enter"
-                          />
-                        </div>
-                      </div>
+                     
+                      
+                      
+                    
                     </div>
 
                     <div className="flex justify-end gap-3">

@@ -22,7 +22,7 @@ const SENTIMENT_COLORS = {
   negative: '#ef4444'
 };
 
-const ANALYTICS_POST_LIMIT = 1000;
+const ANALYTICS_POST_LIMIT = 2000;
 const ANALYTICS_SENTIMENT_CHUNK_SIZE = 10;
 
 const buildSentimentRequestPayload = (post) => ({
@@ -152,7 +152,10 @@ export default function AnalyticsPage() {
   };
 
   const loadKeywordGroups = (brandName) => {
-    if (!brandName) return;
+    if (!brandName || brandName === 'all') {
+      setKeywordGroups([]);
+      return;
+    }
 
     try {
       const raw = localStorage.getItem(storageKeyForBrand(brandName));
@@ -168,6 +171,29 @@ export default function AnalyticsPage() {
     if (!brandName) return;
 
     try {
+      if (brandName === 'all') {
+        if (!Array.isArray(brands) || brands.length === 0) {
+          setBrandKeywords([]);
+          return;
+        }
+
+        const keywordSet = new Set();
+        await Promise.all(
+          brands.map(async (brand) => {
+            try {
+              const data = await api.dashboard.getKeywords(brand.brandName);
+              (data.keywords || []).forEach((kw) => keywordSet.add(kw));
+            } catch (err) {
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn(`Failed to load keywords for ${brand.brandName}:`, err);
+              }
+            }
+          }),
+        );
+        setBrandKeywords(Array.from(keywordSet));
+        return;
+      }
+
       const data = await api.dashboard.getKeywords(brandName);
       setBrandKeywords(data.keywords || []);
     } catch (err) {
@@ -182,19 +208,62 @@ export default function AnalyticsPage() {
     setLoadingPosts(true);
     setSentimentWarning('');
     try {
-      const params = { brandName, limit: ANALYTICS_POST_LIMIT, sort: 'desc' };
-      const data = await api.dashboard.getPosts(params);
-      const fetchedPosts = data.data || [];
-      setPosts(fetchedPosts);
+      const targetBrands =
+        brandName === 'all'
+          ? (Array.isArray(brands) ? brands.map((b) => b.brandName) : [])
+          : [brandName];
 
-      const needsSentiment = fetchedPosts.filter(post => {
+      if (targetBrands.length === 0) {
+        setPosts([]);
+        setAnalyzedPosts([]);
+        setSentimentWarning('No brands available for analytics.');
+        return;
+      }
+
+      // Relax the global cap for "All Brands":
+      // - Single brand: keep using ANALYTICS_POST_LIMIT.
+      // - All brands: fetch up to ANALYTICS_POST_LIMIT posts *per brand*,
+      //   and don't slice the merged list later.
+      const perBrandLimit =
+        brandName === 'all'
+          ? ANALYTICS_POST_LIMIT
+          : ANALYTICS_POST_LIMIT;
+
+      const fetchedPosts = [];
+      for (const name of targetBrands) {
+        try {
+          const params = { brandName: name, limit: perBrandLimit, sort: 'desc' };
+          const data = await api.dashboard.getPosts(params);
+          const postsWithBrand = (data.data || []).map((post) => ({
+            ...post,
+            brandName: post.brand?.brandName || post.brandName || name,
+          }));
+          fetchedPosts.push(...postsWithBrand);
+        } catch (brandErr) {
+          console.error(`Failed to load posts for ${name}:`, brandErr);
+        }
+      }
+
+      const sortedPosts = fetchedPosts.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      // Only apply the global post cap for single-brand views.
+      const limitedPosts =
+        brandName === 'all'
+          ? sortedPosts
+          : sortedPosts.slice(0, ANALYTICS_POST_LIMIT);
+      setPosts(limitedPosts);
+
+      const needsSentiment = limitedPosts.filter((post) => {
         const hasScore = typeof post.sentimentScore === 'number';
         return !post.sentiment || post.sentiment === 'pending' || !hasScore;
       });
 
       if (needsSentiment.length === 0) {
         setSentimentWarning('');
-        setAnalyzedPosts(fetchedPosts);
+        setAnalyzedPosts(limitedPosts);
         return;
       }
 
@@ -205,18 +274,18 @@ export default function AnalyticsPage() {
 
         // If analysis returned empty (due to error/cancellation), use original posts
         if (!analyzedSubset || analyzedSubset.length === 0) {
-          setAnalyzedPosts(fetchedPosts);
+          setAnalyzedPosts(limitedPosts);
           setSentimentWarning('Sentiment analysis unavailable. Showing posts without sentiment data.');
           return;
         }
 
         const analyzedMap = new Map();
-        analyzedSubset.forEach(post => {
+        analyzedSubset.forEach((post) => {
           const id = post._id || post.id;
           if (id) analyzedMap.set(id.toString(), post);
         });
 
-        const mergedPosts = fetchedPosts.map(post => {
+        const mergedPosts = limitedPosts.map((post) => {
           const id = post._id || post.id;
           if (!id) return post;
           const updated = analyzedMap.get(id.toString());
@@ -225,9 +294,8 @@ export default function AnalyticsPage() {
           return {
             ...post,
             sentiment: updated.sentiment ?? post.sentiment ?? 'pending',
-            sentimentScore: typeof updated.sentimentScore === 'number'
-              ? updated.sentimentScore
-              : existingScore,
+            sentimentScore:
+              typeof updated.sentimentScore === 'number' ? updated.sentimentScore : existingScore,
             sentimentAnalyzedAt: updated.sentimentAnalyzedAt || post.sentimentAnalyzedAt,
           };
         });
@@ -241,7 +309,7 @@ export default function AnalyticsPage() {
         setSentimentWarning(
           unresolved.length > 0
             ? 'Some posts still lack sentiment data. Please refresh later to retry.'
-            : ''
+            : '',
         );
       } catch (analysisErr) {
         // This catch block should rarely be hit now since analyzeMissingSentiment doesn't throw
@@ -250,7 +318,7 @@ export default function AnalyticsPage() {
           console.error('Unexpected error in sentiment analysis:', analysisErr);
         }
         setSentimentWarning('Could not analyze some posts. Showing available data.');
-        setAnalyzedPosts(fetchedPosts);
+        setAnalyzedPosts(limitedPosts);
       } finally {
         setAnalyzingSentiment(false);
       }
@@ -296,7 +364,12 @@ export default function AnalyticsPage() {
   };
 
   useEffect(() => {
-    if (!selectedBrand) return;
+    if (!selectedBrand || selectedBrand === 'all') {
+      setSummaryData(null);
+      setSummaryError(null);
+      setLoadingSummary(false);
+      return;
+    }
     const effectiveKeyword = selectedGroup === 'all' ? selectedKeyword : 'all';
     fetchSentimentSummary({
       brandName: selectedBrand,
@@ -639,6 +712,7 @@ export default function AnalyticsPage() {
                   }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                 >
+                  <option value="all">All Brands</option>
                   {brands.map((brand) => (
                     <option key={brand._id} value={brand.brandName}>
                       {brand.brandName}

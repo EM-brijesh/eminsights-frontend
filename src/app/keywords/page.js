@@ -832,7 +832,16 @@ export default function KeywordsPage() {
     const q = keywordSearch.trim().toLowerCase();
     if (!q) return true;
 
-    const searchableText = [row.groupName, ...(row.keywords || []), row.query].filter(Boolean).join(' ').toLowerCase();
+    // Include group name, AND, OR, NOT keywords and the built query string in search
+    const searchableParts = [
+      row.groupName,
+      ...(row.keywords || []),
+      ...(row.includeKeywords || []),
+      ...(row.excludeKeywords || []),
+      row.query,
+    ].filter(Boolean);
+
+    const searchableText = searchableParts.join(' ').toLowerCase();
 
     return searchableText.includes(q);
   });
@@ -1437,12 +1446,7 @@ export default function KeywordsPage() {
                       <div className="mb-3">
                         <div className="flex items-center gap-3 mb-2">
                           <Label className="text-sm">Included Keywords (AND)</Label>
-                          <label className="flex items-center gap-1 text-xs text-gray-300">
-                            <input type="radio" checked={andMode === 'AND'} onChange={() => setAndMode('AND')} /> AND
-                          </label>
-                          <label className="flex items-center gap-1 text-xs text-gray-300">
-                            <input type="radio" checked={andMode === 'OR'} onChange={() => setAndMode('OR')} /> OR
-                          </label>
+                          
                         </div>
                         <KeywordChips value={andKeywords} onAdd={(k) => setAndKeywords([...andKeywords, k])} onRemove={(k) => setAndKeywords(andKeywords.filter((x) => x !== k))} placeholder="Add New Keyword" />
                       </div>

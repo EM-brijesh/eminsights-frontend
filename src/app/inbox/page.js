@@ -35,11 +35,11 @@ const DURATION_PRESETS = [
 ];
 
 const TABS = [
-//  { key: 'tickets', label: 'Tickets', icon: Inbox },
+  //  { key: 'tickets', label: 'Tickets', icon: Inbox },
   { key: 'all', label: 'All Mentions', icon: ActivitySquare },
- // { key: 'user', label: 'User Activity', icon: Users },
- // { key: 'brand', label: 'Brand Activity', icon: ActivitySquare },
- // { key: 'actionable', label: 'Actionable', icon: CheckCircle2 },
+  // { key: 'user', label: 'User Activity', icon: Users },
+  // { key: 'brand', label: 'Brand Activity', icon: ActivitySquare },
+  // { key: 'actionable', label: 'Actionable', icon: CheckCircle2 },
   //{ key: 'non-actionable', label: 'Non Actionable', icon: Circle },
 ];
 
@@ -507,11 +507,11 @@ function MultiSelect({
   label,
   brandDetails = [],
   selectedKeywordGroups = [],
-  onToggleKeywordGroup = () => {},
+  onToggleKeywordGroup = () => { },
   selectedKeywords = [],
-  onToggleKeyword = () => {},
+  onToggleKeyword = () => { },
   expandedGroups = {},
-  onToggleExpand = () => {},
+  onToggleExpand = () => { },
 }) {
   const [open, setOpen] = useState(false);
   const [activeBrand, setActiveBrand] = useState(value[0] || options[0] || '');
@@ -677,7 +677,7 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
   };
 
   return (
-      <div className="relative duration-picker w-full sm:w-auto">
+    <div className="relative duration-picker w-full sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="inline-flex w-full min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
@@ -1411,7 +1411,7 @@ export default function InboxPage() {
     setSelectedKeywordsFilter((prev) => {
       // Check if all keywords in this group are currently selected
       const allKeywordsInGroup = groupKeywords.map((kw) => `${groupId}::${kw}`);
-      const allSelected = allKeywordsInGroup.length > 0 && 
+      const allSelected = allKeywordsInGroup.length > 0 &&
         allKeywordsInGroup.every((id) => prev.includes(id));
 
       if (allSelected) {
@@ -1423,16 +1423,16 @@ export default function InboxPage() {
       } else {
         // Select all keywords in this group
         // groupKeywords are already lowercased and trimmed, so use them directly
-        const newKeywords = groupKeywords.map((keyword) => 
+        const newKeywords = groupKeywords.map((keyword) =>
           `${groupId}::${keyword}`
         );
-        
+
         // Remove any existing keywords from this group, then add all new ones
         const updatedKeywords = [
           ...prev.filter((kw) => !kw.startsWith(`${groupId}::`)),
           ...newKeywords
         ];
-        
+
         // Update group state - React will batch these
         setSelectedKeywordGroups((groupPrev) => {
           if (!groupPrev.includes(groupId)) {
@@ -1440,7 +1440,7 @@ export default function InboxPage() {
           }
           return groupPrev;
         });
-        
+
         return updatedKeywords;
       }
     });
@@ -1466,7 +1466,7 @@ export default function InboxPage() {
         }
         return false;
       });
-      
+
       if (isSelected) {
         // Remove the keyword - filter out exact match and any format variations
         const newKeywords = prev.filter((kw) => {
@@ -1478,22 +1478,22 @@ export default function InboxPage() {
           }
           return true; // Keep invalid formats
         });
-        
+
         // Check if any keywords remain in this group
         const remainingInGroup = newKeywords.filter((kw) => kw.startsWith(`${groupId}::`));
-        
+
         // Update group state - remove group if no keywords remain
         if (remainingInGroup.length === 0) {
           setSelectedKeywordGroups((groupPrev) => groupPrev.filter((id) => id !== groupId));
         }
-        
+
         return newKeywords;
       } else {
         // Add the keyword - check if it already exists to avoid duplicates
         if (prev.includes(keywordId)) {
           return prev; // Already exists
         }
-        
+
         // Ensure parent group is selected
         setSelectedKeywordGroups((groupPrev) => {
           if (!groupPrev.includes(groupId)) {
@@ -1501,7 +1501,7 @@ export default function InboxPage() {
           }
           return groupPrev;
         });
-        
+
         return [...prev, keywordId];
       }
     });
@@ -1547,9 +1547,9 @@ export default function InboxPage() {
       const normalizedSearch = searchTerm.trim().toLowerCase();
       const matchesSearch = normalizedSearch
         ? text.includes(normalizedSearch) ||
-          authorValue.includes(normalizedSearch) ||
-          (brandName || '').toLowerCase().includes(normalizedSearch) ||
-          (keywordValue || '').includes(normalizedSearch)
+        authorValue.includes(normalizedSearch) ||
+        (brandName || '').toLowerCase().includes(normalizedSearch) ||
+        (keywordValue || '').includes(normalizedSearch)
         : true;
       const platformValue = String(post?.platform || '').toLowerCase();
       const matchesChannel = !selectedChannels.length || selectedChannels.includes(platformValue);
@@ -1557,9 +1557,9 @@ export default function InboxPage() {
         selectedKeywordsFilter.length === 0
           ? true
           : (keywordValue && selectedKeywordsFilter.some((compoundId) => {
-              const { keywordValue: compoundKeyword } = splitKeywordCompoundId(compoundId);
-              return compoundKeyword === keywordValue;
-            }));
+            const { keywordValue: compoundKeyword } = splitKeywordCompoundId(compoundId);
+            return compoundKeyword === keywordValue;
+          }));
 
       if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel || !matchesKeyword) return false;
 
@@ -1587,11 +1587,11 @@ export default function InboxPage() {
     <div className="relative min-h-screen overflow-hidden bg-[#020202] text-white">
       <DottedBackground />
       <FilterDrawer open={isFilterDrawerOpen} onClose={() => setIsFilterDrawerOpen(false)} />
-      <div className="relative z-10 mx-auto max-w-7xl px-6 py-10">
+      <div className="relative z-1 mx-auto max-w-7xl px-6 py-10">
         <header className="mb-10 flex flex-col gap-4">
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-white">INBOX</h1>
-            
+
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {TABS.map(({ key, label, icon: Icon }) => {
@@ -1619,8 +1619,8 @@ export default function InboxPage() {
           </div>
         </header>
 
-        <section className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/50 backdrop-blur-sm xl:flex-row xl:flex-wrap xl:items-start xl:justify-between">
-      <div className="relative z-10 flex min-w-0 flex-1 flex-wrap items-center gap-4">
+        <section className="relative z-1 mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/50 backdrop-blur-sm xl:flex-row xl:flex-wrap xl:items-start xl:justify-between">
+          <div className="relative z-30 flex min-w-0 flex-1 flex-wrap items-center gap-4">
             <div className="flex flex-col gap-3">
               <MultiSelect
                 options={brands}
@@ -1637,7 +1637,7 @@ export default function InboxPage() {
               />
             </div>
             <DurationPicker value={duration} onChange={setDuration} timeRange={timeRange} onTimeChange={setTimeRange} />
-            <label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">
+            <label className="flex min-w-[200px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">
               <Search className="h-4 w-4 text-gray-400" />
               <input
                 value={searchTerm}
@@ -1783,7 +1783,7 @@ export default function InboxPage() {
                               const targets = selectedBrands.length ? selectedBrands : brands;
 
                               if (targets.length === 0) {
-                              showFreqMessage('No brands available to configure');
+                                showFreqMessage('No brands available to configure');
                                 return;
                               }
 
@@ -1842,8 +1842,8 @@ export default function InboxPage() {
                       </li>
                     ))}
                   </ul>
-                 
-                </div> 
+
+                </div>
               )}
             </div>
           </div>
@@ -1920,3 +1920,4 @@ export default function InboxPage() {
     </div>
   );
 }
+

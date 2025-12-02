@@ -1023,16 +1023,9 @@ export default function BrandsPage() {
                       <Label htmlFor="create-brand-name" className="text-sm mb-1.5 inline-block">Brand Name *</Label>
                       <Input id="create-brand-name" value={newBrand.brandName} onChange={(e) => setNewBrand((prev) => ({ ...prev, brandName: e.target.value }))} required className="bg-gray-800 border-gray-700 text-white h-11 px-4 text-sm rounded-lg" placeholder="Enter brand name" aria-label="Brand name (required)" aria-required="true" />
                     </div>
+
                     <div>
-                      <Label htmlFor="create-country" className="text-sm mb-1.5 inline-block">Country</Label>
-                      <Input id="create-country" value={newBrand.country} onChange={(e) => setNewBrand((prev) => ({ ...prev, country: e.target.value }))} className="bg-gray-800 border-gray-700 text-white h-11 px-4 text-sm rounded-lg" placeholder="India" aria-label="Brand country" />
-                    </div>
-                    <div>
-                      <Label htmlFor="create-brand-color" className="text-sm mb-1.5 inline-block">Select Brand Color</Label>
-                      <div className="flex items-center gap-3">
-                        <input id="create-brand-color" type="color" value={newBrand.brandColor} onChange={(e) => setNewBrand((prev) => ({ ...prev, brandColor: e.target.value }))} className="h-10 w-10 p-0 border border-gray-700 rounded" aria-label="Select brand color using color picker" />
-                        <input value={newBrand.brandColor} onChange={(e) => setNewBrand((prev) => ({ ...prev, brandColor: e.target.value }))} className="bg-gray-800 border border-gray-700 text-white h-10 px-3 text-sm rounded-lg w-28" aria-label="Brand color hex code" />
-                      </div>
+
                     </div>
                     <div>
                       <Label className="text-sm mb-1.5 inline-block">Enable ticket creation</Label>
@@ -1062,10 +1055,7 @@ export default function BrandsPage() {
 
                   {/* Right Column */}
                   <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="create-ai-name" className="text-sm mb-1.5 inline-block">AI Friendly Name</Label>
-                      <Input id="create-ai-name" value={newBrand.aiFriendlyName} onChange={(e) => setNewBrand((prev) => ({ ...prev, aiFriendlyName: e.target.value }))} className="bg-gray-800 border-gray-700 text-white h-11 px-4 text-sm rounded-lg" placeholder="Brand friendly name" aria-label="AI friendly brand name" />
-                    </div>
+
                     <div>
                       <Label htmlFor="create-description" className="text-sm mb-1.5 inline-block">Brand Description</Label>
                       <textarea id="create-description" value={newBrand.description} onChange={(e) => setNewBrand((prev) => ({ ...prev, description: e.target.value }))} rows={6} className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg p-3" placeholder="Describe your brand..." aria-label="Brand description" />

@@ -1,69 +1,31 @@
-import Image from 'next/image';
+import { Circle } from 'lucide-react';
+import clsx from 'clsx';
 
-const PlatformBadge = ({ platform, size = 'sm' }) => {
-  const platformConfig = {
-    youtube: {
-      icon: '/youtube-logo.svg',
-      name: 'YouTube',
-      bgColor: 'bg-gray-800/50',
-      borderColor: 'border-gray-600/50',
-      textColor: 'text-gray-200',
-      iconFilter: 'grayscale(0.2) brightness(0.9)'
-    },
-    twitter: {
-      icon: '/x-logo.svg',
-      name: 'X',
-      bgColor: 'bg-gray-800/50',
-      borderColor: 'border-gray-600/50',
-      textColor: 'text-gray-200',
-      iconFilter: 'grayscale(0) brightness(1.1)'
-    },
-    reddit: {
-      icon: '/reddit-logo.svg',
-      name: 'Reddit',
-      bgColor: 'bg-gray-800/50',
-      borderColor: 'border-gray-600/50',
-      textColor: 'text-gray-200',
-      iconFilter: 'grayscale(0.2) brightness(0.9)'
-    }
+// Shared platform badge used across Inbox, Analytics, etc.
+// Matches the visual style of the Inbox badges.
+const PlatformBadge = ({ platform }) => {
+  const map = {
+    twitter: { label: 'Public Tweets', color: 'bg-sky-500/15 text-sky-200 border-sky-500/40' },
+    youtube: { label: 'YouTube', color: 'bg-red-500/15 text-red-200 border-red-500/40' },
+    reddit: { label: 'Reddit', color: 'bg-orange-500/15 text-orange-200 border-orange-500/40' },
+    news: { label: 'News', color: 'bg-amber-500/15 text-amber-200 border-amber-500/40' },
   };
 
-  const config = platformConfig[platform?.toLowerCase()] || platformConfig.twitter;
-  
-  const sizeClasses = {
-    xs: {
-      container: 'px-2 py-0.5 gap-1',
-      icon: 16,
-      text: 'text-[10px]'
-    },
-    sm: {
-      container: 'px-2.5 py-1 gap-1.5',
-      icon: 18,
-      text: 'text-xs'
-    },
-    md: {
-      container: 'px-3 py-1.5 gap-2',
-      icon: 20,
-      text: 'text-sm'
-    }
-  };
-
-  const sizeConfig = sizeClasses[size] || sizeClasses.sm;
+  // Treat Google/web results like "news" so they match Inbox
+  const raw = platform?.toLowerCase();
+  const key = raw === 'google' ? 'news' : raw;
+  const info = map[key] || map.news;
 
   return (
-    <div 
-      className={`inline-flex items-center ${sizeConfig.container} rounded-lg border ${config.bgColor} ${config.borderColor} ${config.textColor} font-semibold backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-200`}
+    <span
+      className={clsx(
+        'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide',
+        info.color,
+      )}
     >
-      <Image 
-        src={config.icon} 
-        alt={config.name} 
-        width={sizeConfig.icon} 
-        height={sizeConfig.icon} 
-        className="object-contain" 
-        style={{ filter: config.iconFilter }}
-      />
-      <span className={sizeConfig.text}>{config.name}</span>
-    </div>
+      <Circle className="h-2 w-2" />
+      {info.label}
+    </span>
   );
 };
 

@@ -743,7 +743,7 @@ export default function BrandsPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h2 id="config-form-title" className="text-xl font-semibold">Edit Brand — {editBrandName}</h2>
                   <div className="flex items-center gap-2">
-                    <Button onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-9 px-3 text-sm" aria-label="Close edit brand dialog">Close</Button>
+                    <Button onClick={closeModal} className="bg-red-800 hover:bg-white-700 h-9 px-3 text-sm" aria-label="Close edit brand dialog">Close</Button>
                   </div>
                 </div>
                 <form onSubmit={(e) => handleConfigureBrand(e, editBrandName)}>
@@ -985,7 +985,7 @@ export default function BrandsPage() {
             <div className="relative z-10 w-[96vw] max-w-6xl mx-auto bg-black border border-white/10 rounded-xl shadow-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 id="create-form-title" className="text-xl font-semibold">Create Brand</h2>
-                <Button onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-9 px-3 text-sm" aria-label="Close create brand dialog">Close</Button>
+                <Button onClick={closeModal} className="bg-red-800 hover:bg-white-700 h-9 px-3 text-sm" aria-label="Close create brand dialog">Close</Button>
               </div>
               <form onSubmit={handleCreateBrand}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -1,6 +1,19 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { RefreshCw, TrendingUp, MessageSquare, BarChart3, Smile, Frown, Meh, Clock } from 'lucide-react';
+import Link from 'next/link';
+import clsx from 'clsx';
+import {
+  RefreshCw,
+  TrendingUp,
+  MessageSquare,
+  BarChart3,
+  Smile,
+  Frown,
+  Meh,
+  Clock,
+  ExternalLink,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
@@ -86,6 +99,101 @@ const EmptyState = ({ message = "No data available", helpText }) => (
     )}
   </div>
 );
+
+// Analytics mention card – visually aligned with Inbox MentionCard
+function AnalyticsMentionCard({ post }) {
+  const brandName =
+    post?.brand?.brandName || post?.brandName || post?.brand?.aiFriendlyName || 'Unknown Brand';
+  const author =
+    post?.author?.name || post?.author?.id || post?.user?.name || post?.user?.username || 'Anonymous';
+  const platform = post?.platform || 'news';
+  const sentiment = (post?.sentiment || post?.analysis?.sentiment || 'neutral').toLowerCase();
+  const createdAt = post?.createdAt || post?.fetchedAt;
+
+  const underlineColor =
+    sentiment === 'negative'
+      ? 'border-red-500/60 text-red-300'
+      : sentiment === 'positive'
+      ? 'border-emerald-500/60 text-emerald-300'
+      : 'border-cyan-400/50 text-cyan-200';
+
+  const engagement =
+    post?.metrics?.likes ??
+    post?.metrics?.comments ??
+    post?.metrics?.shares ??
+    post?.metrics?.views ??
+    'NA';
+  const reach = post?.analysis?.engagementScore ?? post?.reach ?? 'NA';
+
+  const mainText =
+    post?.content?.text ||
+    post?.content?.description ||
+    post?.text ||
+    post?.summary ||
+    'No text content available for this mention.';
+
+  return (
+    <article className="group overflow-hidden rounded-xl border border-white/5 bg-gradient-to-br from-white/5 via-white/[0.03] to-transparent p-4 md:p-5 shadow-lg shadow-black/10 transition hover:border-white/15 hover:shadow-black/30">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <PlatformBadge platform={platform} size="xs" />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={clsx(
+              'rounded-full border px-3 py-1 text-xs font-medium capitalize',
+              underlineColor,
+            )}
+          >
+            {sentiment}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs md:text-sm text-white">
+            <Users className="h-4 w-4 text-indigo-300" />
+            {brandName}
+          </span>
+          {createdAt && (
+            <span className="flex items-center gap-2 text-xs md:text-sm text-gray-400">
+              <Clock className="h-4 w-4 text-gray-500" />
+              {new Date(createdAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-xs md:text-sm text-gray-400">
+          <span className="font-semibold text-white">{author}</span>
+          <span className="text-[10px] md:text-xs uppercase tracking-widest text-gray-500">
+            • {platform}
+          </span>
+        </div>
+        <p className="text-sm md:text-base leading-relaxed text-gray-100 line-clamp-3">{mainText}</p>
+
+        {post?.sourceUrl && (
+          <Link
+            href={post.sourceUrl}
+            target="_blank"
+            className="inline-flex items-center gap-2 text-xs md:text-sm text-indigo-300 transition hover:text-indigo-100 mt-2"
+          >
+            View original source
+            <ExternalLink className="h-4 w-4" />
+          </Link>
+        )}
+      </div>
+
+      <footer className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-3 text-xs md:text-sm text-gray-400">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="flex items-center gap-1">
+            Engagement: <span className="font-semibold text-white">{engagement}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            Reach: <span className="font-semibold text-white">{reach}</span>
+          </span>
+        </div>
+      </footer>
+    </article>
+  );
+}
 export default function AnalyticsPage() {
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('');
@@ -1260,28 +1368,7 @@ export default function AnalyticsPage() {
             ) : filteredPosts.length > 0 ? (
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {filteredPosts.slice(0, 10).map((post) => (
-                  <div key={post._id} className="p-4 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition border border-gray-700">
-                    <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <PlatformBadge platform={post.platform} size="xs" />
-                        <span className="text-xs px-2 py-1 rounded-lg bg-purple-600/20 border border-purple-600/50 text-purple-300 font-semibold">
-                          {post.keyword}
-                        </span>
-                        <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-gray-700 border border-gray-600">
-                          {getSentimentIcon(post.sentiment)}
-                          {post.sentiment || 'pending'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-300 line-clamp-3">
-                      {post.content?.text || post.text || 'No content'}
-                    </p>
-                    {post.createdAt && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        {new Date(post.createdAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
+                  <AnalyticsMentionCard key={post._id || post.id} post={post} />
                 ))}
               </div>
             ) : (

@@ -116,7 +116,7 @@ export default function DashboardLayout({ children }) {
     <div className={`flex min-h-dvh dark`}>
       {/* Sidebar */}
       <aside
-        className={`fixed lg:relative inset-y-0 left-0 z-50 w-20 bg-black border-r border-gray-800 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 w-20 bg-black border-r border-gray-800 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -246,7 +246,7 @@ export default function DashboardLayout({ children }) {
             {sidebarProfileOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setSidebarProfileOpen(false)} />
-                <div className="absolute left-full top-0 ml-3 mt-1 w-64 max-h-[70vh] overflow-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                <div className="absolute left-full bottom-0 mb-4 ml-3 w-64 max-h-[70vh] overflow-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                   {isLoggedIn ? (
                     <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                       <div className="flex items-center justify-between">
@@ -304,7 +304,7 @@ export default function DashboardLayout({ children }) {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-20">
         {/* Mobile Top Bar */}
         <div className="lg:hidden sticky top-0 z-40 bg-black/80 backdrop-blur border-b border-gray-800">
           <div className="px-4 py-3 flex items-center justify-between">

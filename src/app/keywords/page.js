@@ -313,6 +313,7 @@ export default function KeywordsPage() {
   const [keywordGroups, setKeywordGroups] = useState([]);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editingGroup, setEditingGroup] = useState(null); // {groupName, keywords}
+  const [editingBrandName, setEditingBrandName] = useState(null);
   const [brandPosts, setBrandPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsError, setPostsError] = useState('');
@@ -376,7 +377,8 @@ export default function KeywordsPage() {
 
   // Update brand data when brand changes - memoized using ref
   useEffect(() => {
-    if (!selectedBrand || brands.length === 0) {
+    // When no brand or "All Brands" is selected, clear brand-specific config
+    if (!selectedBrand || selectedBrand === 'all' || brands.length === 0) {
       setSelectedBrandData(null);
       setKeywordGroups([]);
       return;
@@ -482,6 +484,10 @@ export default function KeywordsPage() {
       // Auto-select first brand if none selected or current selection invalid
       if (Array.isArray(data.brands) && data.brands.length > 0) {
         setSelectedBrand((prevSelected) => {
+          // Preserve explicit "all" selection even after refresh
+          if (prevSelected === 'all') {
+            return 'all';
+          }
           const currentBrandExists = data.brands.some((b) => b.brandName === prevSelected);
           if (!prevSelected || !currentBrandExists) {
             return data.brands[0].brandName;
@@ -506,7 +512,8 @@ export default function KeywordsPage() {
   const fetchBrandPosts = useCallback(async () => {
     const currentCallId = ++fetchPostsCallIdRef.current;
 
-    if (!selectedBrand) {
+    // Skip fetching posts when "All Brands" or no brand is selected
+    if (!selectedBrand || selectedBrand === 'all') {
       setBrandPosts([]);
       return;
     }
@@ -549,7 +556,8 @@ export default function KeywordsPage() {
   const fetchBrandKeywords = useCallback(async () => {
     const currentCallId = ++fetchKeywordsCallIdRef.current;
 
-    if (!selectedBrand) {
+    // Skip fetching keywords when "All Brands" or no brand is selected
+    if (!selectedBrand || selectedBrand === 'all') {
       setBrandKeywords([]);
       return;
     }
@@ -630,8 +638,10 @@ export default function KeywordsPage() {
   };
 
   const handleSaveConfiguration = async () => {
-    if (!selectedBrand) {
-      showMessage('Please select a brand', 'warning');
+    const effectiveBrandName = editingBrandName || selectedBrand;
+
+    if (!effectiveBrandName || effectiveBrandName === 'all') {
+      showMessage('Please select a specific brand', 'warning');
       return;
     }
 
@@ -660,7 +670,7 @@ export default function KeywordsPage() {
       });
 
       const requestBody = {
-        brandName: selectedBrand,
+        brandName: effectiveBrandName,
         groupName: groupName.trim(),
         originalGroupName: editingGroup?.groupName?.trim(),
         keywords: andKeywords,
@@ -686,15 +696,23 @@ export default function KeywordsPage() {
           ? updatedBrand.keywordGroups.map((group) => normalizeKeywordGroup(group, updatedBrand.platforms || [], updatedBrand.frequency || '30m'))
           : [];
 
-      setSelectedBrandData(updatedBrand);
-      setConfigKeywords(Array.isArray(updatedBrand.keywords) ? updatedBrand.keywords.join(', ') : '');
-      setConfigPlatforms(Array.isArray(updatedBrand.platforms) ? updatedBrand.platforms : []);
-      setConfigFrequency(updatedBrand.frequency || '30m');
-      setKeywordGroups(backendGroups);
+      // Update brands list
+      setBrands((prev) =>
+        Array.isArray(prev) ? prev.map((b) => (b.brandName === effectiveBrandName ? updatedBrand : b)) : prev,
+      );
 
-      setBrands((prev) => (Array.isArray(prev) ? prev.map((b) => (b.brandName === selectedBrand ? updatedBrand : b)) : prev));
-
-      saveGroupsToLocalStorage(selectedBrand, backendGroups);
+      // If we're currently viewing this brand specifically, sync local state
+      if (selectedBrand === effectiveBrandName && selectedBrand !== 'all') {
+        setSelectedBrandData(updatedBrand);
+        setConfigKeywords(Array.isArray(updatedBrand.keywords) ? updatedBrand.keywords.join(', ') : '');
+        setConfigPlatforms(Array.isArray(updatedBrand.platforms) ? updatedBrand.platforms : []);
+        setConfigFrequency(updatedBrand.frequency || '30m');
+        setKeywordGroups(backendGroups);
+        saveGroupsToLocalStorage(effectiveBrandName, backendGroups);
+      } else {
+        // All-brands view or editing a different brand: refresh brands to reflect new groups
+        await fetchBrands();
+      }
 
       try {
         await Promise.allSettled([fetchBrandPosts(), fetchBrandKeywords()]);
@@ -707,6 +725,7 @@ export default function KeywordsPage() {
 
       setShowConfig(false);
       setEditingGroup(null);
+      setEditingBrandName(null);
       setGroupName('');
       setAndKeywords([]);
       setOrKeywords([]);
@@ -726,8 +745,8 @@ export default function KeywordsPage() {
   const handleSubmit = async () => {
     if (status === 'loading') return;
 
-    if (!selectedBrand) {
-      showMessage('Please select a brand.', 'warning');
+    if (!selectedBrand || selectedBrand === 'all') {
+      showMessage('Please select a specific brand.', 'warning');
       return;
     }
 
@@ -784,20 +803,39 @@ export default function KeywordsPage() {
     }
   };
 
-  const hasGroups = Array.isArray(keywordGroups) && keywordGroups.length > 0;
+  // Build groups for display:
+  // - if a specific brand is selected: use its groups or a default group with brand-level keywords
+  // - if "All Brands" is selected: merge groups from all brands (read-only view)
+  const groupsForDisplay = React.useMemo(() => {
+    if (selectedBrand === 'all') {
+      return (brands || []).flatMap((brand) => {
+        const rawGroups = Array.isArray(brand.keywordGroups) ? brand.keywordGroups : [];
+        if (rawGroups.length === 0) return [];
+        const normalized = normalizeGroupsForBrand(rawGroups, brand.platforms || [], brand.frequency || '30m');
+        return normalized.map((g) => ({
+          ...g,
+          _brandName: brand.brandName,
+        }));
+      });
+    }
 
-  const groupsForDisplay = hasGroups
-    ? keywordGroups
-    : selectedBrandData?.keywords && selectedBrandData.keywords.length > 0
-      ? [
+    if (Array.isArray(keywordGroups) && keywordGroups.length > 0) {
+      return keywordGroups;
+    }
+
+    if (selectedBrandData?.keywords && selectedBrandData.keywords.length > 0) {
+      return [
         {
           name: 'Default Group',
           keywords: selectedBrandData.keywords,
           platforms: selectedBrandData.platforms || [],
           paused: false,
         },
-      ]
-      : [];
+      ];
+    }
+
+    return [];
+  }, [selectedBrand, keywordGroups, selectedBrandData, brands]);
 
   const keywordRows = groupsForDisplay.map((g, i) => {
     const keywords = Array.isArray(g.keywords) ? g.keywords : [];
@@ -808,10 +846,12 @@ export default function KeywordsPage() {
     const createdOn = g.createdAt || deriveGroupCreatedAt(g) || selectedBrandData?.updatedAt || null;
     const countryList = Array.isArray(g.countries) ? g.countries : g.country ? [g.country] : [];
     const languageList = Array.isArray(g.languages) ? g.languages : g.language ? [g.language] : [];
+    const brandNameForRow = g._brandName || selectedBrandData?.brandName || selectedBrand || '-';
 
     return {
       id: g.id || `${g.name || 'group'}-${i}`,
       groupName: g.groupName || g.name || 'Unnamed Group',
+      brandName: brandNameForRow,
       keywords,
       includeKeywords,
       excludeKeywords,
@@ -878,7 +918,9 @@ export default function KeywordsPage() {
   }, [brands, selectedBrand, selectedBrandData]);
 
   const handleDeleteGroup = async (row) => {
-    if (!selectedBrandData || !row?.groupName) {
+    const targetBrandName = selectedBrand === 'all' ? row.brandName : selectedBrand;
+
+    if (!targetBrandName || !row?.groupName) {
       showMessage('Invalid group data', 'warning');
       return;
     }
@@ -887,26 +929,49 @@ export default function KeywordsPage() {
     if (!ok) return;
 
     try {
-      const updated = (selectedBrandData.keywords || []).filter((k) => !(row.keywords || []).includes(k));
-      const nextGroups = (keywordGroups || []).filter((g) => (g.groupName || g.name) !== row.groupName);
-      const normalizedNextGroups = normalizeGroupsForBrand(nextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
+      const brandRecord =
+        (brands || []).find((b) => b.brandName === targetBrandName) ||
+        (selectedBrandData?.brandName === targetBrandName ? selectedBrandData : null);
+
+      if (!brandRecord) {
+        showMessage('Brand data not found for this group', 'error');
+        return;
+      }
+
+      const brandPlatforms = Array.isArray(brandRecord.platforms) ? brandRecord.platforms : [];
+      const brandFrequency = brandRecord.frequency || '30m';
+
+      const brandKeywords = Array.isArray(brandRecord.keywords) ? brandRecord.keywords : [];
+      const updated = brandKeywords.filter((k) => !(row.keywords || []).includes(k));
+
+      const sourceGroups = Array.isArray(brandRecord.keywordGroups)
+        ? normalizeGroupsForBrand(brandRecord.keywordGroups, brandPlatforms, brandFrequency)
+        : keywordGroups || [];
+
+      const nextGroups = (sourceGroups || []).filter((g) => (g.groupName || g.name) !== row.groupName);
+      const normalizedNextGroups = normalizeGroupsForBrand(nextGroups, brandPlatforms, brandFrequency);
       const keywordGroupsForBackend = serializeGroupsForBackend(
         normalizedNextGroups,
-        getCurrentBrandPlatforms(),
-        selectedBrandData.frequency || '30m',
+        brandPlatforms,
+        brandFrequency,
       );
 
       await api.brands.configure({
-        brandName: selectedBrand,
+        brandName: targetBrandName,
         keywords: updated,
-        platforms: getCurrentBrandPlatforms(),
-        frequency: selectedBrandData.frequency || '30m',
+        platforms: brandPlatforms,
+        frequency: brandFrequency,
         keywordGroups: keywordGroupsForBackend,
       });
 
-      persistGroups(selectedBrand, normalizedNextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
-
-      await fetchBrands();
+      if (targetBrandName === selectedBrand && selectedBrand !== 'all') {
+        // Update local state for current brand view
+        persistGroups(selectedBrand, normalizedNextGroups, brandPlatforms, brandFrequency);
+        await fetchBrands();
+      } else {
+        // All-brands view or different brand: just refresh brands list
+        await fetchBrands();
+      }
       showMessage('✅ Group deleted successfully', 'success');
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') {
@@ -917,12 +982,20 @@ export default function KeywordsPage() {
   };
 
   const handleEditGroup = async (row) => {
+    const targetBrandName = selectedBrand === 'all' ? row.brandName : selectedBrand;
+
+    if (!targetBrandName) {
+      showMessage('Invalid brand for this group', 'warning');
+      return;
+    }
+
     const editData = {
       groupName: row.groupName,
       keywords: row.keywords || [],
       assignedUsers: row.assignedUsers || [],
     };
     setEditingGroup(editData);
+    setEditingBrandName(targetBrandName);
     setGroupName(row.groupName);
     setAndKeywords(row.keywords || []);
     setOrKeywords(row.includeKeywords || []);
@@ -936,45 +1009,52 @@ export default function KeywordsPage() {
   };
 
   const handlePauseToggle = async (row) => {
-    if (!row?.groupName || !selectedBrand) {
-      showMessage("Invalid group", "warning");
+    const brandNameForAction = selectedBrand === 'all' ? row.brandName : selectedBrand;
+
+    if (!row?.groupName || !brandNameForAction) {
+      showMessage('Invalid group', 'warning');
       return;
     }
 
     try {
-      const action = row.paused ? "start" : "pause";  // paused → start, running → pause
+      const action = row.paused ? 'start' : 'pause'; // paused → start, running → pause
 
       const token = getAuthToken();
 
       const res = await fetch(`${API_BASE_URL}/api/search/group/toggle`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          brandName: selectedBrand,
+          brandName: brandNameForAction,
           groupName: row.groupName,
-          action
-        })
+          action,
+        }),
       });
 
       const data = await res.json();
       if (!data.success) {
-        showMessage(`❌ ${data.message}`, "error");
+        showMessage(`❌ ${data.message}`, 'error');
         return;
       }
 
       showMessage(`✔️ Group ${row.groupName} is now ${data.status}`, "success");
 
-      // Update UI state
-      setKeywordGroups((groups) =>
-        groups.map((g) =>
-          (g.groupName || g.name) === row.groupName
-            ? { ...g, paused: data.paused, status: data.status }
-            : g
-        )
-      );
+      if (selectedBrand === 'all') {
+        // In all-brands view, reload brands so merged list reflects latest status
+        await fetchBrands();
+      } else {
+        // Update UI state for currently selected brand
+        setKeywordGroups((groups) =>
+          groups.map((g) =>
+            (g.groupName || g.name) === row.groupName
+              ? { ...g, paused: data.paused, status: data.status }
+              : g,
+          ),
+        );
+      }
 
     } catch (e) {
       console.error(e);
@@ -984,22 +1064,40 @@ export default function KeywordsPage() {
 
 
   const handleDuplicateGroup = async (row) => {
-    if (!selectedBrandData || !row?.groupName) {
+    const targetBrandName = selectedBrand === 'all' ? row.brandName : selectedBrand;
+
+    if (!targetBrandName || !row?.groupName) {
       showMessage('Invalid group data', 'warning');
       return;
     }
 
     try {
+      const brandRecord =
+        (brands || []).find((b) => b.brandName === targetBrandName) ||
+        (selectedBrandData?.brandName === targetBrandName ? selectedBrandData : null);
+
+      if (!brandRecord) {
+        showMessage('Brand data not found for this group', 'error');
+        return;
+      }
+
+      const brandPlatforms = Array.isArray(brandRecord.platforms) ? brandRecord.platforms : [];
+      const brandFrequency = brandRecord.frequency || '30m';
+
       const baseName = `${row.groupName} (copy)`;
       let newName = baseName;
       let counter = 2;
-      const names = new Set((keywordGroups || []).map((g) => g.groupName || g.name));
+      const sourceGroups = Array.isArray(brandRecord.keywordGroups)
+        ? normalizeGroupsForBrand(brandRecord.keywordGroups, brandPlatforms, brandFrequency)
+        : keywordGroups || [];
+
+      const names = new Set((sourceGroups || []).map((g) => g.groupName || g.name));
 
       while (names.has(newName)) {
         newName = `${baseName} ${counter++}`;
       }
 
-      const sourceGroup = (keywordGroups || []).find((g) => (g.groupName || g.name) === row.groupName);
+      const sourceGroup = (sourceGroups || []).find((g) => (g.groupName || g.name) === row.groupName);
       const dupSource = sourceGroup
         ? { ...sourceGroup }
         : {
@@ -1023,23 +1121,27 @@ export default function KeywordsPage() {
         createdAt: new Date().toISOString(),
       };
 
-      const nextGroups = [...(keywordGroups || []), dup];
-      const normalizedNextGroups = normalizeGroupsForBrand(nextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
+      const nextGroups = [...(sourceGroups || []), dup];
+      const normalizedNextGroups = normalizeGroupsForBrand(nextGroups, brandPlatforms, brandFrequency);
       const keywordGroupsForBackend = serializeGroupsForBackend(
         normalizedNextGroups,
-        getCurrentBrandPlatforms(),
-        selectedBrandData.frequency || '30m',
+        brandPlatforms,
+        brandFrequency,
       );
 
       await api.brands.configure({
-        brandName: selectedBrand,
-        keywords: selectedBrandData.keywords || [],
-        platforms: getCurrentBrandPlatforms(),
-        frequency: selectedBrandData.frequency || '30m',
+        brandName: targetBrandName,
+        keywords: brandRecord.keywords || [],
+        platforms: brandPlatforms,
+        frequency: brandFrequency,
         keywordGroups: keywordGroupsForBackend,
       });
 
-      persistGroups(selectedBrand, normalizedNextGroups, getCurrentBrandPlatforms(), selectedBrandData.frequency || '30m');
+      if (targetBrandName === selectedBrand && selectedBrand !== 'all') {
+        persistGroups(selectedBrand, normalizedNextGroups, brandPlatforms, brandFrequency);
+      } else {
+        await fetchBrands();
+      }
       showMessage('✅ Group duplicated successfully', 'success');
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') {
@@ -1085,6 +1187,9 @@ export default function KeywordsPage() {
                 onChange={(e) => setSelectedBrand(e.target.value)}
                 className={`w-full md:w-64 px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-white ${inter.className}`}
               >
+                <option value="all" className={`bg-gray-900 text-white ${inter.className}`}>
+                  All Brands
+                </option>
                 {filteredBrands.map((brand) => (
                   <option key={brand._id} value={brand.brandName} className={`bg-gray-900 text-white ${inter.className}`}>
                     {brand.brandName}
@@ -1192,6 +1297,7 @@ export default function KeywordsPage() {
               <Button
                 onClick={() => {
                   setEditingGroup(null);
+                  setEditingBrandName(selectedBrand === 'all' ? '' : selectedBrand);
                   setGroupName('');
                   setAndKeywords([]);
                   setOrKeywords([]);
@@ -1218,6 +1324,7 @@ export default function KeywordsPage() {
             <table className="w-full table-auto">
               <thead className="bg-black">
                 <tr>
+                  <th className="px-5 py-3 text-left text-xs md:text-sm font-semibold text-slate-200 uppercase tracking-wide">Brands</th>
                   <th className="px-5 py-3 text-left text-xs md:text-sm font-semibold text-slate-200 uppercase tracking-wide">Keywords Group Name</th>
                   <th className="px-5 py-3 text-left text-xs md:text-sm font-semibold text-slate-200 uppercase tracking-wide">Keywords/Keywords Query</th>
                   <th className="px-5 py-3 text-left text-xs md:text-sm font-semibold text-slate-200 uppercase tracking-wide">Channels</th>
@@ -1229,6 +1336,7 @@ export default function KeywordsPage() {
               <tbody>
                 {channelFilteredRows.map((row) => (
                   <tr key={row.id} className="border-t border-gray-800 hover:bg-gray-800/40 even:bg-gray-900/40">
+                    <td className="px-5 py-4 text-sm text-slate-100">{row.brandName}</td>
                     <td className="px-5 py-4 text-sm text-slate-100">{row.groupName}</td>
                     <td className="px-4 py-3 text-sm text-gray-300">
                       <div className="space-y-2">
@@ -1301,22 +1409,46 @@ export default function KeywordsPage() {
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-300 relative">
                       <div className="flex items-center gap-3">
-                        <button onClick={() => handlePauseToggle(row)} className="text-gray-200 hover:text-white border border-gray-700 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-white">
-                          {row.paused ? "Start" : "Pause"}
+                        <button
+                          onClick={() => handlePauseToggle(row)}
+                          className="text-gray-200 hover:text-white border border-gray-700 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-white"
+                        >
+                          {row.paused ? 'Start' : 'Pause'}
                         </button>
-                        <button onClick={() => setOpenMenuId(openMenuId === row.id ? null : row.id)} className="text-gray-400 hover:text-white w-8 h-8 rounded-md border border-gray-700 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white">
+                        <button
+                          onClick={() => setOpenMenuId(openMenuId === row.id ? null : row.id)}
+                          className="text-gray-400 hover:text-white w-8 h-8 rounded-md border border-gray-700 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white"
+                        >
                           ⋯
                         </button>
                       </div>
                       {openMenuId === row.id && (
                         <div className="absolute right-4 mt-2 w-44 bg-gray-900 border border-gray-800 rounded shadow-lg z-50">
-                          <button onClick={() => { handleDuplicateGroup(row); setOpenMenuId(null); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-800">
+                          <button
+                            onClick={() => {
+                              handleDuplicateGroup(row);
+                              setOpenMenuId(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-800"
+                          >
                             Duplicate
                           </button>
-                          <button onClick={() => { handleEditGroup(row); setOpenMenuId(null); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-800">
+                          <button
+                            onClick={() => {
+                              handleEditGroup(row);
+                              setOpenMenuId(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-800"
+                          >
                             Edit
                           </button>
-                          <button onClick={() => { handleDeleteGroup(row); setOpenMenuId(null); }} className="block w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-gray-800">
+                          <button
+                            onClick={() => {
+                              handleDeleteGroup(row);
+                              setOpenMenuId(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-gray-800"
+                          >
                             Delete
                           </button>
                         </div>
@@ -1326,7 +1458,7 @@ export default function KeywordsPage() {
                 ))}
                 {channelFilteredRows.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-4 py-10 text-center text-sm text-gray-400">
+                    <td colSpan="7" className="px-4 py-10 text-center text-sm text-gray-400">
                       No keywords found.
                     </td>
                   </tr>

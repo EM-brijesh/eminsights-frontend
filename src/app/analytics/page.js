@@ -165,9 +165,12 @@ export default function AnalyticsPage() {
           : [];
 
         groups = backendGroups.map((g, idx) => ({
-          // Normalize into the simple shape analytics needs
+          // Normalize into the shape analytics needs; keep AND/OR/NOT keywords
           name: g.groupName || g.name || `Group ${idx + 1}`,
+          groupName: g.groupName || g.name || `Group ${idx + 1}`,
           keywords: Array.isArray(g.keywords) ? g.keywords : [],
+          includeKeywords: Array.isArray(g.includeKeywords) ? g.includeKeywords : [],
+          excludeKeywords: Array.isArray(g.excludeKeywords) ? g.excludeKeywords : [],
         }));
 
         // Cache normalized version for next time
@@ -368,13 +371,27 @@ export default function AnalyticsPage() {
     });
   }, [selectedBrand, selectedPlatform, selectedKeyword, selectedGroup, fetchSentimentSummary]);
   const availableKeywords = useMemo(() => {
+    // Helper to merge AND / OR keywords into a unique list (exclude NOT keywords)
+    const collectKeywordsFromGroup = (group) => {
+      if (!group) return [];
+      const set = new Set();
+      (group.keywords || []).forEach((k) => k && set.add(k));
+      (group.includeKeywords || []).forEach((k) => k && set.add(k));
+      return Array.from(set);
+    };
+
     if (selectedGroup !== 'all') {
       const group = keywordGroups.find(
         (g) => (g.groupName || g.name) === selectedGroup,
       );
-      return Array.isArray(group?.keywords) ? group.keywords : [];
+      return collectKeywordsFromGroup(group);
     }
-    return brandKeywords || [];
+
+    const set = new Set(brandKeywords || []);
+    keywordGroups.forEach((g) => {
+      collectKeywordsFromGroup(g).forEach((k) => set.add(k));
+    });
+    return Array.from(set);
   }, [selectedGroup, keywordGroups, brandKeywords]);
   const filteredPosts = React.useMemo(() => {
     let filtered = [...analyzedPosts];
@@ -700,9 +717,12 @@ export default function AnalyticsPage() {
                   </option>
                   {keywordGroups.map((group, idx) => {
                     const label = group.groupName || group.name || `Group ${idx + 1}`;
+                    const andCount = Array.isArray(group.keywords) ? group.keywords.length : 0;
+                    const orCount = Array.isArray(group.includeKeywords) ? group.includeKeywords.length : 0;
+                    const totalCount = andCount + orCount;
                     return (
                       <option key={idx} value={label}>
-                        {label} ({group.keywords?.length || 0})
+                        {label} ({totalCount})
                       </option>
                     );
                   })}

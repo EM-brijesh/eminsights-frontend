@@ -624,14 +624,20 @@ function MultiSelect({
                 );
               })}
             </ul>
-            {activeBrand && (
+            {brandDetails && brandDetails.length > 0 && (
               <div className="flex-1 rounded-2xl border border-white/10 bg-black/20 p-3">
                 <div className="mb-2 text-xs uppercase tracking-widest text-gray-500">
-                  {`${activeBrand} Keywords`}
+                  {value.length === 0
+                    ? 'All Brands Keywords'
+                    : value.length === 1
+                      ? `${value[0]} Keywords`
+                      : 'Selected Brands Keywords'}
                 </div>
                 <KeywordTree
                   brandDetails={brandDetails}
-                  visibleBrands={[activeBrand]}
+                  // When no specific brands are selected, pass an empty array so
+                  // KeywordTree falls back to showing all brands' keyword groups.
+                  visibleBrands={value}
                   selectedGroups={selectedKeywordGroups}
                   onToggleGroup={onToggleKeywordGroup}
                   selectedKeywords={selectedKeywords}
@@ -838,7 +844,9 @@ function KeywordTree({
               {groups.map((group) => {
                 const groupId = makeGroupId(brand.brandName, group);
                 const expanded = expandedGroups[groupId] ?? true;
-                const keywords = group?.keywords || [];
+                const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
+                const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
+                const keywords = [...andKeywords, ...orKeywords];
                 // Check if all keywords in this group are selected
                 const allKeywordsSelected = keywords.length > 0 && keywords.every((keyword) => {
                   const keywordValue = (keyword || '').toLowerCase().trim();
@@ -1370,7 +1378,9 @@ export default function InboxPage() {
     const keywordSet = new Set();
     visibleBrandDetails.forEach((brand) => {
       brand?.keywordGroups?.forEach((group) => {
-        group?.keywords?.forEach((keyword) => {
+        const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
+        const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
+        [...andKeywords, ...orKeywords].forEach((keyword) => {
           if (keyword) keywordSet.add(keyword.toLowerCase());
         });
       });
@@ -1407,13 +1417,16 @@ export default function InboxPage() {
   }, [visibleGroupIds]);
   // Handler for toggling keyword groups
   const handleToggleKeywordGroup = useCallback((groupId) => {
-    // Find the group and its keywords from brandDetails
+    // Find the group and its keywords (AND + OR) from brandDetails
     let groupKeywords = [];
     assignedBrandDetails.forEach((brand) => {
       brand?.keywordGroups?.forEach((group) => {
         const currentGroupId = makeGroupId(brand.brandName, group);
         if (currentGroupId === groupId) {
-          groupKeywords = (group?.keywords || []).map((k) => (k || '').toLowerCase().trim()).filter(Boolean);
+          const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
+          const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
+          const merged = [...andKeywords, ...orKeywords];
+          groupKeywords = merged.map((k) => (k || '').toLowerCase().trim()).filter(Boolean);
         }
       });
     });

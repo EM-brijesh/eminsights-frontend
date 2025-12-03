@@ -1203,8 +1203,16 @@ export default function AnalyticsPage() {
                   <YAxis stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
                   <Tooltip
                     contentStyle={CHART_TOOLTIP_STYLE}
-                    formatter={(value) => [value, 'Posts']}
                     cursor={{ fill: 'rgba(15, 23, 42, 0.6)' }}
+                    formatter={(value, name) => {
+                      const sentimentLabel =
+                        typeof name === 'string'
+                          ? name.charAt(0).toUpperCase() + name.slice(1)
+                          : 'Posts';
+                      const valueLabel = `${value} ${value === 1 ? 'post' : 'posts'}`;
+                      return [valueLabel, sentimentLabel];
+                    }}
+                    labelFormatter={(label) => `Platform: ${label}`}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" radius={[0, 0, 0, 0]} activeBar={false} />

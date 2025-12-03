@@ -254,11 +254,32 @@ export default function AnalyticsPage() {
     }
   };
   const loadKeywordGroups = (brandName) => {
-    if (!brandName || brandName === 'all') {
+    if (!brandName) {
       setKeywordGroups([]);
       return;
     }
     try {
+      // Special case: "All Brands" → aggregate groups from every brand
+      if (brandName === 'all') {
+        const allGroups = [];
+        (Array.isArray(brands) ? brands : []).forEach((brand) => {
+          const backendGroups = Array.isArray(brand.keywordGroups) ? brand.keywordGroups : [];
+          backendGroups.forEach((g, idx) => {
+            const baseName = g.groupName || g.name || `Group ${idx + 1}`;
+            allGroups.push({
+              name: baseName,
+              groupName: baseName,
+              brandName: brand.brandName,
+              keywords: Array.isArray(g.keywords) ? g.keywords : [],
+              includeKeywords: Array.isArray(g.includeKeywords) ? g.includeKeywords : [],
+              excludeKeywords: Array.isArray(g.excludeKeywords) ? g.excludeKeywords : [],
+            });
+          });
+        });
+        setKeywordGroups(allGroups);
+        return;
+      }
+
       // 1) Try localStorage (preferred for already-normalized groups)
       const raw = localStorage.getItem(storageKeyForBrand(brandName));
       let groups = raw ? JSON.parse(raw) : [];

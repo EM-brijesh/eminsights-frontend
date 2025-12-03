@@ -391,18 +391,12 @@ export default function KeywordsPage() {
       return;
     }
 
-    const currentKeywordGroupsHash = JSON.stringify(brand.keywordGroups || []);
-    const brandChanged =
-      prevBrandDataRef.current.id !== brand._id ||
-      prevBrandDataRef.current.keywordGroupsHash !== currentKeywordGroupsHash;
-
-    if (!brandChanged) {
-      return; // Skip if brand data hasn't changed
-    }
-
+    // Track last brand we loaded (may be useful for future optimizations),
+    // but always refresh state when the selected brand changes or when we
+    // come back from "All Brands" view.
     prevBrandDataRef.current = {
       id: brand._id,
-      keywordGroupsHash: currentKeywordGroupsHash,
+      keywordGroupsHash: JSON.stringify(brand.keywordGroups || []),
     };
 
     setSelectedBrandData(brand);

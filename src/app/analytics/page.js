@@ -691,10 +691,22 @@ export default function AnalyticsPage() {
     return acc;
   }, {}), [filteredPosts]);
   const combinedTimeline = useMemo(() => {
-    if (summaryUsable && Array.isArray(summaryData?.timeline) && summaryData.timeline.length > 0) {
-      return summaryData.timeline;
-    }
-    return Object.values(clientTimelineData);
+    // Prefer backend summary timeline when available, otherwise fall back to client aggregation
+    const rawTimeline = (summaryUsable && Array.isArray(summaryData?.timeline) && summaryData.timeline.length > 0)
+      ? summaryData.timeline
+      : Object.values(clientTimelineData);
+
+    // Filter out invalid dates and restrict to the last 14 calendar days (including today)
+    const now = new Date();
+    const fourteenDaysAgo = new Date(now);
+    fourteenDaysAgo.setDate(now.getDate() - 13); // inclusive 14‑day window
+
+    return rawTimeline.filter((item) => {
+      if (!item || !item.date) return false;
+      const d = new Date(item.date);
+      if (Number.isNaN(d.getTime())) return false;
+      return d >= fourteenDaysAgo && d <= now;
+    });
   }, [summaryUsable, summaryData, clientTimelineData]);
   const timelineChartData = useMemo(() => {
     const sorted = [...combinedTimeline]

@@ -153,9 +153,9 @@ export default function ChannelConfigPage() {
               ))}
             </div>
             <div className="flex items-center gap-3 mt-4">
-              <button onClick={() => handleReauth(p)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-gray-900 border border-white/10 hover:bg-gray-800 text-sm"><KeyRound className="w-4 h-4"/> Reauthorize</button>
-              <button onClick={() => handleDelete(p)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-gray-900 border border-white/10 hover:bg-gray-800 text-sm text-red-300"><Trash2 className="w-4 h-4"/> Delete</button>
-              <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-white text-black hover:bg-white/90 text-sm"><Play className="w-4 h-4"/> Start</button>
+              <button onClick={() => handleReauth(p)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-gray-900 border border-white/10 hover:bg-gray-800 text-sm cursor-pointer"><KeyRound className="w-4 h-4"/> Reauthorize</button>
+              <button onClick={() => handleDelete(p)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-gray-900 border border-white/10 hover:bg-gray-800 text-sm text-red-300 cursor-pointer"><Trash2 className="w-4 h-4"/> Delete</button>
+              <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-white text-black hover:bg-white/90 text-sm cursor-pointer"><Play className="w-4 h-4"/> Start</button>
             </div>
           </div>
         </div>
@@ -172,7 +172,7 @@ export default function ChannelConfigPage() {
           <div className="flex items-center gap-3">
             <StatChip value={stats.social} label="Active Social Profiles/Total" />
             <StatChip value={stats.other} label="Active Other Profiles/Total" />
-            <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 h-10 rounded-lg bg-white text-black hover:bg-white/90"><Plus className="w-4 h-4"/> Add Channel</button>
+            <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 h-10 rounded-lg bg-white text-black hover:bg-white/90 cursor-pointer"><Plus className="w-4 h-4"/> Add Channel</button>
           </div>
         </div>
 
@@ -195,10 +195,10 @@ export default function ChannelConfigPage() {
                 </div>
               </div>
               <div className="ml-auto flex items-center gap-2">
-                <button onClick={() => setFilter('all')} className={`px-3 py-1.5 rounded-md text-sm ${filter==='all'?'bg-white text-black':'bg-gray-900 text-gray-300'}`}>All</button>
-                <button onClick={() => setFilter('social')} className={`px-3 py-1.5 rounded-md text-sm ${filter==='social'?'bg-white text-black':'bg-gray-900 text-gray-300'}`}>Social</button>
-                <button onClick={() => setFilter('premium')} className={`px-3 py-1.5 rounded-md text-sm ${filter==='premium'?'bg-white text-black':'bg-gray-900 text-gray-300'}`}>Premium</button>
-                <button className="ml-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-900 border border-white/10 hover:bg-gray-800 text-sm"><RefreshCw className="w-4 h-4"/> Refresh</button>
+                <button onClick={() => setFilter('all')} className={`px-3 py-1.5 rounded-md text-sm cursor-pointer ${filter==='all'?'bg-white text-black':'bg-gray-900 text-gray-300'}`}>All</button>
+                <button onClick={() => setFilter('social')} className={`px-3 py-1.5 rounded-md text-sm cursor-pointer ${filter==='social'?'bg-white text-black':'bg-gray-900 text-gray-300'}`}>Social</button>
+                <button onClick={() => setFilter('premium')} className={`px-3 py-1.5 rounded-md text-sm cursor-pointer ${filter==='premium'?'bg-white text-black':'bg-gray-900 text-gray-300'}`}>Premium</button>
+                <button className="ml-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-900 border border-white/10 hover:bg-gray-800 text-sm cursor-pointer"><RefreshCw className="w-4 h-4"/> Refresh</button>
               </div>
             </div>
           </CardContent>
@@ -236,11 +236,11 @@ export default function ChannelConfigPage() {
           <div className="relative z-10 max-w-3xl w-[95vw] mx-auto mt-24 bg-black border border-white/10 rounded-xl p-6" onClick={(e)=>e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="text-lg font-semibold">Social Media Channels</div>
-              <button className="text-gray-400 hover:text-white" onClick={() => setShowAdd(false)}>✕</button>
+              <button className="text-gray-400 hover:text-white cursor-pointer" onClick={() => setShowAdd(false)}>✕</button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {visibleChannels.map(ch => (
-                <button key={ch.key} onClick={() => connectChannel(ch)} className="flex flex-col items-center gap-2 p-4 rounded-lg bg-gray-900 border border-white/10 hover:bg-gray-800">
+                <button key={ch.key} onClick={() => connectChannel(ch)} className="flex flex-col items-center gap-2 p-4 rounded-lg bg-gray-900 border border-white/10 hover:bg-gray-800 cursor-pointer">
                   <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-950 border border-white/10 overflow-hidden">
                     {ch.icon ? (
                       <Image src={ch.icon} alt={ch.label} width={20} height={20} />
@@ -257,7 +257,7 @@ export default function ChannelConfigPage() {
                 <div className="mt-6 text-sm text-gray-400">Premium Channels</div>
                 <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {CHANNELS.filter(c=>c.type==='premium').map(ch => (
-                    <button key={ch.key} onClick={() => connectChannel(ch)} className="flex flex-col items-center gap-2 p-4 rounded-lg bg-gray-900 border border-white/10 hover:bg-gray-800">
+                    <button key={ch.key} onClick={() => connectChannel(ch)} className="flex flex-col items-center gap-2 p-4 rounded-lg bg-gray-900 border border-white/10 hover:bg-gray-800 cursor-pointer">
                       <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-950 border border-white/10">
                         <span className="text-sm text-gray-300">{ch.label.slice(0,1)}</span>
                       </span>

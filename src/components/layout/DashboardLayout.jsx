@@ -202,16 +202,14 @@ export default function DashboardLayout({ children }) {
                   <Tag className="w-4 h-4 mb-1" />
                   <span className="text-[10px] font-medium">Keywords</span>
                 </Link>
-                <Link
-                  href="/settings/channel-config"
-                  onClick={() => setSettingsOpen(false)}
-                  className={`flex flex-col items-center justify-center w-full py-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
-                    pathname === '/settings/channel-config' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                  }`}
-                >
-                  <Plug className="w-4 h-4 mb-1" />
-                  <span className="text-[10px] font-medium text-center">Coming Soon</span>
-                </Link>
+        <div
+          aria-disabled="true"
+          title="Channel Configuration (coming soon)"
+          className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-500 cursor-not-allowed opacity-60"
+        >
+          <Plug className="w-4 h-4 mb-1" />
+          <span className="text-[10px] font-medium text-center">Coming Soon</span>
+        </div>
               </div>
             )}
           </div>

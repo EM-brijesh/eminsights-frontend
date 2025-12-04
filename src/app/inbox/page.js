@@ -1625,7 +1625,7 @@ export default function InboxPage() {
                   onClick={() => isClickable && setActiveTab(key)}
                   disabled={!isClickable}
                   className={clsx(
-                    'group flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition',
+                    'group flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition cursor-pointer',
                     !isClickable && 'cursor-not-allowed opacity-60',
                     activeTab === key
                       ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 shadow-lg shadow-indigo-500/20'
@@ -1716,7 +1716,7 @@ export default function InboxPage() {
                 }
               }}
               disabled={manualRefreshLoading}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:opacity-60 cursor-pointer"
             >
               <RefreshCcw className={`h-4 w-4 ${manualRefreshLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -1724,7 +1724,7 @@ export default function InboxPage() {
             <div className="relative channel-menu">
               <button
                 onClick={() => setIsChannelMenuOpen((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 cursor-pointer"
               >
                 Channels
                 {selectedChannels.length > 0 && (
@@ -1742,7 +1742,7 @@ export default function InboxPage() {
                         setSelectedChannels([]);
                         setIsChannelMenuOpen(false);
                       }}
-                      className="text-indigo-200 hover:text-indigo-100"
+                      className="text-indigo-200 hover:text-indigo-100 cursor-pointer"
                     >
                       Reset
                     </button>

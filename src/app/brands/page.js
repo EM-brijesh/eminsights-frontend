@@ -743,7 +743,7 @@ export default function BrandsPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h2 id="config-form-title" className="text-xl font-semibold">Edit Brand — {editBrandName}</h2>
                   <div className="flex items-center gap-2">
-                    <Button onClick={closeModal} className="bg-red-800 hover:bg-white-700 h-9 px-3 text-sm" aria-label="Close edit brand dialog">Close</Button>
+                    <Button onClick={closeModal} className="bg-gray-100 hover:bg-gray-100 h-9 px-3 text-sm" aria-label="Close edit brand dialog">Close</Button>
                   </div>
                 </div>
                 <form onSubmit={(e) => handleConfigureBrand(e, editBrandName)}>
@@ -895,7 +895,7 @@ export default function BrandsPage() {
                     )}
                     {currentUser?.role !== 'admin' && <div />}
                     <div className="flex gap-2">
-                      <Button type="button" onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
+                      <Button type="button" onClick={closeModal} className="bg-gray-100 hover:bg-gray-100 h-10 px-4" disabled={loading}>Cancel</Button>
                       <Button type="submit" className="bg-white text-black hover:bg-white/90 h-10 px-4" disabled={loading}>
                         {loading ? 'Updating...' : 'Update Brand'}
                       </Button>
@@ -985,7 +985,7 @@ export default function BrandsPage() {
             <div className="relative z-10 w-[96vw] max-w-6xl mx-auto bg-black border border-white/10 rounded-xl shadow-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 id="create-form-title" className="text-xl font-semibold">Create Brand</h2>
-                <Button onClick={closeModal} className="bg-red-800 hover:bg-white-700 h-9 px-3 text-sm" aria-label="Close create brand dialog">Close</Button>
+                <Button onClick={closeModal} className="bg-gray-100 hover:bg-gray-100 h-9 px-3 text-sm" aria-label="Close create brand dialog">Close</Button>
               </div>
               <form onSubmit={handleCreateBrand}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1072,7 +1072,7 @@ export default function BrandsPage() {
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6">
-                  <Button type="button" onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
+                  <Button type="button" onClick={closeModal} className="bg-gray-100 hover:bg-gray-100 h-10 px-4" disabled={loading}>Cancel</Button>
                   <Button type="submit" className="bg-blue-600 hover:bg-blue-700 h-10 px-4" disabled={loading}>
                     {loading ? 'Creating...' : 'Create Brand'}
                   </Button>
@@ -1183,7 +1183,7 @@ export default function BrandsPage() {
                             className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition duration-150 absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20"
                             style={{ pointerEvents: 'auto' }}
                           >
-                            <div className="w-56 max-w-[70vw] bg-black/60 border border-white/10 rounded-xl backdrop-blur-md shadow-xl p-3">
+                            <div className="w-72 max-w-[80vw] bg-black/60 border border-white/10 rounded-xl backdrop-blur-md shadow-xl p-3">
                               {(() => {
                                 if (!Array.isArray(brand.keywordGroups) || brand.keywordGroups.length === 0) {
                                   return (
@@ -1194,36 +1194,59 @@ export default function BrandsPage() {
                                 }
 
                                 return (
-                                  <div className="space-y-2 max-h-56 overflow-auto pr-1">
-                                    {brand.keywordGroups.map((group, index) => (
-                                      <div key={index} className="border border-white/5 rounded-lg p-2 bg-white/5">
-                                        <div className="text-xs font-semibold text-white mb-1 flex justify-between">
-                                          <span>{group.groupName || group.name || 'Unnamed Group'}</span>
-                                          <span className="text-[10px] text-gray-300">
-                                            {Array.isArray(group.keywords) ? group.keywords.length : 0}
-                                          </span>
-                                        </div>
-                                        {Array.isArray(group.keywords) && group.keywords.length > 0 ? (
-                                          <div className="flex flex-wrap gap-1">
-                                            {group.keywords.slice(0, 6).map((kw, i) => (
-                                              <span
-                                                key={i}
-                                                className="text-[10px] tracking-wide px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-gray-100"
-                                              >
-                                                {String(kw).trim()}
-                                              </span>
-                                            ))}
-                                            {group.keywords.length > 6 && (
-                                              <span className="text-[10px] text-gray-300">
-                                                +{group.keywords.length - 6} more
-                                              </span>
-                                            )}
+                                  <div className="space-y-3 max-h-80 overflow-auto pr-1">
+                                    {brand.keywordGroups.map((group, index) => {
+                                      const andKeywords = Array.isArray(group.keywords) ? group.keywords : [];
+                                      const orKeywords = Array.isArray(group.includeKeywords) ? group.includeKeywords : [];
+                                      const totalKeywords = andKeywords.length + orKeywords.length;
+                                      
+                                      return (
+                                        <div key={index} className="border border-white/5 rounded-lg p-2.5 bg-white/5">
+                                          <div className="text-xs font-semibold text-white mb-2 flex justify-between items-center">
+                                            <span>{group.groupName || group.name || 'Unnamed Group'}</span>
+                                            <span className="text-[10px] text-gray-300">
+                                              {totalKeywords} keyword{totalKeywords !== 1 ? 's' : ''}
+                                            </span>
                                           </div>
-                                        ) : (
-                                          <div className="text-[11px] text-gray-400">No keywords</div>
-                                        )}
-                                      </div>
-                                    ))}
+                                          
+                                          {andKeywords.length > 0 && (
+                                            <div className="mb-2">
+                                              <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">AND Keywords</div>
+                                              <div className="flex flex-wrap gap-1">
+                                                {andKeywords.map((kw, i) => (
+                                                  <span
+                                                    key={`and-${i}`}
+                                                    className="text-[10px] tracking-wide px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white"
+                                                  >
+                                                    {String(kw).trim()}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                          
+                                          {orKeywords.length > 0 && (
+                                            <div className="mb-2">
+                                              <div className="text-[10px] text-blue-400 mb-1 uppercase tracking-wide">OR Keywords</div>
+                                              <div className="flex flex-wrap gap-1">
+                                                {orKeywords.map((kw, i) => (
+                                                  <span
+                                                    key={`or-${i}`}
+                                                    className="text-[10px] tracking-wide px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-100"
+                                                  >
+                                                    {String(kw).trim()}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                          
+                                          {totalKeywords === 0 && (
+                                            <div className="text-[11px] text-gray-400">No keywords configured</div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 );
                               })()}
@@ -1486,7 +1509,7 @@ export default function BrandsPage() {
                                 <Button
                                   type="button"
                                   onClick={() => setShowConfigureForm(null)}
-                                  className="flex-1 bg-gray-700 hover:bg-gray-600 h-10 text-sm rounded-lg"
+                                  className="flex-1 bg-gray-100 hover:bg-gray-100 h-10 text-sm rounded-lg"
                                 >
                                   Cancel
                                 </Button>

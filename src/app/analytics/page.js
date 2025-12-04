@@ -196,7 +196,7 @@ function AnalyticsMentionCard({ post }) {
 }
 export default function AnalyticsPage() {
   const [brands, setBrands] = useState([]);
-  const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('all');
   const [brandKeywords, setBrandKeywords] = useState([]);
   const [posts, setPosts] = useState([]);
   const [analyzedPosts, setAnalyzedPosts] = useState([]);
@@ -244,7 +244,13 @@ export default function AnalyticsPage() {
       const fetchedBrands = data?.brands || [];
       setBrands(fetchedBrands);
       if (fetchedBrands.length > 0) {
-        setSelectedBrand(fetchedBrands[0].brandName);
+        setSelectedBrand((prev) => {
+          if (prev === 'all') return prev;
+          const exists = fetchedBrands.some((brand) => brand.brandName === prev);
+          return exists ? prev : 'all';
+        });
+      } else {
+        setSelectedBrand('all');
       }
     } catch (err) {
       console.error('Failed to load brands:', err);

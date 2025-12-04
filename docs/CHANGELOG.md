@@ -1,3 +1,8 @@
+## 2025-12-04 - Keyword Config Shortcut
+
+- **UX**: `src/app/brands/page.js` now shows a "View keywords" button instead of the hover-only tooltip. Clicking the button sends admins directly to the Keywords configuration page with the selected brand in the query string.
+- **Feature**: `src/app/keywords/page.js` reads the `?brand=` query parameter and auto-selects the matching brand, so the redirected page opens the correct keyword groups immediately.
+
 ## 2025-11-29 - Sentiment Analysis Optimization
 
 - **Fix**: Reduced sentiment analysis chunk size from 50 to 10 in frontend (`src/app/analytics/page.js`) to prevent timeouts.

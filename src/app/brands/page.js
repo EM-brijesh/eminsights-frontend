@@ -10,6 +10,7 @@ import DottedBackground from '@/components/DottedBackground';
 import PlatformBadge from '@/components/PlatformBadge';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Search, RefreshCw, Trash, Check, X } from 'lucide-react';
 
 // Debug utility - only logs in development or when explicitly enabled
@@ -244,6 +245,7 @@ const MESSAGE_VARIANTS = {
 };
 
 export default function BrandsPage() {
+  const router = useRouter();
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -720,6 +722,18 @@ export default function BrandsPage() {
     openEditModal(brand.brandName);
   }, []);
 
+  const navigateToKeywordConfig = useCallback(
+    (brandName) => {
+      if (!brandName) return;
+      const normalizedName = String(brandName).trim();
+      if (!normalizedName) return;
+
+      const query = new URLSearchParams({ brand: normalizedName });
+      router.push(`/keywords?${query.toString()}`);
+    },
+    [router],
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
@@ -895,7 +909,7 @@ export default function BrandsPage() {
                     )}
                     {currentUser?.role !== 'admin' && <div />}
                     <div className="flex gap-2">
-                      <Button type="button" onClick={closeModal} className="bg-gray-100 hover:bg-gray-100 h-10 px-4" disabled={loading}>Cancel</Button>
+                      <Button type="button" onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
                       <Button type="submit" className="bg-white text-black hover:bg-white/90 h-10 px-4" disabled={loading}>
                         {loading ? 'Updating...' : 'Update Brand'}
                       </Button>
@@ -1072,7 +1086,7 @@ export default function BrandsPage() {
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6">
-                  <Button type="button" onClick={closeModal} className="bg-gray-100 hover:bg-gray-100 h-10 px-4" disabled={loading}>Cancel</Button>
+                  <Button type="button" onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
                   <Button type="submit" className="bg-blue-600 hover:bg-blue-700 h-10 px-4" disabled={loading}>
                     {loading ? 'Creating...' : 'Create Brand'}
                   </Button>
@@ -1153,106 +1167,29 @@ export default function BrandsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-300">
-                        {/* Keywords/Topics count with compact transparent tooltip */}
-                        <div
-                          className="relative inline-flex items-center group focus-within:ring-1 focus-within:ring-white/40 rounded-md"
-                          tabIndex={0}
-                          aria-describedby={`keywords-tooltip-${brand._id}`}
-                        >
-                          <span
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/5 text-white border border-white/30 text-xs font-semibold shadow-inner"
-                            title={(() => {
-                              if (!Array.isArray(brand.keywordGroups) || brand.keywordGroups.length === 0) {
-                                return 'No keyword groups';
-                              }
-                              const names = brand.keywordGroups
-                                .map(g => g.groupName || g.name || 'Unnamed Group')
-                                .filter(Boolean);
-                              return (
-                                names.slice(0, 5).join(', ') +
-                                (names.length > 5 ? ` and ${names.length - 5} more` : '')
-                              );
-                            })()}
-                          >
-                            {Array.isArray(brand.keywordGroups) ? brand.keywordGroups.length : 0}
-                          </span>
+                        {(() => {
+                          const keywordGroups = Array.isArray(brand.keywordGroups) ? brand.keywordGroups : [];
+                          const keywordGroupCount = keywordGroups.length;
+                          const summaryLabel = keywordGroupCount === 0
+                            ? 'No keyword groups configured yet'
+                            : `${keywordGroupCount} keyword group${keywordGroupCount !== 1 ? 's' : ''}`;
 
-                          <div
-                            id={`keywords-tooltip-${brand._id}`}
-                            role="tooltip"
-                            className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition duration-150 absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20"
-                            style={{ pointerEvents: 'auto' }}
-                          >
-                            <div className="w-72 max-w-[80vw] bg-black/60 border border-white/10 rounded-xl backdrop-blur-md shadow-xl p-3">
-                              {(() => {
-                                if (!Array.isArray(brand.keywordGroups) || brand.keywordGroups.length === 0) {
-                                  return (
-                                    <div className="text-xs text-gray-300 text-center">
-                                      No keyword groups configured yet.
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div className="space-y-3 max-h-80 overflow-auto pr-1">
-                                    {brand.keywordGroups.map((group, index) => {
-                                      const andKeywords = Array.isArray(group.keywords) ? group.keywords : [];
-                                      const orKeywords = Array.isArray(group.includeKeywords) ? group.includeKeywords : [];
-                                      const totalKeywords = andKeywords.length + orKeywords.length;
-                                      
-                                      return (
-                                        <div key={index} className="border border-white/5 rounded-lg p-2.5 bg-white/5">
-                                          <div className="text-xs font-semibold text-white mb-2 flex justify-between items-center">
-                                            <span>{group.groupName || group.name || 'Unnamed Group'}</span>
-                                            <span className="text-[10px] text-gray-300">
-                                              {totalKeywords} keyword{totalKeywords !== 1 ? 's' : ''}
-                                            </span>
-                                          </div>
-                                          
-                                          {andKeywords.length > 0 && (
-                                            <div className="mb-2">
-                                              <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">AND Keywords</div>
-                                              <div className="flex flex-wrap gap-1">
-                                                {andKeywords.map((kw, i) => (
-                                                  <span
-                                                    key={`and-${i}`}
-                                                    className="text-[10px] tracking-wide px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white"
-                                                  >
-                                                    {String(kw).trim()}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          )}
-                                          
-                                          {orKeywords.length > 0 && (
-                                            <div className="mb-2">
-                                              <div className="text-[10px] text-blue-400 mb-1 uppercase tracking-wide">OR Keywords</div>
-                                              <div className="flex flex-wrap gap-1">
-                                                {orKeywords.map((kw, i) => (
-                                                  <span
-                                                    key={`or-${i}`}
-                                                    className="text-[10px] tracking-wide px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-100"
-                                                  >
-                                                    {String(kw).trim()}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          )}
-                                          
-                                          {totalKeywords === 0 && (
-                                            <div className="text-[11px] text-gray-400">No keywords configured</div>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })()}
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => navigateToKeywordConfig(brand.brandName)}
+                                  className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/5 text-white border border-white/30 text-xs font-semibold shadow-inner hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60"
+                                  aria-label={`Open keyword configuration for ${brand.brandName}`}
+                                >
+                                  {keywordGroupCount}
+                                </button>
+                                <span className="text-xs text-gray-400">{summaryLabel}</span>
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-300">{brand.createdAt ? new Date(brand.createdAt).toLocaleDateString() : '-'}</td>
                       <td className="px-4 py-3 text-sm">
@@ -1509,7 +1446,7 @@ export default function BrandsPage() {
                                 <Button
                                   type="button"
                                   onClick={() => setShowConfigureForm(null)}
-                                  className="flex-1 bg-gray-100 hover:bg-gray-100 h-10 text-sm rounded-lg"
+                                  className="flex-1 bg-gray-100 hover:bg-gray-600 h-10 text-sm rounded-lg"
                                 >
                                   Cancel
                                 </Button>

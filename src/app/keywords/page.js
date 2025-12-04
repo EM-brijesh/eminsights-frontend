@@ -10,6 +10,7 @@ import DottedBackground from '@/components/DottedBackground';
 import Image from 'next/image';
 import { Inter } from 'next/font/google';
 import COUNTRIES from '@/lib/countries';
+import { useSearchParams } from 'next/navigation';
 
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] });
@@ -250,10 +251,12 @@ function KeywordChips({ value = [], onAdd, onRemove, placeholder }) {
 
 export default function KeywordsPage() {
   const [brands, setBrands] = useState([]);
-  const [selectedBrand, setSelectedBrand] = useState('');
+  // Default to "All Brands" instead of auto-selecting the first brand
+  const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedBrandData, setSelectedBrandData] = useState(null);
   const [status, setStatus] = useState(''); // '', 'loading', 'done'
   const [resultMessage, setResultMessage] = useState({ type: null, text: '' });
+  const searchParams = useSearchParams();
   const messageTimerRef = useRef(null);
   const [showConfig, setShowConfig] = useState(false);
   const [brandSearchText, setBrandSearchText] = useState('');
@@ -326,6 +329,7 @@ export default function KeywordsPage() {
   const fetchBrandsCallIdRef = useRef(0);
   const fetchPostsCallIdRef = useRef(0);
   const fetchKeywordsCallIdRef = useRef(0);
+  const brandPrefillAppliedRef = useRef(false);
 
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
 
@@ -374,6 +378,33 @@ export default function KeywordsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (brandPrefillAppliedRef.current) return;
+    if (!Array.isArray(brands) || brands.length === 0) return;
+
+    const queryBrand = searchParams?.get('brand');
+    if (!queryBrand) {
+      brandPrefillAppliedRef.current = true;
+      return;
+    }
+
+    const normalizedQuery = String(queryBrand).trim().toLowerCase();
+    if (!normalizedQuery) {
+      brandPrefillAppliedRef.current = true;
+      return;
+    }
+
+    const matchedBrand = brands.find(
+      (b) => String(b.brandName || '').toLowerCase() === normalizedQuery,
+    );
+
+    if (matchedBrand) {
+      setSelectedBrand(matchedBrand.brandName);
+    }
+
+    brandPrefillAppliedRef.current = true;
+  }, [brands, searchParams]);
 
   // Update brand data when brand changes - memoized using ref
   useEffect(() => {

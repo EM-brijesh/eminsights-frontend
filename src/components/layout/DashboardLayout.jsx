@@ -59,6 +59,8 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     if (pathname === '/keywords' || pathname === '/settings/channel-config') {
       setSettingsOpen(true);
+    } else {
+      setSettingsOpen(false);
     }
   }, [pathname]);
   const handleLogout = () => {
@@ -164,6 +166,7 @@ export default function DashboardLayout({ children }) {
                 key={item.href}
                 href={item.href}
                 title={item.title}
+                onClick={() => setSettingsOpen(false)}
                 className={`flex flex-col items-center justify-center w-full py-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
                   item.active ? 'bg-white text-black' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                 }`}
@@ -191,6 +194,7 @@ export default function DashboardLayout({ children }) {
               <div className="mt-2 w-full space-y-2">
                 <Link
                   href="/keywords"
+                  onClick={() => setSettingsOpen(false)}
                   className={`flex flex-col items-center justify-center w-full py-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
                     pathname === '/keywords' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                   }`}
@@ -200,6 +204,7 @@ export default function DashboardLayout({ children }) {
                 </Link>
                 <Link
                   href="/settings/channel-config"
+                  onClick={() => setSettingsOpen(false)}
                   className={`flex flex-col items-center justify-center w-full py-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
                     pathname === '/settings/channel-config' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                   }`}

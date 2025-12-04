@@ -100,6 +100,43 @@ const EmptyState = ({ message = "No data available", helpText }) => (
   </div>
 );
 
+// Custom tooltip for "Sentiment Distribution by Platform" chart
+const SentimentByPlatformTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const SENTIMENT_TEXT_COLORS = {
+    positive: '#10b981',
+    neutral: '#f59e0b',
+    negative: '#ef4444',
+  };
+
+  return (
+    <div style={CHART_TOOLTIP_STYLE}>
+      <p className="text-xs text-gray-300 mb-2">{`Platform: ${label}`}</p>
+      {payload.map((entry) => {
+        const rawName = typeof entry.name === 'string' ? entry.name : '';
+        const key = rawName.toLowerCase();
+        const color = SENTIMENT_TEXT_COLORS[key] || '#e5e7eb';
+        const value = entry.value ?? 0;
+        const sentimentLabel = rawName
+          ? rawName.charAt(0).toUpperCase() + rawName.slice(1)
+          : 'Posts';
+        const valueLabel = `${value} ${value === 1 ? 'post' : 'posts'}`;
+
+        return (
+          <p
+            key={rawName || key}
+            className="text-xs font-medium"
+            style={{ color }}
+          >
+            {`${sentimentLabel} : ${valueLabel}`}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 // Analytics mention card – visually aligned with Inbox MentionCard
 function AnalyticsMentionCard({ post }) {
   const brandName =
@@ -1229,17 +1266,8 @@ export default function AnalyticsPage() {
                   <XAxis dataKey="platform" stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
                   <YAxis stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
                   <Tooltip
-                    contentStyle={CHART_TOOLTIP_STYLE}
+                    content={<SentimentByPlatformTooltip />}
                     cursor={{ fill: 'rgba(15, 23, 42, 0.6)' }}
-                    formatter={(value, name) => {
-                      const sentimentLabel =
-                        typeof name === 'string'
-                          ? name.charAt(0).toUpperCase() + name.slice(1)
-                          : 'Posts';
-                      const valueLabel = `${value} ${value === 1 ? 'post' : 'posts'}`;
-                      return [valueLabel, sentimentLabel];
-                    }}
-                    labelFormatter={(label) => `Platform: ${label}`}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" radius={[0, 0, 0, 0]} activeBar={false} />

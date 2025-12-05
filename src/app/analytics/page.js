@@ -983,10 +983,10 @@ export default function AnalyticsPage() {
               <p className="text-4xl font-bold">{stats.total}</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-green-900/50 to-green-800/30 border-green-700/50">
+          <Card className="bg-gradient-to-br from-emerald-500/20 to-emerald-400/10 border-emerald-500/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Smile className="w-5 h-5 text-green-400" />
+                <Smile className="w-5 h-5 text-emerald-300" />
                 Positive
               </CardTitle>
             </CardHeader>
@@ -997,10 +997,10 @@ export default function AnalyticsPage() {
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-yellow-900/50 to-yellow-800/30 border-yellow-700/50">
+          <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 border-yellow-500/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Meh className="w-5 h-5 text-yellow-400" />
+                <Meh className="w-5 h-5 text-yellow-300" />
                 Neutral
               </CardTitle>
             </CardHeader>
@@ -1011,10 +1011,10 @@ export default function AnalyticsPage() {
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-red-900/50 to-red-800/30 border-red-700/50">
+          <Card className="bg-gradient-to-br from-red-500/20 to-red-400/10 border-red-500/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Frown className="w-5 h-5 text-red-400" />
+                <Frown className="w-5 h-5 text-red-300" />
                 Negative
               </CardTitle>
             </CardHeader>

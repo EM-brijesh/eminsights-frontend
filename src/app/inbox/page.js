@@ -405,7 +405,7 @@ function MentionCard({ post }) {
       ? 'border-red-500/60 text-red-300'
       : sentiment === 'positive'
         ? 'border-emerald-500/60 text-emerald-300'
-        : 'border-cyan-400/50 text-cyan-200';
+        : 'border-yellow-500/60 text-yellow-300';
   const createdAt = post?.createdAt || post?.fetchedAt;
 
   const engagement =

@@ -887,7 +887,7 @@ export default function AnalyticsPage() {
           </Button>
         </div>
         {sentimentWarning && (
-          <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <div className="mb-6 rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-100">
             {sentimentWarning}
           </div>
         )}

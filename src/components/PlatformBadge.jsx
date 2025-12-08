@@ -8,7 +8,7 @@ const PlatformBadge = ({ platform }) => {
     twitter: { label: 'Public Tweets', color: 'bg-sky-500/15 text-sky-200 border-sky-500/40' },
     youtube: { label: 'YouTube', color: 'bg-red-500/15 text-red-200 border-red-500/40' },
     reddit: { label: 'Reddit', color: 'bg-orange-500/15 text-orange-200 border-orange-500/40' },
-    news: { label: 'News', color: 'bg-amber-500/15 text-amber-200 border-amber-500/40' },
+    news:   { label: 'News', color:     'bg-indigo-500/10 text-indigo-100 border-indigo-400/60' },
   };
 
   // Treat Google/web results like "news" so they match Inbox

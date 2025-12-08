@@ -34,7 +34,7 @@ const DURATION_PRESETS = [
   { label: 'Last 30 Days', value: '30' },
   { label: 'Last 60 Days', value: '60' },
   { label: 'Last 90 Days', value: '90' },
-  
+
 ];
 
 const TABS = [
@@ -685,7 +685,7 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
   };
 
   return (
-      <div className="relative duration-picker w-full sm:w-auto">
+    <div className="relative duration-picker w-full sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="inline-flex w-full min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
@@ -798,10 +798,11 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </div >
+        </div >
+      )
+      }
+    </div >
   );
 }
 
@@ -872,18 +873,20 @@ function KeywordTree({
                         <span className="flex-1 text-white">
                           {group.groupName || group.name || 'Keyword Group'}
                           <span className="ml-2 text-xs text-gray-400">{keywords.length} keywords</span>
-                        </span>
-                      </label>
-                      {keywords.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => onToggleExpand(groupId)}
-                          className="rounded-full border border-white/10 px-2 py-1 text-xs text-gray-300 transition hover:border-white/30"
-                        >
-                          {expanded ? 'Hide' : 'Show'}
-                        </button>
-                      )}
-                    </div>
+                        </span >
+                      </label >
+                      {
+                        keywords.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleExpand(groupId)}
+                            className="rounded-full border border-white/10 px-2 py-1 text-xs text-gray-300 transition hover:border-white/30"
+                          >
+                            {expanded ? 'Hide' : 'Show'}
+                          </button>
+                        )
+                      }
+                    </div >
                     {expanded && keywords.length > 0 && (
                       <div className="mt-2 space-y-1 pl-6">
                         {keywords.map((keyword) => {
@@ -906,15 +909,16 @@ function KeywordTree({
                           );
                         })}
                       </div>
-                    )}
-                  </div>
+                    )
+                    }
+                  </div >
                 );
               })}
-            </div>
-          </div>
+            </div >
+          </div >
         );
       })}
-    </div>
+    </div >
   );
 }
 
@@ -1139,7 +1143,7 @@ function InboxPageContent() {
   // Read URL parameters and apply filters
   const searchParams = useSearchParams();
   const urlParamsRef = useRef({ sentiment: null, brand: null, platform: null, keywordGroup: null, keyword: null });
-  
+
   useEffect(() => {
     const sentiment = searchParams.get('sentiment');
     const brand = searchParams.get('brand');
@@ -1199,8 +1203,8 @@ function InboxPageContent() {
     if (keyword && keyword !== 'all') {
       // If keywordGroup is provided, construct compound keyword ID: groupId::keywordValue
       if (keywordGroup) {
-        const groupId = keywordGroup.includes('::') 
-          ? keywordGroup 
+        const groupId = keywordGroup.includes('::')
+          ? keywordGroup
           : (brand && brand !== 'all' ? `${brand}::${keywordGroup}` : keywordGroup);
         const keywordId = `${groupId}::${keyword.toLowerCase().trim()}`;
         setSelectedKeywordsFilter([keywordId]);
@@ -1214,7 +1218,7 @@ function InboxPageContent() {
     if (!assignedBrandDetails?.length) return;
 
     const { keywordGroup, brand } = urlParamsRef.current;
-    
+
     // Validate brand filter
     if (brand && brand !== 'all') {
       const brandExists = assignedBrandDetails.some(b => b.brandName === brand);
@@ -1231,10 +1235,10 @@ function InboxPageContent() {
         return;
       }
     }
-    
+
     // Validate keyword group filter
     if (!keywordGroup) return;
-    
+
     // If keyword group is already in compound format, validate it exists
     if (keywordGroup.includes('::')) {
       const [brandName, groupName] = keywordGroup.split('::');

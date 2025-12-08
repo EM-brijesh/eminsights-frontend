@@ -899,17 +899,17 @@ export default function BrandsPage() {
                     {currentUser?.role === 'admin' && (
                       <Button
                         type="button"
-                        className="bg-red-600 hover:bg-red-700 h-10 px-4 inline-flex items-center gap-2"
+                        className="bg-red-600 text-white hover:bg-red-600 h-10 px-4 inline-flex items-center gap-2"
                         onClick={() => handleDeleteBrand(getEditBrandName())}
                         disabled={loading}
                       >
                         <Trash className="w-4 h-4" />
-                        Delete Brand
+                        Delete Brand  
                       </Button>
                     )}
                     {currentUser?.role !== 'admin' && <div />}
                     <div className="flex gap-2">
-                      <Button type="button" onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
+                      <Button type="button" onClick={closeModal} className="bg-gray-700 text-white hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
                       <Button type="submit" className="bg-white text-black hover:bg-white/90 h-10 px-4" disabled={loading}>
                         {loading ? 'Updating...' : 'Update Brand'}
                       </Button>
@@ -1086,7 +1086,7 @@ export default function BrandsPage() {
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6">
-                  <Button type="button" onClick={closeModal} className="bg-gray-800 hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
+                  <Button type="button" onClick={closeModal} className="bg-gray-700 text-white hover:bg-gray-700 h-10 px-4" disabled={loading}>Cancel</Button>
                   <Button type="submit" className="bg-blue-600 hover:bg-blue-700 h-10 px-4" disabled={loading}>
                     {loading ? 'Creating...' : 'Create Brand'}
                   </Button>

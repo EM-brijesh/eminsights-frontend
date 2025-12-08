@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ActivitySquare,
   Calendar,
@@ -32,6 +32,9 @@ const DURATION_PRESETS = [
   { label: 'Last 7 Days', value: '7' },
   { label: 'Last 14 Days', value: '14' },
   { label: 'Last 30 Days', value: '30' },
+  { label: 'Last 60 Days', value: '60' },
+  { label: 'Last 90 Days', value: '90' },
+  
 ];
 
 const TABS = [
@@ -208,7 +211,7 @@ function PlatformBadge({ platform }) {
     twitter: { label: 'Public Tweets', color: 'bg-sky-500/15 text-sky-200 border-sky-500/40' },
     youtube: { label: 'YouTube', color: 'bg-red-500/15 text-red-200 border-red-500/40' },
     reddit: { label: 'Reddit', color: 'bg-orange-500/15 text-orange-200 border-orange-500/40' },
-    news: { label: 'News', color: 'bg-amber-500/15 text-amber-200 border-amber-500/40' },
+    news: { label: 'News', color: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60' },
   };
   const info = map[platform?.toLowerCase()] || map.news;
   return (
@@ -657,7 +660,8 @@ function MultiSelect({
 
 function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
   const [open, setOpen] = useState(false);
-  const current = DURATION_PRESETS.find((item) => item.value === value) || DURATION_PRESETS[1];
+  const currentPreset = DURATION_PRESETS.find((item) => item.value === value);
+  const current = currentPreset || (Number(value) >= 365 ? { label: 'All Time', value } : DURATION_PRESETS[1]);
   const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
   const minutes = ['00', '15', '30', '45'];
   const ampm = ['AM', 'PM'];
@@ -715,7 +719,7 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
                   }}
                   className={clsx(
                     'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition',
-                    option.value === value ? 'bg-indigo-500/20 text-indigo-100' : 'hover:bg-white/5 text-gray-200',
+                    option.value === value ? 'bg-indigo-500/20 text-indigo-100 font-semibold' : 'hover:bg-white/5 text-gray-200',
                   )}
                 >
                   {option.label}
@@ -1020,6 +1024,8 @@ export default function InboxPage() {
   const [selectedKeywordsFilter, setSelectedKeywordsFilter] = useState([]);
   const [expandedKeywordGroups, setExpandedKeywordGroups] = useState({});
   const [postsLimit, setPostsLimit] = useState(DEFAULT_POSTS_LIMIT);
+  const [selectedSentiments, setSelectedSentiments] = useState([]);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
 
   // Refs for race condition prevention and memory leak protection
   const fetchDataCallIdRef = useRef(0);
@@ -1108,6 +1114,187 @@ export default function InboxPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isFreqOpen]);
+
+  // Close filter menu when clicking outside
+  useEffect(() => {
+    if (!isFilterMenuOpen) return;
+    const handleClickOutside = (e) => {
+      const target = e.target;
+      if (!target.closest('.filter-menu')) {
+        setIsFilterMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFilterMenuOpen]);
+
+  // Read URL parameters and apply filters
+  const searchParams = useSearchParams();
+  const urlParamsRef = useRef({ sentiment: null, brand: null, platform: null, keywordGroup: null, keyword: null });
+  
+  useEffect(() => {
+    const sentiment = searchParams.get('sentiment');
+    const brand = searchParams.get('brand');
+    const platform = searchParams.get('platform');
+    const keywordGroup = searchParams.get('keywordGroup');
+    const keyword = searchParams.get('keyword');
+    const durationParam = searchParams.get('duration');
+
+    // Store URL params in ref for later use
+    urlParamsRef.current = { sentiment, brand, platform, keywordGroup, keyword };
+
+    // Set sentiment filter (support single value from URL, convert to array)
+    if (sentiment && ['positive', 'neutral', 'negative'].includes(sentiment.toLowerCase())) {
+      setSelectedSentiments([sentiment.toLowerCase()]);
+    } else {
+      setSelectedSentiments([]);
+    }
+
+    // Set duration filter - if coming from analytics (sentiment param exists), use duration from URL
+    // Accept any valid number (not just presets) to allow showing all posts
+    if (durationParam) {
+      const durationNum = Number(durationParam);
+      if (!isNaN(durationNum) && durationNum > 0) {
+        setDuration(durationParam);
+      }
+    } else if (sentiment) {
+      // If sentiment filter is set but no duration, set to large value to show all matching posts
+      // User can manually change duration later if needed
+      setDuration('3650');
+    }
+
+    // Set brand filter (will be validated when brands are loaded)
+    if (brand && brand !== 'all') {
+      setSelectedBrands([brand]);
+    }
+
+    // Set platform/channel filter
+    if (platform && platform !== 'all') {
+      setSelectedChannels([platform.toLowerCase()]);
+    }
+
+    // Set keyword group filter (will be validated when brands are loaded)
+    if (keywordGroup) {
+      // Check if it's already in compound format (brandName::groupName)
+      if (keywordGroup.includes('::')) {
+        setSelectedKeywordGroups([keywordGroup]);
+      } else if (brand && brand !== 'all') {
+        // Construct compound ID format
+        setSelectedKeywordGroups([`${brand}::${keywordGroup}`]);
+      } else {
+        // Store for later validation when brands are loaded
+        setSelectedKeywordGroups([keywordGroup]);
+      }
+    }
+
+    // Set keyword filter
+    if (keyword && keyword !== 'all') {
+      // If keywordGroup is provided, construct compound keyword ID: groupId::keywordValue
+      if (keywordGroup) {
+        const groupId = keywordGroup.includes('::') 
+          ? keywordGroup 
+          : (brand && brand !== 'all' ? `${brand}::${keywordGroup}` : keywordGroup);
+        const keywordId = `${groupId}::${keyword.toLowerCase().trim()}`;
+        setSelectedKeywordsFilter([keywordId]);
+      }
+      // If no keywordGroup, we'll need to find matching keywords when brands are loaded
+    }
+  }, [searchParams]);
+
+  // Validate and apply filters after brands are loaded
+  useEffect(() => {
+    if (!assignedBrandDetails?.length) return;
+
+    const { keywordGroup, brand } = urlParamsRef.current;
+    
+    // Validate brand filter
+    if (brand && brand !== 'all') {
+      const brandExists = assignedBrandDetails.some(b => b.brandName === brand);
+      if (!brandExists) {
+        // Brand doesn't exist, clear brand filter
+        setSelectedBrands([]);
+        // Also clear keyword group and keyword filters since they depend on brand
+        if (keywordGroup) {
+          setSelectedKeywordGroups([]);
+          if (urlParamsRef.current.keyword) {
+            setSelectedKeywordsFilter([]);
+          }
+        }
+        return;
+      }
+    }
+    
+    // Validate keyword group filter
+    if (!keywordGroup) return;
+    
+    // If keyword group is already in compound format, validate it exists
+    if (keywordGroup.includes('::')) {
+      const [brandName, groupName] = keywordGroup.split('::');
+      const brandDetail = assignedBrandDetails.find(b => b.brandName === brandName);
+      if (brandDetail) {
+        const groupExists = brandDetail.keywordGroups?.some(
+          g => (g.groupName || g.name) === groupName
+        );
+        if (!groupExists) {
+          // Group doesn't exist, clear the filter
+          setSelectedKeywordGroups([]);
+          if (urlParamsRef.current.keyword) {
+            setSelectedKeywordsFilter([]);
+          }
+        }
+      }
+    } else if (brand && brand !== 'all') {
+      // Validate the group exists for the specified brand
+      const brandDetail = assignedBrandDetails.find(b => b.brandName === brand);
+      if (brandDetail) {
+        const groupExists = brandDetail.keywordGroups?.some(
+          g => (g.groupName || g.name) === keywordGroup
+        );
+        if (groupExists) {
+          // Update to compound format
+          const groupId = `${brand}::${keywordGroup}`;
+          setSelectedKeywordGroups([groupId]);
+          // Update keyword filter if exists
+          if (urlParamsRef.current.keyword) {
+            const keywordId = `${groupId}::${urlParamsRef.current.keyword.toLowerCase().trim()}`;
+            setSelectedKeywordsFilter([keywordId]);
+          }
+        } else {
+          // Group doesn't exist, clear the filter
+          setSelectedKeywordGroups([]);
+          if (urlParamsRef.current.keyword) {
+            setSelectedKeywordsFilter([]);
+          }
+        }
+      }
+    } else {
+      // No brand specified, try to find matching groups across all brands
+      let foundGroupId = null;
+      for (const brandDetail of assignedBrandDetails) {
+        const group = brandDetail.keywordGroups?.find(
+          g => (g.groupName || g.name) === keywordGroup
+        );
+        if (group) {
+          foundGroupId = makeGroupId(brandDetail.brandName, group);
+          break;
+        }
+      }
+      if (foundGroupId) {
+        setSelectedKeywordGroups([foundGroupId]);
+        // Update keyword filter if exists
+        if (urlParamsRef.current.keyword) {
+          const keywordId = `${foundGroupId}::${urlParamsRef.current.keyword.toLowerCase().trim()}`;
+          setSelectedKeywordsFilter([keywordId]);
+        }
+      } else {
+        // Group not found, clear the filter
+        setSelectedKeywordGroups([]);
+        if (urlParamsRef.current.keyword) {
+          setSelectedKeywordsFilter([]);
+        }
+      }
+    }
+  }, [assignedBrandDetails]);
 
   useEffect(() => {
     if (loadings) return;
@@ -1586,11 +1773,17 @@ export default function InboxPage() {
 
       if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel || !matchesKeyword) return false;
 
+      // Apply sentiment filter if set
+      if (selectedSentiments.length > 0) {
+        const postSentiment = (post?.analysis?.sentiment || post?.sentiment || '').toLowerCase();
+        if (!selectedSentiments.includes(postSentiment)) return false;
+      }
+
       if (activeTab === 'actionable') return (post?.analysis?.sentiment || '').toLowerCase() === 'negative';
       if (activeTab === 'non-actionable') return (post?.analysis?.sentiment || '').toLowerCase() !== 'negative';
       return true;
     });
-  }, [posts, selectedBrands, duration, searchTerm, activeTab, selectedChannels, timeRange, selectedKeywordsFilter]);
+  }, [posts, selectedBrands, duration, searchTerm, activeTab, selectedChannels, timeRange, selectedKeywordsFilter, selectedSentiments]);
 
   const counts = useMemo(() => {
     const total = posts.length;
@@ -1772,101 +1965,59 @@ export default function InboxPage() {
                 </div>
               )}
             </div>
-            <div className="relative freq-menu">
+            <div className="relative filter-menu">
               <button
-                // Monitoring frequency disabled
-                disabled
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white opacity-60 cursor-not-allowed"
+                onClick={() => setIsFilterMenuOpen((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 cursor-pointer"
               >
                 <Filter className="h-4 w-4" />
                 Filter
+                {selectedSentiments.length > 0 && (
+                  <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs text-indigo-100">
+                    {selectedSentiments.length}
+                  </span>
+                )}
               </button>
-              {false && isFreqOpen && (
+              {isFilterMenuOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-white/10 bg-[#080808] p-2 shadow-xl shadow-black/40">
-                  <div className="px-2 pb-2 text-xs uppercase tracking-widest text-gray-400">Monitoring Frequency</div>
+                  <div className="flex items-center justify-between px-2 pb-2 text-xs uppercase tracking-widest text-gray-400">
+                    <span>Sentiment Filter</span>
+                    <button
+                      onClick={() => {
+                        setSelectedSentiments([]);
+                        setIsFilterMenuOpen(false);
+                      }}
+                      className="text-indigo-200 hover:text-indigo-100 cursor-pointer"
+                    >
+                      Reset
+                    </button>
+                  </div>
                   <ul className="space-y-1 text-sm">
                     {[
-                      { label: 'Every 5 minutes', value: '5m' },
-                      { label: 'Every 10 minutes', value: '10m' },
-                      { label: 'Every 30 minutes', value: '30m' },
-                      { label: 'Every 1 hour', value: '1h' },
-                      { label: 'Every 2 hours', value: '2h' },
-                    ].map(({ label, value }) => (
-                      <li key={value}>
-                        <button
-                          disabled={savingFreq}
-                          onClick={async () => {
-                            // Guard: prevent multiple simultaneous updates
-                            if (savingFreq) return;
-
-                            try {
-                              setSavingFreq(true);
-                              showFreqMessage('');
-                              showErrorMessage('');
-
-                              const targets = selectedBrands.length ? selectedBrands : brands;
-
-                              if (targets.length === 0) {
-                                showFreqMessage('No brands available to configure');
-                                return;
-                              }
-
-                              // Update frequency for each target brand using allSettled
-                              const configResults = await Promise.allSettled(
-                                targets.map((brandName) =>
-                                  api.brands.configure({ brandName, frequency: value })
-                                )
+                      { value: 'positive', label: 'Positive' },
+                      { value: 'neutral', label: 'Neutral' },
+                      { value: 'negative', label: 'Negative' },
+                    ].map(({ value, label }) => {
+                      const active = selectedSentiments.includes(value);
+                      return (
+                        <li key={value}>
+                          <button
+                            className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition ${active ? 'bg-indigo-500/20 text-indigo-100' : 'hover:bg-white/5 text-gray-200'}`}
+                            onClick={() => {
+                              setSelectedSentiments((prev) =>
+                                prev.includes(value)
+                                  ? prev.filter((item) => item !== value)
+                                  : [...prev, value]
                               );
-
-                              const configFailures = configResults.filter(r => r.status === 'rejected');
-                              if (configFailures.length > 0) {
-                                if (process.env.NODE_ENV !== 'production') {
-                                  console.warn(`${configFailures.length} brand(s) failed to configure`);
-                                }
-                              }
-
-                              showFreqMessage(`Monitoring set to ${label.toLowerCase()}${selectedBrands.length ? '' : ' for all brands'}. Refreshing data…`);
-
-                              // Re-run search for updated brands
-                              try {
-                                const refreshTargets = selectedBrands.length ? selectedBrands : brands;
-                                if (refreshTargets.length === 0) {
-                                  await api.data.getData({
-                                    email: user?.email,
-                                  });
-                                } else {
-                                  await Promise.allSettled(
-                                    refreshTargets.map((b) =>
-                                      api.data.getData({
-                                        email: user?.email,
-                                        brandName: b,
-                                      })
-                                    )
-                                  );
-                                }
-                              } catch (refreshErr) {
-                                if (process.env.NODE_ENV !== 'production') {
-                                  console.warn('Post-frequency refresh failed:', refreshErr);
-                                }
-                              }
-
-                              setReloadKey((k) => k + 1);
-                              setIsFreqOpen(false);
-                            } catch (e) {
-                              showFreqMessage(e?.message || 'Failed to update frequency');
-                              showErrorMessage(e?.message || 'Failed to update frequency');
-                            } finally {
-                              setSavingFreq(false);
-                            }
-                          }}
-                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition hover:bg-white/5 disabled:opacity-60"
-                        >
-                          <span>{label}</span>
-                        </button>
-                      </li>
-                    ))}
+                            }}
+                          >
+                            <span>{label}</span>
+                            {active && <CheckCircle2 className="h-4 w-4 text-indigo-300" />}
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
-
                 </div>
               )}
             </div>
@@ -1923,13 +2074,19 @@ export default function InboxPage() {
                 <span className="font-semibold text-white">
                   {selectedBrands.length ? selectedBrands.join(', ') : 'all assigned brands'}
                 </span>{' '}
-                over the last{' '}
-                <span className="font-semibold text-white">
-                  {
-                    (DURATION_PRESETS.find((item) => item.value === duration) || DURATION_PRESETS[1])
-                      .label
-                  }
-                </span>
+                {Number(duration) >= 365 ? (
+                  <span className="font-semibold text-white">from all time</span>
+                ) : (
+                  <>
+                    over the last{' '}
+                    <span className="font-semibold text-white">
+                      {
+                        (DURATION_PRESETS.find((item) => item.value === duration) || DURATION_PRESETS[1])
+                          .label
+                      }
+                    </span>
+                  </>
+                )}
               </span>
             </div>
 

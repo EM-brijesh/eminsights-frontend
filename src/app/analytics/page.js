@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import {
   RefreshCw,
@@ -232,6 +233,7 @@ function AnalyticsMentionCard({ post }) {
   );
 }
 export default function AnalyticsPage() {
+  const router = useRouter();
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [brandKeywords, setBrandKeywords] = useState([]);
@@ -249,6 +251,47 @@ export default function AnalyticsPage() {
   const [summaryError, setSummaryError] = useState(null);
   const [sentimentWarning, setSentimentWarning] = useState('');
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
+
+  // Handle sentiment card click - navigate to inbox with filters
+  const handleSentimentClick = useCallback((sentiment) => {
+    const params = new URLSearchParams();
+    
+    // Add sentiment filter
+    params.set('sentiment', sentiment);
+    
+    // Set duration to a very large value (3650 days = ~10 years) to show all matching posts from all time
+    // User can manually change duration later if needed
+    params.set('duration', '3650');
+    
+    // Add brand filter if not 'all'
+    if (selectedBrand && selectedBrand !== 'all') {
+      params.set('brand', selectedBrand);
+    }
+    
+    // Add platform filter if not 'all'
+    if (selectedPlatform && selectedPlatform !== 'all') {
+      params.set('platform', selectedPlatform);
+    }
+    
+    // Add keyword group filter if not 'all'
+    if (selectedGroup && selectedGroup !== 'all') {
+      // Construct compound ID format for inbox compatibility
+      if (selectedBrand && selectedBrand !== 'all') {
+        params.set('keywordGroup', `${selectedBrand}::${selectedGroup}`);
+      } else {
+        // If 'all brands', just pass the group name
+        params.set('keywordGroup', selectedGroup);
+      }
+    }
+    
+    // Add keyword filter if not 'all'
+    if (selectedKeyword && selectedKeyword !== 'all') {
+      params.set('keyword', selectedKeyword);
+    }
+    
+    // Navigate to inbox with query parameters
+    router.push(`/inbox?${params.toString()}`);
+  }, [router, selectedBrand, selectedPlatform, selectedGroup, selectedKeyword]);
   // Initialize
   useEffect(() => {
     fetchBrands();
@@ -983,7 +1026,10 @@ export default function AnalyticsPage() {
               <p className="text-4xl font-bold">{stats.total}</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-emerald-500/20 to-emerald-400/10 border-emerald-500/60">
+          <Card 
+            className="bg-gradient-to-br from-emerald-500/20 to-emerald-400/10 border-emerald-500/60 cursor-pointer transition-all hover:scale-105 hover:border-emerald-400/80 hover:shadow-lg hover:shadow-emerald-500/20"
+            onClick={() => handleSentimentClick('positive')}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Smile className="w-5 h-5 text-emerald-300" />
@@ -997,7 +1043,10 @@ export default function AnalyticsPage() {
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 border-yellow-500/60">
+          <Card 
+            className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 border-yellow-500/60 cursor-pointer transition-all hover:scale-105 hover:border-yellow-400/80 hover:shadow-lg hover:shadow-yellow-500/20"
+            onClick={() => handleSentimentClick('neutral')}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Meh className="w-5 h-5 text-yellow-300" />
@@ -1011,7 +1060,10 @@ export default function AnalyticsPage() {
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-red-500/20 to-red-400/10 border-red-500/60">
+          <Card 
+            className="bg-gradient-to-br from-red-500/20 to-red-400/10 border-red-500/60 cursor-pointer transition-all hover:scale-105 hover:border-red-400/80 hover:shadow-lg hover:shadow-red-500/20"
+            onClick={() => handleSentimentClick('negative')}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Frown className="w-5 h-5 text-red-300" />

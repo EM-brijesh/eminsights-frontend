@@ -274,18 +274,29 @@ export default function AnalyticsPage() {
     }
     
     // Add keyword group filter if not 'all'
+    // Note: keyword group and individual keyword are mutually exclusive
     if (selectedGroup && selectedGroup !== 'all') {
-      // Construct compound ID format for inbox compatibility
-      if (selectedBrand && selectedBrand !== 'all') {
+      // If already in compound format (brandName::groupName), use it directly
+      if (selectedGroup.includes('::')) {
+        params.set('keywordGroup', selectedGroup);
+      } else if (selectedBrand && selectedBrand !== 'all') {
+        // Construct compound ID format for inbox compatibility
         params.set('keywordGroup', `${selectedBrand}::${selectedGroup}`);
       } else {
-        // If 'all brands', just pass the group name
-        params.set('keywordGroup', selectedGroup);
+        // If 'all brands' and group is not in compound format, find the group to get its brand
+        const group = keywordGroups.find(
+          (g) => (g.groupName || g.name) === selectedGroup
+        );
+        if (group?.brandName) {
+          params.set('keywordGroup', `${group.brandName}::${selectedGroup}`);
+        } else {
+          // Fallback: just pass the group name (inbox will try to find it)
+          params.set('keywordGroup', selectedGroup);
+        }
       }
-    }
-    
-    // Add keyword filter if not 'all'
-    if (selectedKeyword && selectedKeyword !== 'all') {
+      // Don't pass keyword when keyword group is selected (they're mutually exclusive)
+    } else if (selectedKeyword && selectedKeyword !== 'all') {
+      // Add keyword filter only if no keyword group is selected
       params.set('keyword', selectedKeyword);
     }
     
@@ -596,9 +607,22 @@ export default function AnalyticsPage() {
     };
 
     if (selectedGroup !== 'all') {
-      const group = keywordGroups.find(
-        (g) => (g.groupName || g.name) === selectedGroup,
-      );
+      // Handle compound format (brandName::groupName) when "all brands" is selected
+      let groupName = selectedGroup;
+      let brandName = null;
+      if (selectedGroup.includes('::')) {
+        [brandName, groupName] = selectedGroup.split('::');
+      }
+      
+      // Find the matching group
+      const group = keywordGroups.find((g) => {
+        const gName = g.groupName || g.name;
+        if (brandName) {
+          return gName === groupName && g.brandName === brandName;
+        }
+        return gName === groupName;
+      });
+      
       return collectKeywordsFromGroup(group);
     }
 
@@ -614,22 +638,98 @@ export default function AnalyticsPage() {
       filtered = filtered.filter(p => p.platform === selectedPlatform);
     }
     if (selectedGroup !== 'all') {
-      const group = keywordGroups.find(
-        (g) => (g.groupName || g.name) === selectedGroup,
-      );
-      if (group?.keywords?.length > 0) {
-        filtered = filtered.filter(post => {
-          const postKeyword = post.keyword?.toLowerCase().trim();
-          return group.keywords.some(k =>
-            postKeyword === k.toLowerCase().trim() || postKeyword?.includes(k.toLowerCase().trim())
-          );
-        });
+      // Handle compound format (brandName::groupName) when "all brands" is selected
+      let groupName = selectedGroup;
+      let brandName = null;
+      if (selectedGroup.includes('::')) {
+        [brandName, groupName] = selectedGroup.split('::');
+      }
+      
+      // Find the matching group
+      const group = keywordGroups.find((g) => {
+        const gName = g.groupName || g.name;
+        if (brandName) {
+          // When brand is specified, match both brand and group name
+          return gName === groupName && g.brandName === brandName;
+        }
+        // When single brand is selected, just match group name
+        return gName === groupName;
+      });
+      
+      if (group) {
+        // Filter by brand if group belongs to a specific brand
+        if (brandName && group.brandName) {
+          filtered = filtered.filter(post => {
+            const postBrandName = post?.brand?.brandName || post?.brandName;
+            return postBrandName === brandName;
+          });
+        } else if (group.brandName && selectedBrand === 'all') {
+          // When "all brands" is selected but group has a specific brand, filter by that brand
+          filtered = filtered.filter(post => {
+            const postBrandName = post?.brand?.brandName || post?.brandName;
+            return postBrandName === group.brandName;
+          });
+        }
+        
+        // Collect all keywords to match (AND keywords + OR keywords)
+        const allKeywords = [
+          ...(Array.isArray(group.keywords) ? group.keywords : []),
+          ...(Array.isArray(group.includeKeywords) ? group.includeKeywords : [])
+        ];
+        const excludeKeywords = Array.isArray(group.excludeKeywords) ? group.excludeKeywords : [];
+        
+        if (allKeywords.length > 0) {
+          filtered = filtered.filter(post => {
+            // Use same keyword extraction logic as inbox for consistency
+            const postKeyword = (
+              post?.keyword ||
+              post?.content?.keyword ||
+              post?.content?.tag ||
+              post?.analysis?.keyword ||
+              post?.tag ||
+              post?.topic ||
+              ''
+            ).toString().trim().toLowerCase();
+            
+            if (!postKeyword) return false;
+            
+            // Check if post matches any of the include keywords (exact match like inbox)
+            const matchesInclude = allKeywords.some(k => {
+              const keywordLower = (k || '').toString().trim().toLowerCase();
+              return postKeyword === keywordLower;
+            });
+            
+            if (!matchesInclude) return false;
+            
+            // Check if post should be excluded
+            if (excludeKeywords.length > 0) {
+              const matchesExclude = excludeKeywords.some(k => {
+                const keywordLower = (k || '').toString().trim().toLowerCase();
+                return postKeyword === keywordLower;
+              });
+              if (matchesExclude) return false;
+            }
+            
+            return true;
+          });
+        }
       }
     }
     if (selectedKeyword !== 'all') {
-      filtered = filtered.filter(p =>
-        p.keyword?.toLowerCase() === selectedKeyword.toLowerCase()
-      );
+      const keywordLower = selectedKeyword.toLowerCase().trim();
+      filtered = filtered.filter(p => {
+        // Use same keyword extraction logic as inbox for consistency
+        const postKeyword = (
+          p?.keyword ||
+          p?.content?.keyword ||
+          p?.content?.tag ||
+          p?.analysis?.keyword ||
+          p?.tag ||
+          p?.topic ||
+          ''
+        ).toString().trim().toLowerCase();
+        return postKeyword === keywordLower;
+      });
     }
     return filtered;
   }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups]);
@@ -947,9 +1047,16 @@ export default function AnalyticsPage() {
                     const andCount = Array.isArray(group.keywords) ? group.keywords.length : 0;
                     const orCount = Array.isArray(group.includeKeywords) ? group.includeKeywords.length : 0;
                     const totalCount = andCount + orCount;
+                    // When "all brands" is selected, use compound format to distinguish groups from different brands
+                    const optionValue = selectedBrand === 'all' && group.brandName
+                      ? `${group.brandName}::${label}`
+                      : label;
+                    const displayLabel = selectedBrand === 'all' && group.brandName
+                      ? `${label} (${group.brandName})`
+                      : label;
                     return (
-                      <option key={idx} value={label}>
-                        {label} ({totalCount})
+                      <option key={idx} value={optionValue}>
+                        {displayLabel} ({totalCount})
                       </option>
                     );
                   })}

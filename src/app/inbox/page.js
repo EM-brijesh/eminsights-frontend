@@ -275,9 +275,9 @@ function PlatformBadge({ platform }) {
     twitter: { label: 'Public Tweets', color: 'bg-sky-500/15 text-sky-200 border-sky-500/40' },
     youtube: { label: 'YouTube', color: 'bg-red-500/15 text-red-200 border-red-500/40' },
     reddit: { label: 'Reddit', color: 'bg-orange-500/15 text-orange-200 border-orange-500/40' },
-    news: { label: 'News', color: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60' },
+    google: { label: 'Google', color: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60' },
   };
-  const info = map[platform?.toLowerCase()] || map.news;
+  const info = map[platform?.toLowerCase()] || map.google;
   return (
     <span
       className={clsx(

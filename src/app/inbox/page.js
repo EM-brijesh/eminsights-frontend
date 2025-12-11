@@ -467,6 +467,7 @@ function MentionCard({ post }) {
   const author = post?.author?.name || post?.author?.id || 'Anonymous';
   const platform = post?.platform || 'news';
   const sentiment = post?.analysis?.sentiment || 'neutral';
+  const keywordValue = getPostKeyword(post);
   const underlineColor =
     sentiment === 'negative'
       ? 'border-red-500/60 text-red-300'
@@ -492,6 +493,15 @@ function MentionCard({ post }) {
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white">
             <Users className="h-4 w-4 text-indigo-300" />
             {brandName}
+          </span>
+          <span
+            className="inline-flex max-w-[180px] items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-100"
+            title={keywordValue ? `Keyword: ${keywordValue}` : 'Keyword unavailable'}
+          >
+            <Search className="h-4 w-4 text-indigo-200" />
+            <span className="truncate">
+              {keywordValue || 'Keyword N/A'}
+            </span>
           </span>
           <span className="flex items-center gap-2 text-sm text-gray-400">
             <Clock className="h-4 w-4 text-gray-500" />

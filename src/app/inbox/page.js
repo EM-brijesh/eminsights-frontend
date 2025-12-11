@@ -1075,7 +1075,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
                   </div>
                   <div className="space-y-2">
                     <div className="text-xs text-gray-400">
-                      .
+                      
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <select
@@ -2238,7 +2238,7 @@ function InboxPageContent() {
     <div className="relative min-h-screen overflow-hidden bg-[#020202] text-white">
       <DottedBackground />
       <FilterDrawer open={isFilterDrawerOpen} onClose={() => setIsFilterDrawerOpen(false)} />
-      <div className="relative z-1 mx-auto max-w-7xl px-6 py-10">
+      <div className="relative z-1 mx-auto max-w-7xl px-10 py-10">
         <header className="mb-10 flex flex-col gap-4">
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-white">INBOX</h1>

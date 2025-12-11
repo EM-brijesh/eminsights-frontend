@@ -42,7 +42,7 @@ const DURATION_PRESETS = [
 
 const TABS = [
   //  { key: 'tickets', label: 'Tickets', icon: Inbox },
-  { key: 'all', label: 'All Mentions', icon: ActivitySquare },
+ // { key: 'all', label: 'All Mentions', icon: ActivitySquare },
   // { key: 'user', label: 'User Activity', icon: Users },
   // { key: 'brand', label: 'Brand Activity', icon: ActivitySquare },
   // { key: 'actionable', label: 'Actionable', icon: CheckCircle2 },
@@ -465,7 +465,7 @@ function MediaPreview({ post }) {
 function MentionCard({ post }) {
   const brandName = post?.brand?.brandName || 'Unknown Brand';
   const author = post?.author?.name || post?.author?.id || 'Anonymous';
-  const platform = post?.platform || 'news';
+  const platform = post?.platform || 'google';
   const sentiment = post?.analysis?.sentiment || 'neutral';
   const keywordValue = getPostKeyword(post);
   const underlineColor =
@@ -2250,10 +2250,7 @@ function InboxPageContent() {
       <FilterDrawer open={isFilterDrawerOpen} onClose={() => setIsFilterDrawerOpen(false)} />
       <div className="relative z-1 mx-auto max-w-7xl px-10 py-10">
         <header className="mb-10 flex flex-col gap-4">
-          <div>
-            <h1 className="text-4xl font-semibold tracking-tight text-white">INBOX</h1>
-
-          </div>
+          
           <div className="flex flex-wrap items-center gap-3">
             {TABS.map(({ key, label, icon: Icon }) => {
               const isClickable = key === 'all';

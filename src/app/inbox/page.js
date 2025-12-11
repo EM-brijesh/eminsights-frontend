@@ -36,7 +36,8 @@ const DURATION_PRESETS = [
   { label: 'Last 14 Days', value: '14' },
   { label: 'Last 30 Days', value: '30' },
   { label: 'Last 60 Days', value: '60' },
-  { label: 'Last 90 Days', value: '90' },
+  { label: 'All Time', value: 'all-time' },
+ 
 
 ];
 
@@ -94,6 +95,14 @@ const formatDisplayDate = (value) => {
 };
 
 const buildRangeFromDuration = (days) => {
+  // Special case: full history
+  if (days === 'all-time') {
+    const end = new Date();
+    // Pick a very early anchor so we include all historical posts
+    const start = new Date(2000, 0, 1);
+    return { start: formatDateInput(start), end: formatDateInput(end) };
+  }
+
   const durationNum = Number(days);
   if (Number.isNaN(durationNum) || durationNum <= 0) {
     return createDefaultDateRange();
@@ -738,9 +747,14 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
   const [selectionMode, setSelectionMode] = useState(durationValue === 'custom' ? 'custom' : 'preset');
   const [timeError, setTimeError] = useState('');
   const [lastClickedDate, setLastClickedDate] = useState(null);
-  const [viewDate, setViewDate] = useState(() => {
+  const [viewDateStart, setViewDateStart] = useState(() => {
     const start = parseDateOnly(range?.start) || new Date();
     return new Date(start.getFullYear(), start.getMonth(), 1);
+  });
+
+  const [viewDateEnd, setViewDateEnd] = useState(() => {
+    const start = parseDateOnly(range?.start) || new Date();
+    return new Date(start.getFullYear(), start.getMonth() + 1, 1);
   });
 
   const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
@@ -784,12 +798,20 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  const moveMonth = (delta) => {
-    setViewDate((prev) => {
-      const next = new Date(prev);
-      next.setMonth(prev.getMonth() + delta);
-      return new Date(next.getFullYear(), next.getMonth(), 1);
-    });
+  const moveMonth = (calendarType, delta) => {
+    if (calendarType === 'start') {
+      setViewDateStart((prev) => {
+        const next = new Date(prev);
+        next.setMonth(prev.getMonth() + delta);
+        return new Date(next.getFullYear(), next.getMonth(), 1);
+      });
+    } else if (calendarType === 'end') {
+      setViewDateEnd((prev) => {
+        const next = new Date(prev);
+        next.setMonth(prev.getMonth() + delta);
+        return new Date(next.getFullYear(), next.getMonth(), 1);
+      });
+    }
   };
 
   const applyPreset = (days) => {
@@ -921,18 +943,35 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
 
     return (
       <div className={clsx('rounded-lg border bg-black/40 p-3', borderColor)}>
-        <div className="mb-3 flex items-center justify-between">
-         
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => moveMonth(calendarType, -1)}
+            className="rounded-full border border-white/10 p-1 text-gray-300 transition hover:border-white/20 hover:text-white"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
           <span className="text-sm font-semibold text-gray-100">
             {startOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </span>
+
+          <button
+            type="button"
+            onClick={() => moveMonth(calendarType, 1)}
+            className="rounded-full border border-white/10 p-1 text-gray-300 transition hover:border-white/20 hover:text-white"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-widest text-gray-400">
           {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
             <span key={d}>{d}</span>
           ))}
         </div>
-        <div className="mt-2 grid grid-cols-7 gap-1 text-xs">
+        <div className="mt-2 grid grid-cols-7 gap-1 text-xss">
           {cells.map((cell, idx) => {
             if (!cell) {
               return <span key={`empty-${idx}`} />;
@@ -958,7 +997,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
                 className={clsx(
                   'relative flex h-8 flex-col items-center justify-center rounded-md transition',
                   isFuture
-                    ? 'cursor-not-allowed text-gray-400 opacity-60'
+                    ? 'cursor-not-allowed text-gray-200 opacity-70'
                     : isStart || isEnd
                       ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
                       : inRange
@@ -1000,112 +1039,94 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
     <div className="relative duration-picker w-full min-w-[220px] sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex w-full min-w-[220px] items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
+        className="inline-flex w-full min-w-[220px] items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xss font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
       >
         <span className="flex flex-col items-start leading-tight">
-          <span className="text-xs uppercase tracking-widest text-gray-400">Date Range</span>
-          <span className="text-[11px]">{buttonLabel}</span>
+          <span className="text-sm uppercase tracking-widest text-gray-400">Date </span>
+          <span className="text-[15px]">{buttonLabel}</span>
         </span>
         <Calendar className="h-4 w-4 text-gray-300" />
       </button>
 
       {open && (
-        <div className="absolute left-1/2 z-[200] mt-2 w-[600px] min-w-[600px] max-w-[96vw] -translate-x-1/2 rounded-xl border border-white/10 bg-[#080808] p-2.5 shadow-2xl shadow-black/50">
-          <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-widest text-gray-400">
-            <span>Select a range</span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => moveMonth(-1)}
-                className="rounded-full border border-white/10 p-1 text-gray-300 transition hover:border-white/20 hover:text-white"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => moveMonth(1)}
-                className="rounded-full border border-white/10 p-1 text-gray-300 transition hover:border-white/20 hover:text-white"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+        <div className="absolute left-1/2 z-[200] mt-2 w-[580px] min-w-[50px] max-w-[50vw] -translate-x-1/2 rounded-xl border border-white/10 bg-[#080808] p-2.5 shadow-2xl shadow-black/50">
+          
 
-          <div className="mb-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs">
+          <div className="mb-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-widest text-gray-400">From:</span>
+              <span className="text-xss uppercase tracking-widest text-gray-400">From:</span>
               <span className="font-medium text-white">{formatDisplayDate(draftRange?.start)}</span>
             </div>
             <div className="h-4 w-px bg-white/20" />
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-widest text-gray-400">To:</span>
+              <span className="text-xss uppercase tracking-widest text-gray-400">To:</span>
               <span className="font-medium text-white">{formatDisplayDate(draftRange?.end)}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-2">
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                {renderMonth(viewDate, 'start')}
-                {renderMonth(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1), 'end')}
+          <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-1">
+            <div className="space-y-0">
+              <div className="grid grid-cols-2 gap-1">
+                {renderMonth(viewDateStart, 'start')}
+                {renderMonth(viewDateEnd, 'end')}
               </div>
               <div className="rounded-lg border border-white/10 bg-black/40 p-3">
-                <div className="mb-2 text-xs uppercase tracking-widest text-gray-400">Time Range</div>
+                <div className="mb-2 text-xss uppercase tracking-widest text-gray-400"></div>
                 {timeError && (
-                  <div className="mb-2 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  <div className="mb-2 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-xss text-red-200">
                     {timeError}
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="space-y-2">
-                    <div className="text-xs text-gray-400"></div>
+                <div className="grid grid-cols-2 justify-between gap-1 text-xs">
+                  <div className="space-y-0">
+                    <div className="text-xss text-gray-400"></div>
                     <div className="flex flex-wrap items-center gap-2">
                       <select
                         value={timeRange.from.h}
                         onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, h: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {hours.map((h) => <option key={`fh-${h}`} value={h}>{h}</option>)}
                       </select>
                       <select
                         value={timeRange.from.m}
                         onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, m: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {minutes.map((m) => <option key={`fm-${m}`} value={m}>{m}</option>)}
                       </select>
                       <select
                         value={timeRange.from.ampm}
                         onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, ampm: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-12 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {ampm.map((p) => <option key={`fa-${p}`} value={p}>{p}</option>)}
                       </select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-xs text-gray-400">
+                  <div className="space-y-0">
+                    <div className="text-xss text-gray-400">
                       
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <select
                         value={timeRange.to.h}
                         onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, h: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {hours.map((h) => <option key={`th-${h}`} value={h}>{h}</option>)}
                       </select>
                       <select
                         value={timeRange.to.m}
                         onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, m: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {minutes.map((m) => <option key={`tm-${m}`} value={m}>{m}</option>)}
                       </select>
                       <select
                         value={timeRange.to.ampm}
                         onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, ampm: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-12 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {ampm.map((p) => <option key={`ta-${p}`} value={p}>{p}</option>)}
                       </select>
@@ -1116,8 +1137,8 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
             </div>
 
             <div className="flex flex-col gap-2 text-sm">
-              <div className="text-xs uppercase tracking-widest text-gray-500">Quick Ranges</div>
-              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+              
+              <div className="flex-1 space-y-1 overflow-y-auto pr-1">
                 {quickRanges.map((option) => (
                   <button
                     key={option.value}
@@ -1143,7 +1164,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-end gap-3">
+          <div className="mt-4 flex items-end justify-end gap-4">
             <button
               onClick={() => setOpen(false)}
               className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:bg-white/10"
@@ -1152,7 +1173,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
             </button>
             <button
               onClick={applyDraft}
-              className="rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-4 py-2 text-sm font-semibold text-indigo-100 transition hover:border-indigo-300 hover:bg-indigo-500/30"
+              className=" items-end justify-end rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-4 py-2 text-sm font-semibold text-indigo-100 transition hover:border-indigo-300 hover:bg-indigo-500/30"
             >
               Done
             </button>

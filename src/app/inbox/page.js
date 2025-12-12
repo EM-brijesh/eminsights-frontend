@@ -55,6 +55,8 @@ const PLATFORM_OPTIONS = [
   { value: 'youtube', label: 'YouTube' },
   { value: 'reddit', label: 'Reddit' },
   { value: 'google', label: 'Google' },
+  {value:  'facebook', label: 'Facebook' },
+  {value: 'instagram', label: 'Instagram' },
 ];
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v'];

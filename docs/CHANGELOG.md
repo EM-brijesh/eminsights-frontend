@@ -1,3 +1,26 @@
+## 2025-12-04 - Analytics Keyword and Keyword Group Filtering Fix
+
+- **Fix**: Fixed both keyword group and individual keyword filtering in Analytics and Inbox pages.
+- **Issues**:
+  1. When a keyword group was selected and sentiment cards were clicked, redirect to inbox didn't show correct post counts.
+  2. When an individual keyword was selected (without a keyword group), filtering wasn't working when redirecting to inbox.
+- **Changes in Inbox** (`src/app/inbox/page.js`):
+  - Fixed keyword group URL parameter handling: When a keyword group is set from URL params, automatically populates `selectedKeywordsFilter` with all keywords from that group (both AND and OR keywords).
+  - Added logic to handle keyword-only filtering when `keyword` parameter is provided without `keywordGroup`.
+  - When a keyword is provided without a group, searches across all keyword groups to find matching keywords and creates appropriate compound IDs.
+  - This ensures posts are properly filtered when redirected from analytics with either a keyword group or individual keyword parameter.
+- **Changes in Analytics** (`src/app/analytics/page.js`):
+  - Updated keyword group filtering logic to include both `keywords` (AND) and `includeKeywords` (OR) when matching posts, and properly exclude `excludeKeywords` (NOT).
+  - Fixed compound ID format handling: When "all brands" is selected, keyword groups now use `brandName::groupName` format in dropdown values to distinguish groups with the same name from different brands.
+  - Updated redirect logic to properly construct compound keyword group IDs when redirecting to inbox.
+  - Enhanced group matching to consider brand name when "all brands" is selected, preventing incorrect group matches.
+  - Updated keyword filtering to use the same keyword extraction logic as inbox (checking multiple fields: `keyword`, `content.keyword`, `content.tag`, `analysis.keyword`, `tag`, `topic`).
+  - Updated redirect logic to ensure keyword and keyword group filters are mutually exclusive (when a group is selected, keyword is not passed).
+  - Improved keyword matching to use exact matching (consistent with inbox) instead of loose `includes()` matching.
+  - Added brand filtering when a keyword group belongs to a specific brand.
+
+**Impact**: Both keyword group and individual keyword filtering now work correctly in analytics and when redirecting to inbox. Sentiment card clicks show accurate post counts that match the analytics dashboard filters. The filtering logic is consistent between analytics and inbox pages.
+
 ## 2025-12-04 - Keyword Config Shortcut
 
 - **UX**: `src/app/brands/page.js` now shows a "View keywords" button instead of the hover-only tooltip. Clicking the button sends admins directly to the Keywords configuration page with the selected brand in the query string.

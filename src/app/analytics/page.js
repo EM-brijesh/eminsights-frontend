@@ -466,9 +466,19 @@ export default function AnalyticsPage() {
           ? ANALYTICS_POST_LIMIT
           : ANALYTICS_POST_LIMIT;
       const fetchedPosts = [];
+      // Use same "all-time" date range as inbox page (2000-01-01 to today)
+      const allTimeStartDate = new Date(2000, 0, 1).toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      const allTimeEndDate = new Date().toISOString().split('T')[0];
+      
       for (const name of targetBrands) {
         try {
-          const params = { brandName: name, limit: perBrandLimit, sort: 'desc' };
+          const params = { 
+            brandName: name, 
+            limit: perBrandLimit, 
+            sort: 'desc',
+            startDate: allTimeStartDate,
+            endDate: allTimeEndDate
+          };
           const data = await api.dashboard.getPosts(params);
           const postsWithBrand = (data.data || []).map((post) => ({
             ...post,
@@ -479,7 +489,14 @@ export default function AnalyticsPage() {
           console.error(`Failed to load posts for ${name}:`, brandErr);
         }
       }
-      const sortedPosts = fetchedPosts.sort((a, b) => {
+      // Filter posts to match inbox "all-time" behavior (2000-01-01 onwards)
+      const allTimeStartTimestamp = new Date(2000, 0, 1).getTime();
+      const filteredByDate = fetchedPosts.filter((post) => {
+        const postDate = post.createdAt ? new Date(post.createdAt).getTime() : 0;
+        return postDate >= allTimeStartTimestamp;
+      });
+      
+      const sortedPosts = filteredByDate.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA;

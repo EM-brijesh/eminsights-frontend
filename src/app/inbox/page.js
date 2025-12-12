@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ActivitySquare,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   CheckCircle2,
   Circle,
@@ -19,6 +21,7 @@ import {
   Search,
   Users,
   Play,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -33,13 +36,14 @@ const DURATION_PRESETS = [
   { label: 'Last 14 Days', value: '14' },
   { label: 'Last 30 Days', value: '30' },
   { label: 'Last 60 Days', value: '60' },
-  { label: 'Last 90 Days', value: '90' },
+  { label: 'All Time', value: 'all-time' },
+ 
 
 ];
 
 const TABS = [
   //  { key: 'tickets', label: 'Tickets', icon: Inbox },
-  { key: 'all', label: 'All Mentions', icon: ActivitySquare },
+ // { key: 'all', label: 'All Mentions', icon: ActivitySquare },
   // { key: 'user', label: 'User Activity', icon: Users },
   // { key: 'brand', label: 'Brand Activity', icon: ActivitySquare },
   // { key: 'actionable', label: 'Actionable', icon: CheckCircle2 },
@@ -61,6 +65,70 @@ const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 const DEFAULT_DURATION = '1';
 const DEFAULT_POSTS_LIMIT = 100;
 const EXTENDED_POSTS_LIMIT = 1000;
+const MAX_RANGE_POSTS_LIMIT = 3000;
+const RANGE_POSTS_PER_DAY = 150;
+
+const formatDateInput = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateOnly = (value) => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const parsed = new Date(year, month - 1, day);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const createDefaultDateRange = () => {
+  const today = new Date();
+  const todayStr = formatDateInput(today);
+  return { start: todayStr, end: todayStr };
+};
+
+const formatDisplayDate = (value) => {
+  const parsed = parseDateOnly(value);
+  if (!parsed) return 'Select dates';
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const buildRangeFromDuration = (days) => {
+  // Special case: full history
+  if (days === 'all-time') {
+    const end = new Date();
+    // Pick a very early anchor so we include all historical posts
+    const start = new Date(2000, 0, 1);
+    return { start: formatDateInput(start), end: formatDateInput(end) };
+  }
+
+  const durationNum = Number(days);
+  if (Number.isNaN(durationNum) || durationNum <= 0) {
+    return createDefaultDateRange();
+  }
+  
+  // For very large durations (>= 3650 days ~10 years), use same "all-time" behavior
+  // This ensures consistency when redirecting from analytics with large duration values
+  if (durationNum >= 3650) {
+    const end = new Date();
+    const start = new Date(2000, 0, 1);
+    return { start: formatDateInput(start), end: formatDateInput(end) };
+  }
+  
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - durationNum + 1);
+  return { start: formatDateInput(start), end: formatDateInput(end) };
+};
+
+const isDefaultDateRange = (range) => {
+  if (!range) return false;
+  const today = formatDateInput(new Date());
+  return range.start === today && range.end === today;
+};
 
 const createDefaultTimeRange = () => ({
   from: { h: '12', m: '00', ampm: 'AM' },
@@ -77,6 +145,20 @@ const isDefaultTimeRange = (range) => {
     range.to?.m === '59' &&
     range.to?.ampm === 'PM'
   );
+};
+
+const getRangeDays = (range) => {
+  const start = parseDateOnly(range?.start);
+  const end = parseDateOnly(range?.end);
+  if (!start || !end) return 1;
+  const ms = Math.abs(end.getTime() - start.getTime());
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+};
+
+const rangeAwareLimit = (range) => {
+  const days = getRangeDays(range);
+  const estimated = Math.ceil(days * RANGE_POSTS_PER_DAY);
+  return Math.min(MAX_RANGE_POSTS_LIMIT, Math.max(DEFAULT_POSTS_LIMIT, estimated));
 };
 
 const normalizeName = (value) => (value || '').toString().trim();
@@ -213,9 +295,9 @@ function PlatformBadge({ platform }) {
     twitter: { label: 'Public Tweets', color: 'bg-sky-500/15 text-sky-200 border-sky-500/40' },
     youtube: { label: 'YouTube', color: 'bg-red-500/15 text-red-200 border-red-500/40' },
     reddit: { label: 'Reddit', color: 'bg-orange-500/15 text-orange-200 border-orange-500/40' },
-    news: { label: 'News', color: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60' },
+    google: { label: 'Google', color: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60' },
   };
-  const info = map[platform?.toLowerCase()] || map.news;
+  const info = map[platform?.toLowerCase()] || map.google;
   return (
     <span
       className={clsx(
@@ -403,8 +485,9 @@ function MediaPreview({ post }) {
 function MentionCard({ post }) {
   const brandName = post?.brand?.brandName || 'Unknown Brand';
   const author = post?.author?.name || post?.author?.id || 'Anonymous';
-  const platform = post?.platform || 'news';
+  const platform = post?.platform || 'google';
   const sentiment = post?.analysis?.sentiment || 'neutral';
+  const keywordValue = getPostKeyword(post);
   const underlineColor =
     sentiment === 'negative'
       ? 'border-red-500/60 text-red-300'
@@ -430,6 +513,15 @@ function MentionCard({ post }) {
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white">
             <Users className="h-4 w-4 text-indigo-300" />
             {brandName}
+          </span>
+          <span
+            className="inline-flex max-w-[180px] items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-100"
+            title={keywordValue ? `Keyword: ${keywordValue}` : 'Keyword unavailable'}
+          >
+            <Search className="h-4 w-4 text-indigo-200" />
+            <span className="truncate">
+              {keywordValue || 'Keyword N/A'}
+            </span>
           </span>
           <span className="flex items-center gap-2 text-sm text-gray-400">
             <Clock className="h-4 w-4 text-gray-500" />
@@ -660,15 +752,51 @@ function MultiSelect({
   );
 }
 
-function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
+function DateRangePicker({ range, onChange, durationValue, onDurationChange, timeRange, onTimeChange }) {
   const [open, setOpen] = useState(false);
-  const currentPreset = DURATION_PRESETS.find((item) => item.value === value);
-  const current = currentPreset || (Number(value) >= 365 ? { label: 'All Time', value } : DURATION_PRESETS[1]);
+  const [draftRange, setDraftRange] = useState(range || createDefaultDateRange());
+  const [selectionMode, setSelectionMode] = useState(durationValue === 'custom' ? 'custom' : 'preset');
+  const [timeError, setTimeError] = useState('');
+  const [lastClickedDate, setLastClickedDate] = useState(null);
+  const [viewDateStart, setViewDateStart] = useState(() => {
+    const start = parseDateOnly(range?.start) || new Date();
+    return new Date(start.getFullYear(), start.getMonth(), 1);
+  });
+
+  const [viewDateEnd, setViewDateEnd] = useState(() => {
+    const start = parseDateOnly(range?.start) || new Date();
+    return new Date(start.getFullYear(), start.getMonth() + 1, 1);
+  });
+
   const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
   const minutes = ['00', '15', '30', '45'];
   const ampm = ['AM', 'PM'];
+  const quickRanges = [...DURATION_PRESETS, { label: 'custom', value: 'custom' }];
 
-  // Close dropdown when clicking outside
+  const normalizeRangeOrder = (nextRange) => {
+    const start = parseDateOnly(nextRange?.start);
+    const end = parseDateOnly(nextRange?.end);
+    if (start && end && start > end) {
+      return { start: nextRange.end, end: nextRange.start };
+    }
+    return nextRange;
+  };
+
+  const startDate = parseDateOnly(draftRange?.start);
+  const endDate = parseDateOnly(draftRange?.end);
+
+  useEffect(() => {
+    setDraftRange(range || createDefaultDateRange());
+  }, [range]);
+
+  // Default to today's date when picker opens for the first time
+  useEffect(() => {
+    if (open && !range) {
+      const todayRange = createDefaultDateRange();
+      setDraftRange(todayRange);
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e) => {
@@ -681,130 +809,389 @@ function DurationPicker({ value, onChange, timeRange, onTimeChange }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  const handleReset = () => {
-    onChange(DEFAULT_DURATION);
-    onTimeChange(createDefaultTimeRange());
+  const moveMonth = (calendarType, delta) => {
+    if (calendarType === 'start') {
+      setViewDateStart((prev) => {
+        const next = new Date(prev);
+        next.setMonth(prev.getMonth() + delta);
+        return new Date(next.getFullYear(), next.getMonth(), 1);
+      });
+    } else if (calendarType === 'end') {
+      setViewDateEnd((prev) => {
+        const next = new Date(prev);
+        next.setMonth(prev.getMonth() + delta);
+        return new Date(next.getFullYear(), next.getMonth(), 1);
+      });
+    }
   };
 
+  const applyPreset = (days) => {
+    const nextRange = normalizeRangeOrder(buildRangeFromDuration(days));
+    onDurationChange?.(String(days));
+    onChange(nextRange);
+    // Preserve time range instead of resetting it
+    setDraftRange(nextRange);
+    setSelectionMode('preset');
+    setTimeError('');
+    setOpen(false);
+  };
+
+  const enableCustomMode = () => {
+    setSelectionMode('custom');
+    onDurationChange?.('custom');
+    setTimeError('');
+    // Keep picker open for custom selection
+  };
+
+  const handleDayClick = (date) => {
+    const dateStr = formatDateInput(date);
+    setSelectionMode('custom');
+    onDurationChange?.('custom');
+    setTimeError('');
+
+    setDraftRange((prev) => {
+      const hasStart = prev?.start;
+      const hasEnd = prev?.end;
+      const prevStartStr = prev?.start;
+      const prevEndStr = prev?.end;
+      
+      // Check if both dates are already selected and different
+      if (hasStart && hasEnd && prevStartStr !== prevEndStr) {
+        // If clicking a different date, reset to new "from" date only
+        setLastClickedDate(dateStr);
+        return {
+          start: dateStr,
+          end: dateStr
+        };
+      }
+      
+      // If start and end are the same (single day range) or only start is set
+      if (hasStart) {
+        // If clicking the same date as start (double-click), keep both as that date
+        if (prevStartStr === dateStr) {
+          setLastClickedDate(dateStr);
+          return {
+            start: dateStr,
+            end: dateStr
+          };
+        }
+        // Otherwise, set as end date (completing the range)
+        setLastClickedDate(dateStr);
+        return {
+          start: prevStartStr,
+          end: dateStr
+        };
+      }
+      
+      // No dates selected, set as start date (single day range initially)
+      setLastClickedDate(dateStr);
+      return {
+        start: dateStr,
+        end: dateStr
+      };
+    });
+  };
+
+  const validateTimeRange = () => {
+    const start = parseDateOnly(draftRange.start);
+    const end = parseDateOnly(draftRange.end);
+
+    // Only validate if same day
+    if (start && end && start.getTime() === end.getTime()) {
+      const fromHour = (parseInt(timeRange.from.h) % 12) + (timeRange.from.ampm === 'PM' ? 12 : 0);
+      const fromMins = fromHour * 60 + parseInt(timeRange.from.m);
+      const toHour = (parseInt(timeRange.to.h) % 12) + (timeRange.to.ampm === 'PM' ? 12 : 0);
+      const toMins = toHour * 60 + parseInt(timeRange.to.m);
+
+      if (fromMins >= toMins) {
+        setTimeError('End time must be after start time for same-day ranges');
+        return false;
+      }
+    }
+
+    setTimeError('');
+    return true;
+  };
+
+  const applyDraft = () => {
+    if (!validateTimeRange()) return;
+
+    const normalized = normalizeRangeOrder(draftRange);
+    setDraftRange(normalized);
+    onChange(normalized);
+    onDurationChange?.('custom');
+    setOpen(false);
+  };
+
+  const handleReset = () => {
+    const defaults = createDefaultDateRange();
+    setDraftRange(defaults);
+    onChange(defaults);
+    onDurationChange?.(DEFAULT_DURATION);
+    onTimeChange(createDefaultTimeRange());
+    setSelectionMode('preset');
+    setLastClickedDate(null);
+    setTimeError('');
+  };
+
+  const renderMonth = (baseDate, calendarType) => {
+    const isStartCalendar = calendarType === 'start';
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const startOfMonth = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = startOfMonth.getDay(); // 0-6
+    const cells = [];
+
+    for (let i = 0; i < firstDay; i += 1) {
+      cells.push(null);
+    }
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      cells.push(new Date(year, month, day));
+    }
+
+    const borderColor = isStartCalendar ? 'border-emerald-500/20' : 'border-indigo-500/20';
+
+    return (
+      <div className={clsx('rounded-lg border bg-black/40 p-3', borderColor)}>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => moveMonth(calendarType, -1)}
+            className="rounded-full border border-white/10 p-1 text-gray-300 transition hover:border-white/20 hover:text-white"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <span className="text-sm font-semibold text-gray-100">
+            {startOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => moveMonth(calendarType, 1)}
+            className="rounded-full border border-white/10 p-1 text-gray-300 transition hover:border-white/20 hover:text-white"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-widest text-gray-400">
+          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+        <div className="mt-2 grid grid-cols-7 gap-1 text-xss">
+          {cells.map((cell, idx) => {
+            if (!cell) {
+              return <span key={`empty-${idx}`} />;
+            }
+            const cellStr = formatDateInput(cell);
+            const isStart = draftRange?.start && cellStr === draftRange.start;
+            const isEnd = draftRange?.end && cellStr === draftRange.end;
+            const inRange =
+              startDate &&
+              endDate &&
+              cell >= (startDate <= endDate ? startDate : endDate) &&
+              cell <= (endDate >= startDate ? endDate : startDate);
+
+            // Check for future dates
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const isFuture = cell > today;
+
+            return (
+              <button
+                key={cellStr}
+                onClick={() => !isFuture && handleDayClick(cell)}
+                className={clsx(
+                  'relative flex h-8 flex-col items-center justify-center rounded-md transition',
+                  isFuture
+                    ? 'cursor-not-allowed text-gray-200 opacity-70'
+                    : isStart || isEnd
+                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                      : inRange
+                        ? 'bg-indigo-500/10 text-indigo-100'
+                        : 'text-gray-200 hover:bg-white/5'
+                )}
+                title={isFuture ? 'Future dates not available' : (isStart ? 'From date' : isEnd ? 'To date' : '')}
+              >
+                <span>{cell.getDate()}</span>
+                {isFuture && (
+                  <X className="absolute inset-0 m-auto h-4 w-4 text-gray-500 opacity-70" strokeWidth={2.5} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const getButtonLabel = () => {
+    const fromDate = formatDisplayDate(range?.start);
+    const toDate = formatDisplayDate(range?.end);
+    const modeLabel = selectionMode === 'preset'
+      ? (DURATION_PRESETS.find(p => p.value === durationValue)?.label || 'Preset')
+      : 'Custom';
+
+    const isDefaultTime = isDefaultTimeRange(timeRange);
+    const timeLabel = !isDefaultTime
+      ? ` (${timeRange.from.h}:${timeRange.from.m} ${timeRange.from.ampm} - ${timeRange.to.h}:${timeRange.to.m} ${timeRange.to.ampm})`
+      : '';
+
+    return `${modeLabel}: ${fromDate} - ${toDate}${timeLabel}`;
+  };
+
+  const buttonLabel = getButtonLabel();
+
   return (
-    <div className="relative duration-picker w-full sm:w-auto">
+    <div className="relative duration-picker w-full min-w-[220px] sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex w-full min-w-[180px] items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
+        className="inline-flex w-full min-w-[220px] items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xss font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
       >
         <span className="flex flex-col items-start leading-tight">
-          <span className="text-xs uppercase tracking-widest text-gray-400">Duration</span>
-          <span>{current.label}</span>
+          <span className="text-sm uppercase tracking-widest text-gray-400">Date </span>
+          <span className="text-[15px]">{buttonLabel}</span>
         </span>
         <Calendar className="h-4 w-4 text-gray-300" />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-[200] mt-2 w-[320px] rounded-xl border border-white/10 bg-[#080808] p-3 shadow-xl shadow-black/40">
-          <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-widest text-gray-500">
-            <span>Duration Presets</span>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="text-indigo-300 transition hover:text-indigo-100"
-            >
-              Reset
-            </button>
+        <div className="absolute left-1/2 z-[200] mt-2 w-[580px] min-w-[50px] max-w-[50vw] -translate-x-1/2 rounded-xl border border-white/10 bg-[#080808] p-2.5 shadow-2xl shadow-black/50">
+          
+
+          <div className="mb-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-xss uppercase tracking-widest text-gray-400">From:</span>
+              <span className="font-medium text-white">{formatDisplayDate(draftRange?.start)}</span>
+            </div>
+            <div className="h-4 w-px bg-white/20" />
+            <div className="flex items-center gap-2">
+              <span className="text-xss uppercase tracking-widest text-gray-400">To:</span>
+              <span className="font-medium text-white">{formatDisplayDate(draftRange?.end)}</span>
+            </div>
           </div>
-          <ul className="space-y-1 text-sm mb-3">
-            {DURATION_PRESETS.map((option) => (
-              <li key={option.value}>
-                <button
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                  className={clsx(
-                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition',
-                    option.value === value ? 'bg-indigo-500/20 text-indigo-100 font-semibold' : 'hover:bg-white/5 text-gray-200',
-                  )}
-                >
-                  {option.label}
-                  {option.value === value && <CheckCircle2 className="h-4 w-4 text-indigo-300" />}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-2 rounded-lg border border-white/10 bg-black/40 p-3">
-            <div className="mb-2 text-xs uppercase tracking-widest text-gray-400">Time Range</div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <div className="text-xs text-gray-400">From</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1">
+
+          <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-1">
+            <div className="space-y-0">
+              <div className="grid grid-cols-2 gap-1">
+                {renderMonth(viewDateStart, 'start')}
+                {renderMonth(viewDateEnd, 'end')}
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                <div className="mb-2 text-xss uppercase tracking-widest text-gray-400"></div>
+                {timeError && (
+                  <div className="mb-2 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-xss text-red-200">
+                    {timeError}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 justify-between gap-1 text-xs">
+                  <div className="space-y-0">
+                    <div className="text-xss text-gray-400"></div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <select
                         value={timeRange.from.h}
                         onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, h: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {hours.map((h) => <option key={`fh-${h}`} value={h}>{h}</option>)}
                       </select>
-                      <span className="text-[10px] text-gray-400">H</span>
-                    </div>
-                    <div className="flex items-center gap-1">
                       <select
                         value={timeRange.from.m}
                         onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, m: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {minutes.map((m) => <option key={`fm-${m}`} value={m}>{m}</option>)}
                       </select>
-                      <span className="text-[10px] text-gray-400">M</span>
+                      <select
+                        value={timeRange.from.ampm}
+                        onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, ampm: e.target.value } })}
+                        className="w-12 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
+                      >
+                        {ampm.map((p) => <option key={`fa-${p}`} value={p}>{p}</option>)}
+                      </select>
                     </div>
-                    <select
-                      value={timeRange.from.ampm}
-                      onChange={(e) => onTimeChange({ ...timeRange, from: { ...timeRange.from, ampm: e.target.value } })}
-                      className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
-                    >
-                      {ampm.map((p) => <option key={`fa-${p}`} value={p}>{p}</option>)}
-                    </select>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-gray-400">To</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1">
+                  <div className="space-y-0">
+                    <div className="text-xss text-gray-400">
+                      
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <select
                         value={timeRange.to.h}
                         onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, h: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {hours.map((h) => <option key={`th-${h}`} value={h}>{h}</option>)}
                       </select>
-                      <span className="text-[10px] text-gray-400">H</span>
-                    </div>
-                    <div className="flex items-center gap-1">
                       <select
                         value={timeRange.to.m}
                         onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, m: e.target.value } })}
-                        className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
+                        className="w-11 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
                       >
                         {minutes.map((m) => <option key={`tm-${m}`} value={m}>{m}</option>)}
                       </select>
-                      <span className="text-[10px] text-gray-400">M</span>
+                      <select
+                        value={timeRange.to.ampm}
+                        onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, ampm: e.target.value } })}
+                        className="w-12 rounded-md border border-white/10 bg-black/60 px-2 py-2 text-xss"
+                      >
+                        {ampm.map((p) => <option key={`ta-${p}`} value={p}>{p}</option>)}
+                      </select>
                     </div>
-                    <select
-                      value={timeRange.to.ampm}
-                      onChange={(e) => onTimeChange({ ...timeRange, to: { ...timeRange.to, ampm: e.target.value } })}
-                      className="w-16 rounded-md border border-white/10 bg-black/60 px-2 py-1 text-sm"
-                    >
-                      {ampm.map((p) => <option key={`ta-${p}`} value={p}>{p}</option>)}
-                    </select>
                   </div>
                 </div>
               </div>
             </div>
-          </div >
-        </div >
-      )
-      }
-    </div >
+
+            <div className="flex flex-col gap-2 text-sm">
+              
+              <div className="flex-1 space-y-1 overflow-y-auto pr-1">
+                {quickRanges.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => option.value === 'custom' ? enableCustomMode() : applyPreset(option.value)}
+                    className={clsx(
+                      'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition',
+                      durationValue === option.value
+                        ? 'bg-indigo-500/20 text-indigo-100'
+                        : 'bg-white/5 text-gray-200 hover:bg-white/10'
+                    )}
+                  >
+                    <span className="capitalize">{option.label}</span>
+                    {durationValue === option.value && <CheckCircle2 className="h-4 w-4 text-indigo-300" />}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={handleReset}
+                className="mt-1 inline-flex items-center justify-center rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-200 transition hover:border-white/20 hover:bg-white/10"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-end justify-end gap-4">
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={applyDraft}
+              className=" items-end justify-end rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-4 py-2 text-sm font-semibold text-indigo-100 transition hover:border-indigo-300 hover:bg-indigo-500/30"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1020,6 +1407,7 @@ function InboxPageContent() {
   const [brands, setBrands] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [duration, setDuration] = useState(DEFAULT_DURATION);
+  const [dateRange, setDateRange] = useState(() => createDefaultDateRange());
   const [timeRange, setTimeRange] = useState(() => createDefaultTimeRange());
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
@@ -1170,11 +1558,13 @@ function InboxPageContent() {
       const durationNum = Number(durationParam);
       if (!isNaN(durationNum) && durationNum > 0) {
         setDuration(durationParam);
+        setDateRange(buildRangeFromDuration(durationNum));
       }
     } else if (sentiment) {
       // If sentiment filter is set but no duration, set to large value to show all matching posts
       // User can manually change duration later if needed
       setDuration('3650');
+      setDateRange(buildRangeFromDuration(3650));
     }
 
     // Set brand filter (will be validated when brands are loaded)
@@ -1189,15 +1579,25 @@ function InboxPageContent() {
 
     // Set keyword group filter (will be validated when brands are loaded)
     if (keywordGroup) {
+      let groupIdToSet = null;
       // Check if it's already in compound format (brandName::groupName)
       if (keywordGroup.includes('::')) {
+        groupIdToSet = keywordGroup;
         setSelectedKeywordGroups([keywordGroup]);
       } else if (brand && brand !== 'all') {
         // Construct compound ID format
-        setSelectedKeywordGroups([`${brand}::${keywordGroup}`]);
+        groupIdToSet = `${brand}::${keywordGroup}`;
+        setSelectedKeywordGroups([groupIdToSet]);
       } else {
         // Store for later validation when brands are loaded
         setSelectedKeywordGroups([keywordGroup]);
+      }
+      // Expand the keyword group so it's visible when the brand button is opened
+      if (groupIdToSet) {
+        setExpandedKeywordGroups((prev) => ({
+          ...prev,
+          [groupIdToSet]: true,
+        }));
       }
     }
 
@@ -1219,7 +1619,7 @@ function InboxPageContent() {
   useEffect(() => {
     if (!assignedBrandDetails?.length) return;
 
-    const { keywordGroup, brand } = urlParamsRef.current;
+    const { keywordGroup, brand, keyword } = urlParamsRef.current;
 
     // Validate brand filter
     if (brand && brand !== 'all') {
@@ -1230,7 +1630,7 @@ function InboxPageContent() {
         // Also clear keyword group and keyword filters since they depend on brand
         if (keywordGroup) {
           setSelectedKeywordGroups([]);
-          if (urlParamsRef.current.keyword) {
+          if (keyword) {
             setSelectedKeywordsFilter([]);
           }
         }
@@ -1238,74 +1638,148 @@ function InboxPageContent() {
       }
     }
 
+    // Handle keyword-only filtering (when keyword is provided but no keywordGroup)
+    if (!keywordGroup && keyword && keyword !== 'all') {
+      const keywordLower = keyword.toLowerCase().trim();
+      const matchingKeywordIds = [];
+
+      // Find all groups that contain this keyword
+      assignedBrandDetails.forEach((brandDetail) => {
+        // Skip if brand filter is set and this brand doesn't match
+        if (brand && brand !== 'all' && brandDetail.brandName !== brand) {
+          return;
+        }
+
+        brandDetail.keywordGroups?.forEach((group) => {
+          const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
+          const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
+          const merged = [...andKeywords, ...orKeywords];
+          const groupKeywords = merged.map((k) => (k || '').toString().trim().toLowerCase()).filter(Boolean);
+
+          // Check if this group contains the keyword
+          if (groupKeywords.includes(keywordLower)) {
+            const groupId = makeGroupId(brandDetail.brandName, group);
+            matchingKeywordIds.push(`${groupId}::${keywordLower}`);
+          }
+        });
+      });
+
+      if (matchingKeywordIds.length > 0) {
+        setSelectedKeywordsFilter(matchingKeywordIds);
+        // Extract unique group IDs from matching keyword IDs and expand them
+        const groupIdsToExpand = new Set();
+        matchingKeywordIds.forEach((keywordId) => {
+          const { groupId } = splitKeywordCompoundId(keywordId);
+          if (groupId) {
+            groupIdsToExpand.add(groupId);
+          }
+        });
+        // Expand all groups that contain the matching keyword
+        if (groupIdsToExpand.size > 0) {
+          setExpandedKeywordGroups((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            groupIdsToExpand.forEach((groupId) => {
+              if (next[groupId] === undefined) {
+                next[groupId] = true;
+                changed = true;
+              }
+            });
+            return changed ? next : prev;
+          });
+        }
+      } else {
+        // Keyword not found in any group, clear filter
+        setSelectedKeywordsFilter([]);
+      }
+      return;
+    }
+
     // Validate keyword group filter
     if (!keywordGroup) return;
+
+    // Helper function to populate keywords from a group
+    const populateKeywordsFromGroup = (groupId, group) => {
+      const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
+      const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
+      const merged = [...andKeywords, ...orKeywords];
+      const groupKeywords = merged.map((k) => (k || '').toLowerCase().trim()).filter(Boolean);
+
+      // If a specific keyword is provided in URL, use only that
+      if (urlParamsRef.current.keyword) {
+        const keywordId = `${groupId}::${urlParamsRef.current.keyword.toLowerCase().trim()}`;
+        setSelectedKeywordsFilter([keywordId]);
+      } else {
+        // Otherwise, populate all keywords from the group
+        const keywordIds = groupKeywords.map((keyword) => `${groupId}::${keyword}`);
+        setSelectedKeywordsFilter(keywordIds);
+      }
+      
+      // Expand the keyword group so it's visible when the brand button is opened
+      setExpandedKeywordGroups((prev) => ({
+        ...prev,
+        [groupId]: true,
+      }));
+    };
 
     // If keyword group is already in compound format, validate it exists
     if (keywordGroup.includes('::')) {
       const [brandName, groupName] = keywordGroup.split('::');
       const brandDetail = assignedBrandDetails.find(b => b.brandName === brandName);
       if (brandDetail) {
-        const groupExists = brandDetail.keywordGroups?.some(
+        const group = brandDetail.keywordGroups?.find(
           g => (g.groupName || g.name) === groupName
         );
-        if (!groupExists) {
+        if (group) {
+          // Group exists, populate keywords and expand it
+          populateKeywordsFromGroup(keywordGroup, group);
+        } else {
           // Group doesn't exist, clear the filter
           setSelectedKeywordGroups([]);
-          if (urlParamsRef.current.keyword) {
-            setSelectedKeywordsFilter([]);
-          }
+          setSelectedKeywordsFilter([]);
         }
       }
     } else if (brand && brand !== 'all') {
       // Validate the group exists for the specified brand
       const brandDetail = assignedBrandDetails.find(b => b.brandName === brand);
       if (brandDetail) {
-        const groupExists = brandDetail.keywordGroups?.some(
+        const group = brandDetail.keywordGroups?.find(
           g => (g.groupName || g.name) === keywordGroup
         );
-        if (groupExists) {
+        if (group) {
           // Update to compound format
           const groupId = `${brand}::${keywordGroup}`;
           setSelectedKeywordGroups([groupId]);
-          // Update keyword filter if exists
-          if (urlParamsRef.current.keyword) {
-            const keywordId = `${groupId}::${urlParamsRef.current.keyword.toLowerCase().trim()}`;
-            setSelectedKeywordsFilter([keywordId]);
-          }
+          // Populate keywords from the group and expand it
+          populateKeywordsFromGroup(groupId, group);
         } else {
           // Group doesn't exist, clear the filter
           setSelectedKeywordGroups([]);
-          if (urlParamsRef.current.keyword) {
-            setSelectedKeywordsFilter([]);
-          }
+          setSelectedKeywordsFilter([]);
         }
       }
     } else {
       // No brand specified, try to find matching groups across all brands
       let foundGroupId = null;
+      let foundGroup = null;
       for (const brandDetail of assignedBrandDetails) {
         const group = brandDetail.keywordGroups?.find(
           g => (g.groupName || g.name) === keywordGroup
         );
         if (group) {
           foundGroupId = makeGroupId(brandDetail.brandName, group);
+          foundGroup = group;
           break;
         }
       }
-      if (foundGroupId) {
+      if (foundGroupId && foundGroup) {
         setSelectedKeywordGroups([foundGroupId]);
-        // Update keyword filter if exists
-        if (urlParamsRef.current.keyword) {
-          const keywordId = `${foundGroupId}::${urlParamsRef.current.keyword.toLowerCase().trim()}`;
-          setSelectedKeywordsFilter([keywordId]);
-        }
+        // Populate keywords from the group and expand it
+        populateKeywordsFromGroup(foundGroupId, foundGroup);
       } else {
         // Group not found, clear the filter
         setSelectedKeywordGroups([]);
-        if (urlParamsRef.current.keyword) {
-          setSelectedKeywordsFilter([]);
-        }
+        setSelectedKeywordsFilter([]);
       }
     }
   }, [assignedBrandDetails]);
@@ -1484,7 +1958,7 @@ function InboxPageContent() {
     };
 
     fetchData();
-  }, [loadings, router, user?.email, reloadKey, postsLimit]);
+  }, [loadings, router, user?.email, reloadKey, postsLimit, dateRange?.start, dateRange?.end]);
 
   // If user switches to Brand Activity and we have brands but no posts yet,
   // try a per-brand fetch to populate the list.
@@ -1549,13 +2023,15 @@ function InboxPageContent() {
 
   useEffect(() => {
     const searchActive = Boolean(searchTerm.trim());
-    const durationChanged = duration !== DEFAULT_DURATION;
+    const dateRangeChanged = !isDefaultDateRange(dateRange);
     const timeRangeChanged = !isDefaultTimeRange(timeRange);
+    const desired = rangeAwareLimit(dateRange);
+    const targetLimit = (searchActive || dateRangeChanged || timeRangeChanged)
+      ? Math.max(desired, EXTENDED_POSTS_LIMIT)
+      : desired;
 
-    if ((searchActive || durationChanged || timeRangeChanged) && postsLimit !== EXTENDED_POSTS_LIMIT) {
-      setPostsLimit(EXTENDED_POSTS_LIMIT);
-    }
-  }, [searchTerm, duration, timeRange, postsLimit]);
+    setPostsLimit((prev) => (prev === targetLimit ? prev : targetLimit));
+  }, [searchTerm, dateRange, timeRange]);
 
 
   const visibleBrandDetails = useMemo(() => {
@@ -1607,15 +2083,24 @@ function InboxPageContent() {
     setExpandedKeywordGroups((prev) => {
       const next = { ...prev };
       let changed = false;
+      // Expand visible groups
       visibleGroupIds.forEach((id) => {
         if (next[id] === undefined) {
           next[id] = true;
           changed = true;
         }
       });
+      // Also expand any selected keyword groups (from URL params or user selection)
+      // This ensures groups from URL params are expanded even if they're not in visibleGroupIds yet
+      selectedKeywordGroups.forEach((groupId) => {
+        if (groupId && next[groupId] === undefined) {
+          next[groupId] = true;
+          changed = true;
+        }
+      });
       return changed ? next : prev;
     });
-  }, [visibleGroupIds]);
+  }, [visibleGroupIds, selectedKeywordGroups]);
   // Handler for toggling keyword groups
   const handleToggleKeywordGroup = useCallback((groupId) => {
     // Find the group and its keywords (AND + OR) from brandDetails
@@ -1740,10 +2225,6 @@ function InboxPageContent() {
 
   const filteredPosts = useMemo(() => {
     if (!posts?.length) return [];
-    const days = Number(duration || '2');
-    // Lower bound date (start date based on duration)
-    const lower = new Date();
-    lower.setDate(lower.getDate() - days + 1);
 
     // Apply time-of-day window
     const to24 = (h12, ampm) => {
@@ -1753,18 +2234,35 @@ function InboxPageContent() {
     };
     const startHour = to24(timeRange.from.h, timeRange.from.ampm);
     const startMinute = Number(timeRange.from.m);
-    lower.setHours(startHour, startMinute, 0, 0);
-
-    const upper = new Date();
     const endHour = to24(timeRange.to.h, timeRange.to.ampm);
     const endMinute = Number(timeRange.to.m);
-    upper.setHours(endHour, endMinute, 59, 999);
+
+    const startDate = parseDateOnly(dateRange?.start);
+    const endDate = parseDateOnly(dateRange?.end);
+
+    let lower = startDate ? new Date(startDate) : null;
+    let upper = endDate ? new Date(endDate) : null;
+
+    if (lower && upper && lower > upper) {
+      const temp = lower;
+      lower = upper;
+      upper = temp;
+    }
+
+    if (lower) {
+      lower.setHours(startHour, startMinute, 0, 0);
+    }
+    if (upper) {
+      upper.setHours(endHour, endMinute, 59, 999);
+    }
 
     return posts.filter((post) => {
       const brandName = post?.brand?.brandName;
       const matchesBrand = selectedBrands.length === 0 || (brandName && selectedBrands.includes(brandName));
       const createdAt = post?.createdAt ? new Date(post.createdAt) : post?.fetchedAt ? new Date(post.fetchedAt) : null;
-      const matchesDate = createdAt ? (createdAt >= lower && createdAt <= upper) : true;
+      const matchesDate = createdAt
+        ? (!lower || createdAt >= lower) && (!upper || createdAt <= upper)
+        : true;
       const text = `${post?.content?.text || ''} ${post?.content?.description || ''}`.toLowerCase();
       const authorValue = (post?.author?.name || post?.author?.id || '').toLowerCase();
       const keywordValue = getPostKeyword(post);
@@ -1797,7 +2295,7 @@ function InboxPageContent() {
       if (activeTab === 'non-actionable') return (post?.analysis?.sentiment || '').toLowerCase() !== 'negative';
       return true;
     });
-  }, [posts, selectedBrands, duration, searchTerm, activeTab, selectedChannels, timeRange, selectedKeywordsFilter, selectedSentiments]);
+  }, [posts, selectedBrands, dateRange, searchTerm, activeTab, selectedChannels, timeRange, selectedKeywordsFilter, selectedSentiments]);
 
   const counts = useMemo(() => {
     const total = posts.length;
@@ -1813,16 +2311,25 @@ function InboxPageContent() {
     };
   }, [brands.length, posts]);
 
+  const rangeSummaryLabel = useMemo(() => {
+    const startLabel = formatDisplayDate(dateRange?.start);
+    const endLabel = formatDisplayDate(dateRange?.end);
+    if (!dateRange?.start || !dateRange?.end || startLabel === 'Select dates' || endLabel === 'Select dates') {
+      return 'for the selected date range';
+    }
+    if (dateRange.start === dateRange.end) {
+      return `on ${startLabel}`;
+    }
+    return `from ${startLabel} to ${endLabel}`;
+  }, [dateRange]);
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#020202] text-white">
       <DottedBackground />
       <FilterDrawer open={isFilterDrawerOpen} onClose={() => setIsFilterDrawerOpen(false)} />
-      <div className="relative z-1 mx-auto max-w-7xl px-6 py-10">
+      <div className="relative z-1 mx-auto max-w-7xl px-10 py-10">
         <header className="mb-10 flex flex-col gap-4">
-          <div>
-            <h1 className="text-4xl font-semibold tracking-tight text-white">INBOX</h1>
-
-          </div>
+          
           <div className="flex flex-wrap items-center gap-3">
             {TABS.map(({ key, label, icon: Icon }) => {
               const isClickable = key === 'all';
@@ -1866,7 +2373,14 @@ function InboxPageContent() {
                 onToggleExpand={handleToggleGroupExpand}
               />
             </div>
-            <DurationPicker value={duration} onChange={setDuration} timeRange={timeRange} onTimeChange={setTimeRange} />
+            <DateRangePicker
+              range={dateRange}
+              onChange={setDateRange}
+              durationValue={duration}
+              onDurationChange={setDuration}
+              timeRange={timeRange}
+              onTimeChange={setTimeRange}
+            />
             <label className="flex min-w-[200px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">
               <Search className="h-4 w-4 text-gray-400" />
               <input
@@ -2062,13 +2576,15 @@ function InboxPageContent() {
             <div className="space-y-1">
               <p className="text-lg font-semibold text-white">No mentions found</p>
               <p className="text-sm text-gray-400">
-                Try adjusting your filters or expanding the duration range to see more conversations.
+                Try adjusting your filters or widening the date/time range to see more conversations.
               </p>
             </div>
             <button
               onClick={() => {
                 setSelectedBrands([]);
                 setDuration('7');
+                setDateRange(buildRangeFromDuration(7));
+                setTimeRange(createDefaultTimeRange());
                 setSearchTerm('');
                 setActiveTab('all');
               }}
@@ -2088,19 +2604,7 @@ function InboxPageContent() {
                 <span className="font-semibold text-white">
                   {selectedBrands.length ? selectedBrands.join(', ') : 'all assigned brands'}
                 </span>{' '}
-                {Number(duration) >= 365 ? (
-                  <span className="font-semibold text-white">from all time</span>
-                ) : (
-                  <>
-                    over the last{' '}
-                    <span className="font-semibold text-white">
-                      {
-                        (DURATION_PRESETS.find((item) => item.value === duration) || DURATION_PRESETS[1])
-                          .label
-                      }
-                    </span>
-                  </>
-                )}
+                {rangeSummaryLabel}
               </span>
             </div>
 

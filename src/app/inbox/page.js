@@ -107,6 +107,15 @@ const buildRangeFromDuration = (days) => {
   if (Number.isNaN(durationNum) || durationNum <= 0) {
     return createDefaultDateRange();
   }
+  
+  // For very large durations (>= 3650 days ~10 years), use same "all-time" behavior
+  // This ensures consistency when redirecting from analytics with large duration values
+  if (durationNum >= 3650) {
+    const end = new Date();
+    const start = new Date(2000, 0, 1);
+    return { start: formatDateInput(start), end: formatDateInput(end) };
+  }
+  
   const end = new Date();
   const start = new Date();
   start.setDate(end.getDate() - durationNum + 1);
@@ -1568,15 +1577,25 @@ function InboxPageContent() {
 
     // Set keyword group filter (will be validated when brands are loaded)
     if (keywordGroup) {
+      let groupIdToSet = null;
       // Check if it's already in compound format (brandName::groupName)
       if (keywordGroup.includes('::')) {
+        groupIdToSet = keywordGroup;
         setSelectedKeywordGroups([keywordGroup]);
       } else if (brand && brand !== 'all') {
         // Construct compound ID format
-        setSelectedKeywordGroups([`${brand}::${keywordGroup}`]);
+        groupIdToSet = `${brand}::${keywordGroup}`;
+        setSelectedKeywordGroups([groupIdToSet]);
       } else {
         // Store for later validation when brands are loaded
         setSelectedKeywordGroups([keywordGroup]);
+      }
+      // Expand the keyword group so it's visible when the brand button is opened
+      if (groupIdToSet) {
+        setExpandedKeywordGroups((prev) => ({
+          ...prev,
+          [groupIdToSet]: true,
+        }));
       }
     }
 
@@ -1645,6 +1664,28 @@ function InboxPageContent() {
 
       if (matchingKeywordIds.length > 0) {
         setSelectedKeywordsFilter(matchingKeywordIds);
+        // Extract unique group IDs from matching keyword IDs and expand them
+        const groupIdsToExpand = new Set();
+        matchingKeywordIds.forEach((keywordId) => {
+          const { groupId } = splitKeywordCompoundId(keywordId);
+          if (groupId) {
+            groupIdsToExpand.add(groupId);
+          }
+        });
+        // Expand all groups that contain the matching keyword
+        if (groupIdsToExpand.size > 0) {
+          setExpandedKeywordGroups((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            groupIdsToExpand.forEach((groupId) => {
+              if (next[groupId] === undefined) {
+                next[groupId] = true;
+                changed = true;
+              }
+            });
+            return changed ? next : prev;
+          });
+        }
       } else {
         // Keyword not found in any group, clear filter
         setSelectedKeywordsFilter([]);
@@ -1671,6 +1712,12 @@ function InboxPageContent() {
         const keywordIds = groupKeywords.map((keyword) => `${groupId}::${keyword}`);
         setSelectedKeywordsFilter(keywordIds);
       }
+      
+      // Expand the keyword group so it's visible when the brand button is opened
+      setExpandedKeywordGroups((prev) => ({
+        ...prev,
+        [groupId]: true,
+      }));
     };
 
     // If keyword group is already in compound format, validate it exists
@@ -1682,7 +1729,7 @@ function InboxPageContent() {
           g => (g.groupName || g.name) === groupName
         );
         if (group) {
-          // Group exists, populate keywords
+          // Group exists, populate keywords and expand it
           populateKeywordsFromGroup(keywordGroup, group);
         } else {
           // Group doesn't exist, clear the filter
@@ -1701,7 +1748,7 @@ function InboxPageContent() {
           // Update to compound format
           const groupId = `${brand}::${keywordGroup}`;
           setSelectedKeywordGroups([groupId]);
-          // Populate keywords from the group
+          // Populate keywords from the group and expand it
           populateKeywordsFromGroup(groupId, group);
         } else {
           // Group doesn't exist, clear the filter
@@ -1725,7 +1772,7 @@ function InboxPageContent() {
       }
       if (foundGroupId && foundGroup) {
         setSelectedKeywordGroups([foundGroupId]);
-        // Populate keywords from the group
+        // Populate keywords from the group and expand it
         populateKeywordsFromGroup(foundGroupId, foundGroup);
       } else {
         // Group not found, clear the filter
@@ -2034,15 +2081,24 @@ function InboxPageContent() {
     setExpandedKeywordGroups((prev) => {
       const next = { ...prev };
       let changed = false;
+      // Expand visible groups
       visibleGroupIds.forEach((id) => {
         if (next[id] === undefined) {
           next[id] = true;
           changed = true;
         }
       });
+      // Also expand any selected keyword groups (from URL params or user selection)
+      // This ensures groups from URL params are expanded even if they're not in visibleGroupIds yet
+      selectedKeywordGroups.forEach((groupId) => {
+        if (groupId && next[groupId] === undefined) {
+          next[groupId] = true;
+          changed = true;
+        }
+      });
       return changed ? next : prev;
     });
-  }, [visibleGroupIds]);
+  }, [visibleGroupIds, selectedKeywordGroups]);
   // Handler for toggling keyword groups
   const handleToggleKeywordGroup = useCallback((groupId) => {
     // Find the group and its keywords (AND + OR) from brandDetails

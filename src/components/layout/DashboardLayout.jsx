@@ -153,7 +153,7 @@ export default function DashboardLayout({ children }) {
                 <div
                   key={item.title}
                   title={`${item.title} (coming soon)`}
-                  className="flex flex-col items-center justify-center w-full py-3 rounded-lg text-gray-500 cursor-not-allowed opacity-50"
+                  className="flex flex-col items-center justify-center w-full py-3 rounded-lg text-gray-500 cursor-not-allowed opacity-30"
                   aria-disabled="true"
                 >
                   {content}

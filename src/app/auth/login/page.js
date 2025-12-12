@@ -15,6 +15,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
+  const BACKEND_AUTH_URL = typeof window !== "undefined"
+    ? (process.env.NEXT_PUBLIC_BACKEND_AUTH_URL || "http://localhost:5050")
+    : "http://localhost:5050";
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -23,7 +27,7 @@ export default function LoginPage() {
     try {
       const data = await api.auth.signin({ email, password });
       // Persist auth for Next middleware
-      const maxAge = 120 * 60; // 2 hours auth expiry on 2 hrs
+      const maxAge = 120 * 60; // 2 hours auth expiry
       const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
       document.cookie = `auth=${data.token}; Max-Age=${maxAge}; Path=/; SameSite=Lax${isSecure ? '; Secure' : ''}`;
       try {
@@ -40,6 +44,12 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // const handleFacebookLogin = () => {
+  //   // Use the same-window redirect so backend can set the httpOnly cookie on callback
+  //   // Ideally set NEXT_PUBLIC_BACKEND_AUTH_URL in your .env for different environments
+  //   window.location.href = `${BACKEND_AUTH_URL}/auth/meta/login`;
+  // };
 
   return (
     <div className="flex h-screen items-center justify-center bg-black relative">
@@ -81,13 +91,25 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-xs text-black-300 hover:text-white focus:outline-none"
-              tabIndex={-1}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-xs text-gray-300 hover:text-white focus:outline-none"
             >
               {showPassword ? "Hide" : "Show"}
             </button>
           </div>
         </div>
+
+        {/* Facebook login - use a standalone button (not submit) */}
+        {/* <div>
+          <button
+            type="button"
+            onClick={handleFacebookLogin}
+            className="w-full py-2 rounded-lg font-semibold transition duration-200 shadow-md bg-[#1877F2] text-white hover:bg-[#155db8]"
+            aria-label="Login with Facebook"
+            disabled={loading}
+          >
+            {loading ? "Processing..." : "Login with Facebook"}
+          </button>
+        </div> */}
 
         <button
           type="submit"
@@ -109,5 +131,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-

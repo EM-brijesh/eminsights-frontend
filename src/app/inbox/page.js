@@ -612,15 +612,6 @@ function MultiSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [activeBrand, setActiveBrand] = useState(value[0] || options[0] || '');
-  const [hasAutoOpened, setHasAutoOpened] = useState(false);
-
-  // Auto-open dropdown when brand is selected from URL params and has keyword groups
-  useEffect(() => {
-    if (value.length > 0 && selectedKeywordGroups.length > 0 && !hasAutoOpened && !open) {
-      setOpen(true);
-      setHasAutoOpened(true);
-    }
-  }, [value, selectedKeywordGroups, hasAutoOpened, open]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1579,6 +1570,7 @@ function InboxPageContent() {
     }
 
     // Set brand filter (will be validated when brands are loaded)
+    // Note: Brand will be matched case-insensitively and set with correct case after brands load
     if (brand && brand !== 'all') {
       setSelectedBrands([brand]);
     }
@@ -1634,8 +1626,12 @@ function InboxPageContent() {
 
     // Validate brand filter
     if (brand && brand !== 'all') {
-      const brandExists = assignedBrandDetails.some(b => b.brandName === brand);
-      if (!brandExists) {
+      // Use case-insensitive matching to find the brand
+      const matchingBrand = assignedBrandDetails.find(b => 
+        b.brandName?.toLowerCase() === brand?.toLowerCase()
+      );
+      
+      if (!matchingBrand) {
         // Brand doesn't exist, clear brand filter
         setSelectedBrands([]);
         // Also clear keyword group and keyword filters since they depend on brand
@@ -1647,19 +1643,18 @@ function InboxPageContent() {
         }
         return;
       } else {
-        // Brand exists, ensure it's selected (case-insensitive match)
-        const matchingBrand = assignedBrandDetails.find(b => 
-          b.brandName.toLowerCase() === brand.toLowerCase()
-        );
-        if (matchingBrand) {
-          setSelectedBrands((prev) => {
-            // Only update if not already selected
-            if (prev.includes(matchingBrand.brandName)) {
-              return prev;
-            }
-            return [matchingBrand.brandName];
-          });
-        }
+        // Brand exists, ensure it's selected with the correct case from database
+        setSelectedBrands((prev) => {
+          // Check if the correct brand name is already selected
+          if (prev.includes(matchingBrand.brandName)) {
+            return prev;
+          }
+          // Replace any case-variant of the brand with the correct one
+          const filtered = prev.filter(b => 
+            b?.toLowerCase() !== brand?.toLowerCase()
+          );
+          return [...filtered, matchingBrand.brandName];
+        });
       }
     }
 
@@ -1764,12 +1759,20 @@ function InboxPageContent() {
         if (group) {
           // Use the actual group name from the data to ensure consistency
           const actualGroupId = makeGroupId(brandDetail.brandName, group);
-          // Group exists, ensure it's marked as selected and populate keywords
+          // Group exists, replace any old ID (including case variants) with the actual one
           setSelectedKeywordGroups((prev) => {
-            if (prev.includes(actualGroupId)) {
-              return prev;
+            // Remove any ID that matches the keywordGroup (case-insensitive) or the actualGroupId
+            const filtered = prev.filter(id => {
+              const idLower = (id || '').toLowerCase();
+              const keywordGroupLower = (keywordGroup || '').toLowerCase();
+              const actualGroupIdLower = (actualGroupId || '').toLowerCase();
+              return idLower !== keywordGroupLower && idLower !== actualGroupIdLower;
+            });
+            // Add the actual group ID if not already present
+            if (!filtered.includes(actualGroupId)) {
+              return [...filtered, actualGroupId];
             }
-            return [...prev, actualGroupId];
+            return filtered;
           });
           populateKeywordsFromGroup(actualGroupId, group);
         } else {
@@ -1804,12 +1807,16 @@ function InboxPageContent() {
         }
       }
     } else {
-      // No brand specified, try to find matching groups across all brands
+      // No brand specified, try to find matching groups across all brands (case-insensitive)
       let foundGroupId = null;
       let foundGroup = null;
+      const keywordGroupLower = (keywordGroup || '').toLowerCase();
       for (const brandDetail of assignedBrandDetails) {
         const group = brandDetail.keywordGroups?.find(
-          g => (g.groupName || g.name) === keywordGroup
+          g => {
+            const gName = (g.groupName || g.name || '').toLowerCase();
+            return gName === keywordGroupLower;
+          }
         );
         if (group) {
           foundGroupId = makeGroupId(brandDetail.brandName, group);
@@ -1818,7 +1825,19 @@ function InboxPageContent() {
         }
       }
       if (foundGroupId && foundGroup) {
-        setSelectedKeywordGroups([foundGroupId]);
+        // Replace any old ID with the found one
+        setSelectedKeywordGroups((prev) => {
+          const filtered = prev.filter(id => {
+            const idLower = (id || '').toLowerCase();
+            const keywordGroupLower = (keywordGroup || '').toLowerCase();
+            const foundGroupIdLower = (foundGroupId || '').toLowerCase();
+            return idLower !== keywordGroupLower && idLower !== foundGroupIdLower;
+          });
+          if (!filtered.includes(foundGroupId)) {
+            return [...filtered, foundGroupId];
+          }
+          return filtered;
+        });
         // Populate keywords from the group and expand it
         populateKeywordsFromGroup(foundGroupId, foundGroup);
       } else {

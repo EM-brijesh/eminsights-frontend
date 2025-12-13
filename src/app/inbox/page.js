@@ -612,6 +612,15 @@ function MultiSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [activeBrand, setActiveBrand] = useState(value[0] || options[0] || '');
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
+
+  // Auto-open dropdown when brand is selected from URL params and has keyword groups
+  useEffect(() => {
+    if (value.length > 0 && selectedKeywordGroups.length > 0 && !hasAutoOpened && !open) {
+      setOpen(true);
+      setHasAutoOpened(true);
+    }
+  }, [value, selectedKeywordGroups, hasAutoOpened, open]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1241,13 +1250,14 @@ function KeywordTree({
                 const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
                 const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
                 const keywords = [...andKeywords, ...orKeywords];
-                // Check if all keywords in this group are selected
+                // Check if group is explicitly selected OR if all keywords in this group are selected
+                const isGroupExplicitlySelected = selectedGroups.includes(groupId);
                 const allKeywordsSelected = keywords.length > 0 && keywords.every((keyword) => {
                   const keywordValue = (keyword || '').toLowerCase().trim();
                   const keywordId = `${groupId}::${keywordValue}`;
                   return selectedKeywords.includes(keywordId);
                 });
-                const selectedGroup = allKeywordsSelected;
+                const selectedGroup = isGroupExplicitlySelected || allKeywordsSelected;
 
                 return (
                   <div key={groupId} className="rounded-xl border border-white/5 bg-white/5 p-2">
@@ -1538,7 +1548,8 @@ function InboxPageContent() {
     const sentiment = searchParams.get('sentiment');
     const brand = searchParams.get('brand');
     const platform = searchParams.get('platform');
-    const keywordGroup = searchParams.get('keywordGroup');
+    // URL decode the keywordGroup to handle encoded colons (::)
+    const keywordGroup = searchParams.get('keywordGroup') ? decodeURIComponent(searchParams.get('keywordGroup')) : null;
     const keyword = searchParams.get('keyword');
     const durationParam = searchParams.get('duration');
 
@@ -1635,6 +1646,20 @@ function InboxPageContent() {
           }
         }
         return;
+      } else {
+        // Brand exists, ensure it's selected (case-insensitive match)
+        const matchingBrand = assignedBrandDetails.find(b => 
+          b.brandName.toLowerCase() === brand.toLowerCase()
+        );
+        if (matchingBrand) {
+          setSelectedBrands((prev) => {
+            // Only update if not already selected
+            if (prev.includes(matchingBrand.brandName)) {
+              return prev;
+            }
+            return [matchingBrand.brandName];
+          });
+        }
       }
     }
 
@@ -1725,14 +1750,28 @@ function InboxPageContent() {
     // If keyword group is already in compound format, validate it exists
     if (keywordGroup.includes('::')) {
       const [brandName, groupName] = keywordGroup.split('::');
-      const brandDetail = assignedBrandDetails.find(b => b.brandName === brandName);
+      const brandDetail = assignedBrandDetails.find(b => 
+        b.brandName?.toLowerCase() === brandName?.toLowerCase()
+      );
       if (brandDetail) {
+        // Case-insensitive group name matching
         const group = brandDetail.keywordGroups?.find(
-          g => (g.groupName || g.name) === groupName
+          g => {
+            const gName = (g.groupName || g.name || '').toLowerCase();
+            return gName === groupName?.toLowerCase();
+          }
         );
         if (group) {
-          // Group exists, populate keywords and expand it
-          populateKeywordsFromGroup(keywordGroup, group);
+          // Use the actual group name from the data to ensure consistency
+          const actualGroupId = makeGroupId(brandDetail.brandName, group);
+          // Group exists, ensure it's marked as selected and populate keywords
+          setSelectedKeywordGroups((prev) => {
+            if (prev.includes(actualGroupId)) {
+              return prev;
+            }
+            return [...prev, actualGroupId];
+          });
+          populateKeywordsFromGroup(actualGroupId, group);
         } else {
           // Group doesn't exist, clear the filter
           setSelectedKeywordGroups([]);
@@ -1741,14 +1780,20 @@ function InboxPageContent() {
       }
     } else if (brand && brand !== 'all') {
       // Validate the group exists for the specified brand
-      const brandDetail = assignedBrandDetails.find(b => b.brandName === brand);
+      const brandDetail = assignedBrandDetails.find(b => 
+        b.brandName?.toLowerCase() === brand?.toLowerCase()
+      );
       if (brandDetail) {
+        // Case-insensitive group name matching
         const group = brandDetail.keywordGroups?.find(
-          g => (g.groupName || g.name) === keywordGroup
+          g => {
+            const gName = (g.groupName || g.name || '').toLowerCase();
+            return gName === keywordGroup?.toLowerCase();
+          }
         );
         if (group) {
-          // Update to compound format
-          const groupId = `${brand}::${keywordGroup}`;
+          // Update to compound format using actual brand name and group name
+          const groupId = makeGroupId(brandDetail.brandName, group);
           setSelectedKeywordGroups([groupId]);
           // Populate keywords from the group and expand it
           populateKeywordsFromGroup(groupId, group);
@@ -1874,9 +1919,18 @@ function InboxPageContent() {
         // but drop any that no longer exist in the latest brand list.
         setSelectedBrands((prevSelected) => {
           if (!prevSelected || prevSelected.length === 0) return [];
-          const brandSet = new Set(brandNames);
-          const stillValid = prevSelected.filter((name) => brandSet.has(name));
-          return stillValid;
+          if (!brandNames || brandNames.length === 0) return prevSelected;
+
+          // Build a lowercase lookup to keep URL-provided brands (case-insensitive)
+          const brandLowerMap = new Map(
+            brandNames.map((n) => [String(n).toLowerCase(), n]),
+          );
+
+          const normalized = prevSelected
+            .map((name) => brandLowerMap.get(String(name).toLowerCase()))
+            .filter(Boolean);
+
+          return normalized;
         });
 
         // Load mentions/posts
@@ -2619,4 +2673,3 @@ function InboxPageContent() {
     </div>
   );
 }
-

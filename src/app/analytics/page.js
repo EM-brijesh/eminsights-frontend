@@ -255,43 +255,52 @@ export default function AnalyticsPage() {
   // Handle sentiment card click - navigate to inbox with filters
   const handleSentimentClick = useCallback((sentiment) => {
     const params = new URLSearchParams();
-    
+    let brandForQuery = null;
+    let keywordGroupForQuery = null;
+
     // Add sentiment filter
     params.set('sentiment', sentiment);
-    
+
     // Set duration to a very large value (3650 days = ~10 years) to show all matching posts from all time
     // User can manually change duration later if needed
     params.set('duration', '3650');
-    
-    // Add brand filter if not 'all'
+
+    // If a specific brand is chosen, use it
     if (selectedBrand && selectedBrand !== 'all') {
-      params.set('brand', selectedBrand);
+      brandForQuery = selectedBrand;
     }
-    
+
     // Add platform filter if not 'all'
     if (selectedPlatform && selectedPlatform !== 'all') {
       params.set('platform', selectedPlatform);
     }
-    
+
     // Add keyword group filter if not 'all'
     // Note: keyword group and individual keyword are mutually exclusive
     if (selectedGroup && selectedGroup !== 'all') {
-      // If already in compound format (brandName::groupName), use it directly
       if (selectedGroup.includes('::')) {
-        params.set('keywordGroup', selectedGroup);
+        // Already compound format
+        keywordGroupForQuery = selectedGroup;
+        const [groupBrand] = selectedGroup.split('::');
+        if (!brandForQuery && groupBrand) {
+          brandForQuery = groupBrand;
+        }
       } else if (selectedBrand && selectedBrand !== 'all') {
         // Construct compound ID format for inbox compatibility
-        params.set('keywordGroup', `${selectedBrand}::${selectedGroup}`);
+        keywordGroupForQuery = `${selectedBrand}::${selectedGroup}`;
       } else {
-        // If 'all brands' and group is not in compound format, find the group to get its brand
+        // "All brands" selected - infer brand from group definition if available
         const group = keywordGroups.find(
           (g) => (g.groupName || g.name) === selectedGroup
         );
         if (group?.brandName) {
-          params.set('keywordGroup', `${group.brandName}::${selectedGroup}`);
+          keywordGroupForQuery = `${group.brandName}::${selectedGroup}`;
+          if (!brandForQuery) {
+            brandForQuery = group.brandName;
+          }
         } else {
           // Fallback: just pass the group name (inbox will try to find it)
-          params.set('keywordGroup', selectedGroup);
+          keywordGroupForQuery = selectedGroup;
         }
       }
       // Don't pass keyword when keyword group is selected (they're mutually exclusive)
@@ -299,10 +308,17 @@ export default function AnalyticsPage() {
       // Add keyword filter only if no keyword group is selected
       params.set('keyword', selectedKeyword);
     }
-    
+
+    if (brandForQuery) {
+      params.set('brand', brandForQuery);
+    }
+    if (keywordGroupForQuery) {
+      params.set('keywordGroup', keywordGroupForQuery);
+    }
+
     // Navigate to inbox with query parameters
     router.push(`/inbox?${params.toString()}`);
-  }, [router, selectedBrand, selectedPlatform, selectedGroup, selectedKeyword]);
+  }, [router, selectedBrand, selectedPlatform, selectedGroup, selectedKeyword, keywordGroups]);
   // Initialize
   useEffect(() => {
     fetchBrands();
@@ -466,19 +482,9 @@ export default function AnalyticsPage() {
           ? ANALYTICS_POST_LIMIT
           : ANALYTICS_POST_LIMIT;
       const fetchedPosts = [];
-      // Use same "all-time" date range as inbox page (2000-01-01 to today)
-      const allTimeStartDate = new Date(2000, 0, 1).toISOString().split('T')[0]; // Format: YYYY-MM-DD
-      const allTimeEndDate = new Date().toISOString().split('T')[0];
-      
       for (const name of targetBrands) {
         try {
-          const params = { 
-            brandName: name, 
-            limit: perBrandLimit, 
-            sort: 'desc',
-            startDate: allTimeStartDate,
-            endDate: allTimeEndDate
-          };
+          const params = { brandName: name, limit: perBrandLimit, sort: 'desc' };
           const data = await api.dashboard.getPosts(params);
           const postsWithBrand = (data.data || []).map((post) => ({
             ...post,
@@ -489,14 +495,7 @@ export default function AnalyticsPage() {
           console.error(`Failed to load posts for ${name}:`, brandErr);
         }
       }
-      // Filter posts to match inbox "all-time" behavior (2000-01-01 onwards)
-      const allTimeStartTimestamp = new Date(2000, 0, 1).getTime();
-      const filteredByDate = fetchedPosts.filter((post) => {
-        const postDate = post.createdAt ? new Date(post.createdAt).getTime() : 0;
-        return postDate >= allTimeStartTimestamp;
-      });
-      
-      const sortedPosts = filteredByDate.sort((a, b) => {
+      const sortedPosts = fetchedPosts.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA;

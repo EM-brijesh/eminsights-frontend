@@ -1043,8 +1043,9 @@ function MultiSelect({
   }, [value, activeBrand]);
 
   const handleToggle = (option) => {
-    const optionLower = (option || '').toLowerCase();
-    const normalizedSelected = value.map((v) => (v || '').toLowerCase());
+    const normalizedOption = (option || '').toString().trim();
+    const optionLower = normalizedOption.toLowerCase();
+    const normalizedSelected = value.map((v) => (v || '').toString().trim().toLowerCase());
     const exists = normalizedSelected.includes(optionLower);
 
     if (option === '__all__') {
@@ -1052,13 +1053,22 @@ function MultiSelect({
       setActiveBrand('');
       return;
     }
-    setActiveBrand(option);
+    setActiveBrand(normalizedOption);
     if (exists) {
       // Remove case-insensitively, keep original casing of remaining items
-      onChange(value.filter((v) => (v || '').toLowerCase() !== optionLower));
+      onChange(
+        value.filter(
+          (v) => (v || '').toString().trim().toLowerCase() !== optionLower,
+        ),
+      );
     } else {
-      // Multi-select: add the new brand, preserving casing
-      onChange([...value, option]);
+      // Multi-select: add the new brand if not already present (case-insensitive)
+      const hasAlready = value.some(
+        (v) => (v || '').toString().trim().toLowerCase() === optionLower,
+      );
+      if (!hasAlready) {
+        onChange([...value, normalizedOption]);
+      }
     }
   };
 
@@ -2519,10 +2529,13 @@ function InboxPageContent() {
 
 
   const visibleBrandDetails = useMemo(() => {
+    const normalize = (v) => (v || '').toString().trim().toLowerCase();
     if (!assignedBrandDetails?.length) return [];
     if (!selectedBrands.length) return assignedBrandDetails;
-    const brandSet = new Set(selectedBrands);
-    return assignedBrandDetails.filter((brand) => brandSet.has(brand.brandName));
+    const brandSet = new Set(selectedBrands.map(normalize));
+    return assignedBrandDetails.filter(
+      (brand) => brandSet.has(normalize(brand.brandName)),
+    );
   }, [assignedBrandDetails, selectedBrands]);
 
   const visibleGroupIds = useMemo(() => {
@@ -2742,7 +2755,11 @@ function InboxPageContent() {
 
     return posts.filter((post) => {
       const brandName = post?.brand?.brandName;
-      const matchesBrand = selectedBrands.length === 0 || (brandName && selectedBrands.includes(brandName));
+      const normalize = (v) => (v || '').toString().trim().toLowerCase();
+      const matchesBrand =
+        selectedBrands.length === 0 ||
+        (brandName &&
+          selectedBrands.some((b) => normalize(b) === normalize(brandName)));
       const createdAt = post?.createdAt ? new Date(post.createdAt) : post?.fetchedAt ? new Date(post.fetchedAt) : null;
       const matchesDate = createdAt
         ? (!lower || createdAt >= lower) && (!upper || createdAt <= upper)

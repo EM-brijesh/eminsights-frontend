@@ -152,6 +152,11 @@ export const api = {
     getAssigned: (email) =>
       apiRequest(`/api/brands/assigned/${encodeURIComponent(email)}`),
 
+    deletePost: (postId) =>
+      apiRequest(`/api/brands/delete/${encodeURIComponent(postId)}`, {
+        method: "DELETE",
+      }),
+
     create: (data) =>
       apiRequest("/api/brands/create", {
         method: "POST",
@@ -180,6 +185,10 @@ export const api = {
       apiRequest("/api/brands/keywordconfig", {
         method: "PUT",
         body: JSON.stringify(data),
+      }),
+    deletePost: (postId) =>
+      apiRequest(`/api/brands/delete/${encodeURIComponent(postId)}`, {
+        method: "DELETE",
       }),
   },
 

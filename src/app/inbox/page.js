@@ -16,7 +16,7 @@ import {
   Inbox,
   Loader2,
   Mail,
-  MoreHorizontal,
+  Trash,
   RefreshCcw,
   Search,
   Users,
@@ -27,7 +27,7 @@ import clsx from 'clsx';
 
 import DottedBackground from '@/components/DottedBackground';
 import { useAuth } from '@/app/hooks/useAuth';
-import api from '@/lib/api';
+import api, { API_BASE_URL } from '@/lib/api';
 
 const DURATION_PRESETS = [
   { label: 'Today', value: '1' },
@@ -67,6 +67,7 @@ const DEFAULT_POSTS_LIMIT = 100;
 const EXTENDED_POSTS_LIMIT = 1000;
 const MAX_RANGE_POSTS_LIMIT = 3000;
 const RANGE_POSTS_PER_DAY = 150;
+const EMAIL_PLACEHOLDER = 'placeholder@example.com';
 
 const formatDateInput = (date) => {
   const year = date.getFullYear();
@@ -358,6 +359,271 @@ function VideoModal({ modalContent, onClose }) {
   );
 }
 
+function EmailModal({
+  open,
+  onClose,
+  recipient,
+  onRecipientChange,
+  subject,
+  message,
+  onSubjectChange,
+  onMessageChange,
+  sendToGroups,
+  onToggleSendToGroups,
+  onSend,
+  sending,
+  error,
+  success,
+}) {
+  if (!open) return null;
+
+  const editorRef = useRef(null);
+  const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
+  const [fontLabel, setFontLabel] = useState('Font');
+
+  useEffect(() => {
+    if (!open || !editorRef.current) return;
+    // Initialize editor content once when modal opens
+    editorRef.current.innerHTML = message || '';
+  }, [open]);
+
+  const syncMessageFromEditor = () => {
+    if (!editorRef.current) return;
+    const html = editorRef.current.innerHTML;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/1e5b461d-6a47-4b72-acf9-d93cea9e570d', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'inbox/page.js:EmailModal:syncMessageFromEditor',
+        message: 'Editor input sync',
+        data: { htmlLength: html?.length ?? 0, sample: html?.slice(0, 80) ?? '' },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion agent log
+
+    onMessageChange?.(html);
+  };
+
+  const applyFormat = (command) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    try {
+      document.execCommand(command, false, null);
+      syncMessageFromEditor();
+    } catch {
+      // Silently ignore formatting errors
+    }
+  };
+
+  const applyFormatWithValue = (command, value) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    try {
+      document.execCommand(command, false, value);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/1e5b461d-6a47-4b72-acf9-d93cea9e570d', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H2',
+          location: 'inbox/page.js:EmailModal:applyFormatWithValue',
+          message: 'Applied formatted value',
+          data: { command, value },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion agent log
+      syncMessageFromEditor();
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-8">
+      <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute right-3 top-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white transition hover:border-white/30 hover:bg-white/10"
+        >
+          Close
+        </button>
+        <div className="rounded-2xl border border-white/5 bg-[#0a0a0a]">
+          <header className="flex items-center justify-between border-b border-white/5 px-5 py-3">
+            <div className="text-sm font-semibold text-white">Send Email</div>
+            
+          </header>
+
+          <div className="space-y-4 px-5 py-4 text-sm">
+            <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
+              <label className="text-gray-400">To</label>
+              <input
+                value={recipient}
+                onChange={(e) => onRecipientChange(e.target.value)}
+                placeholder="Enter one or more emails, separated by comma"
+                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+            <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
+              <label className="text-gray-400">Subject</label>
+              <input
+                value={subject}
+                onChange={(e) => onSubjectChange(e.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+            <div className="grid items-start gap-2 md:grid-cols-[80px,1fr]">
+              <label className="mt-1 text-gray-400">Message</label>
+              <div className="w-full">
+                <div
+                  ref={editorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="min-h-[140px] w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
+                  onInput={syncMessageFromEditor}
+                />
+              </div>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-2 text-xs text-gray-200">
+              <div className="relative flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center rounded border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-gray-200"
+                  onClick={() => setIsFontMenuOpen((v) => !v)}
+                >
+                  {fontLabel}
+                </button>
+                {isFontMenuOpen && (
+                  <div className="absolute left-0 top-7 z-[10000] w-28 rounded-md border border-white/15 bg-black/90 py-1 text-[11px] shadow-lg">
+                    {[
+                      { label: 'Small', value: '2' },
+                      { label: 'Normal', value: '3' },
+                      { label: 'Large', value: '4' },
+                    ].map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.value}
+                        className="flex w-full items-center px-2 py-1 text-left text-gray-200 hover:bg-white/10"
+                        onClick={() => {
+                          applyFormatWithValue('fontSize', opt.value);
+                          setFontLabel(opt.label);
+                          setIsFontMenuOpen(false);
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="px-1 text-[12px] font-semibold text-gray-200"
+                  onClick={() => applyFormat('bold')}
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  className="px-1 text-[12px] italic text-gray-200"
+                  onClick={() => applyFormat('italic')}
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  className="px-1 text-[12px] underline text-gray-200"
+                  onClick={() => applyFormat('underline')}
+                >
+                  U
+                </button>
+                <button
+                  type="button"
+                  className="px-1 text-[12px] text-gray-200"
+                  onClick={() => applyFormat('undo')}
+                >
+                  ↩
+                </button>
+                <button
+                  type="button"
+                  className="px-1 text-[12px] text-gray-200"
+                  onClick={() => applyFormat('insertUnorderedList')}
+                >
+                  •
+                </button>
+                <button
+                  type="button"
+                  className="px-1 text-[12px] text-gray-200"
+                  onClick={() => applyFormat('justifyLeft')}
+                >
+                  ☰
+                </button>
+              </div>
+              <span className="text-[11px] font-medium text-gray-300">body</span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-200">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 transition hover:border-white/20 hover:bg-white/10"
+                onClick={() => {
+                  // Placeholder: media attach not implemented yet
+                }}
+              >
+                <img src="/file.svg" alt="Attach" className="h-4 w-4" />
+                Attach Media
+              </button>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-400 bg-black text-indigo-500 focus:ring-indigo-400"
+                  checked={sendToGroups}
+                  onChange={() => onToggleSendToGroups?.(!sendToGroups)}
+                />
+                <span>Send to Groups</span>
+              </label>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mx-5 mb-0 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mx-5 mb-0 rounded-lg border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+              {success}
+            </div>
+          )}
+
+          <footer className="flex items-center justify-end gap-3 border-t border-white/5 px-5 py-3 text-sm">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-white/10 px-4 py-2 text-gray-200 transition hover:border-white/20 hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSend}
+              disabled={sending}
+              className="inline-flex items-center gap-2 rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-4 py-2 font-semibold text-indigo-100 transition hover:border-indigo-300 hover:bg-indigo-500/30 disabled:opacity-60"
+            >
+              {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Send Email
+            </button>
+          </footer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MediaPreview({ post }) {
   const [modalContent, setModalContent] = useState(null);
   const platform = (post?.platform || '').toLowerCase();
@@ -482,7 +748,7 @@ function MediaPreview({ post }) {
   return null;
 }
 
-function MentionCard({ post }) {
+function MentionCard({ post, onDelete }) {
   const brandName = post?.brand?.brandName || 'Unknown Brand';
   const author = post?.author?.name || post?.author?.id || 'Anonymous';
   const platform = post?.platform || 'google';
@@ -499,6 +765,109 @@ function MentionCard({ post }) {
   const engagement =
     post?.metrics?.likes ?? post?.metrics?.comments ?? post?.metrics?.shares ?? post?.metrics?.views ?? 'NA';
   const reach = post?.analysis?.engagementScore ?? 'NA';
+
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('Important Social Media Post');
+  const [emailMessage, setEmailMessage] = useState(
+    'Please review this post. It looks important and may need action.'
+  );
+  const [emailRecipient, setEmailRecipient] = useState('');
+  const [sendToGroups, setSendToGroups] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleSendEmail = async () => {
+    if (sendingEmail) return;
+
+    const recipients = emailRecipient
+      .split(/[,\s;]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    if (!recipients.length) {
+      setEmailError('At least one recipient email is required');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = recipients.filter((e) => !emailRegex.test(e));
+    if (invalid.length) {
+      setEmailError(`Invalid email(s): ${invalid.join(', ')}`);
+      return;
+    }
+
+    setEmailError('');
+    setEmailSuccess('');
+    setSendingEmail(true);
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const email of recipients) {
+        const payload = {
+          email,
+          postId: post?._id,
+          subject: emailSubject?.trim() || 'Important Social Media Post',
+          message:
+            emailMessage?.trim() ||
+            'Please review this post. It looks important and may need action.',
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/brands/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          successCount += 1;
+        } else {
+          failCount += 1;
+        }
+      }
+
+      if (!successCount) {
+        throw new Error('Failed to send email to all recipients');
+      }
+
+      const summary =
+        failCount > 0
+          ? `Email sent to ${successCount} recipient(s). ${failCount} failed.`
+          : `Email sent to ${successCount} recipient(s).`;
+
+      setEmailSuccess(summary);
+      setTimeout(() => {
+        setIsEmailOpen(false);
+        setEmailSuccess('');
+        setEmailRecipient('');
+        setSendToGroups(false);
+      }, 1200);
+    } catch (err) {
+      setEmailError(err?.message || 'Failed to send email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleting || !post?._id) return;
+    const confirmed = window.confirm('Delete this post? This cannot be undone.');
+    if (!confirmed) return;
+
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      await api.brands.deletePost(post._id);
+      onDelete?.(post._id);
+    } catch (err) {
+      setDeleteError(err?.message || 'Failed to delete post');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <article className="group overflow-hidden rounded-xl border border-white/5 bg-gradient-to-br from-white/5 via-white/[0.03] to-transparent p-6 shadow-lg shadow-black/10 transition hover:border-white/15 hover:shadow-black/30">
@@ -579,20 +948,57 @@ function MentionCard({ post }) {
               Open Link
             </Link>
           )}
-          <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white transition hover:border-white/30 hover:bg-white/10">
+          <button
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white transition hover:border-white/30 hover:bg-white/10"
+            onClick={() => {
+              setIsEmailOpen(true);
+              setEmailError('');
+              setEmailSuccess('');
+            }}
+          >
             <Mail className="h-4 w-4" />
             Send Email
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 font-medium text-emerald-200 transition hover:border-emerald-300 hover:bg-emerald-500/15">
-            <CheckCircle2 className="h-4 w-4" />
-            Make Actionable
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white transition hover:border-white/30 hover:bg-white/10">
-            <MoreHorizontal className="h-4 w-4" />
-            More
+
+          <button
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white transition hover:border-white/30 hover:bg-white/10 disabled:opacity-60"
+            onClick={handleDelete}
+            disabled={deleting}
+          >
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}
+            {deleting ? 'Deleting…' : 'Delete'}
           </button>
         </div>
+        {deleteError && (
+          <div className="mt-3 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            {deleteError}
+          </div>
+        )}
       </footer>
+      <EmailModal
+        open={isEmailOpen}
+        onClose={() => {
+          if (!sendingEmail) {
+            setIsEmailOpen(false);
+            setEmailError('');
+            setEmailSuccess('');
+            setEmailRecipient('');
+            setSendToGroups(false);
+          }
+        }}
+        recipient={emailRecipient}
+        onRecipientChange={setEmailRecipient}
+        subject={emailSubject}
+        message={emailMessage}
+        onSubjectChange={setEmailSubject}
+        onMessageChange={setEmailMessage}
+        sendToGroups={sendToGroups}
+        onToggleSendToGroups={setSendToGroups}
+        onSend={handleSendEmail}
+        sending={sendingEmail}
+        error={emailError}
+        success={emailSuccess}
+      />
     </article>
   );
 }
@@ -637,16 +1043,21 @@ function MultiSelect({
   }, [value, activeBrand]);
 
   const handleToggle = (option) => {
+    const optionLower = (option || '').toLowerCase();
+    const normalizedSelected = value.map((v) => (v || '').toLowerCase());
+    const exists = normalizedSelected.includes(optionLower);
+
     if (option === '__all__') {
       onChange([]);
       setActiveBrand('');
       return;
     }
     setActiveBrand(option);
-    const exists = value.includes(option);
     if (exists) {
-      onChange(value.filter((v) => v !== option));
+      // Remove case-insensitively, keep original casing of remaining items
+      onChange(value.filter((v) => (v || '').toLowerCase() !== optionLower));
     } else {
+      // Multi-select: add the new brand, preserving casing
       onChange([...value, option]);
     }
   };
@@ -2396,6 +2807,11 @@ function InboxPageContent() {
     return `from ${startLabel} to ${endLabel}`;
   }, [dateRange]);
 
+  const handlePostDeleted = useCallback((postId) => {
+    if (!postId) return;
+    setPosts((prev) => prev.filter((post) => post?._id !== postId));
+  }, []);
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#020202] text-white">
       <DottedBackground />
@@ -2683,7 +3099,7 @@ function InboxPageContent() {
 
             <div className="grid gap-5">
               {filteredPosts.map((post) => (
-                <MentionCard key={post._id} post={post} />
+                <MentionCard key={post._id} post={post} onDelete={handlePostDeleted} />
               ))}
             </div>
           </div>

@@ -276,7 +276,6 @@ export default function AnalyticsPage() {
     }
 
     // Add keyword group filter if not 'all'
-    // Note: keyword group and individual keyword are mutually exclusive
     if (selectedGroup && selectedGroup !== 'all') {
       if (selectedGroup.includes('::')) {
         // Already compound format
@@ -303,9 +302,10 @@ export default function AnalyticsPage() {
           keywordGroupForQuery = selectedGroup;
         }
       }
-      // Don't pass keyword when keyword group is selected (they're mutually exclusive)
-    } else if (selectedKeyword && selectedKeyword !== 'all') {
-      // Add keyword filter only if no keyword group is selected
+    }
+
+    // Always pass keyword when a specific keyword is chosen (even if a group is selected)
+    if (selectedKeyword && selectedKeyword !== 'all') {
       params.set('keyword', selectedKeyword);
     }
 

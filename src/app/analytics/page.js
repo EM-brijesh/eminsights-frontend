@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -232,7 +232,11 @@ function AnalyticsMentionCard({ post }) {
     </article>
   );
 }
-export default function AnalyticsPage() {
+
+// Inner analytics page content that relies on useSearchParams.
+// This is wrapped in a Suspense boundary by the default export
+// to satisfy Next.js' requirement for searchParams-based rendering.
+function AnalyticsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Keep track of filters that came from the URL so we can validate them once data loads
@@ -244,6 +248,8 @@ export default function AnalyticsPage() {
   });
   // Avoid writing query params back to the URL during the very first render
   const hasInitializedFiltersRef = useRef(false);
+  // Ensure we only run URL-derived filter validation once after data has loaded
+  const hasValidatedUrlFiltersRef = useRef(false);
 
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('all');
@@ -704,6 +710,110 @@ export default function AnalyticsPage() {
     });
     return Array.from(set);
   }, [selectedGroup, keywordGroups, brandKeywords]);
+
+  // After brands / keyword groups are available, validate and normalize URL-derived filters
+  useEffect(() => {
+    if (hasValidatedUrlFiltersRef.current) return;
+
+    const { brand: urlBrand, keywordGroup: urlGroup, keyword: urlKeyword } = urlFiltersRef.current || {};
+
+    // If there are no URL filters to validate, mark as done
+    if (!urlBrand && !urlGroup && !urlKeyword) {
+      hasValidatedUrlFiltersRef.current = true;
+      return;
+    }
+
+    // Require brands to be loaded before validating brand/group
+    if (!Array.isArray(brands) || brands.length === 0) {
+      return;
+    }
+
+    let effectiveBrand = selectedBrand;
+
+    // 1) Validate brand from URL against loaded brands (case-insensitive)
+    if (urlBrand && urlBrand !== 'all') {
+      const matchingBrand = brands.find(
+        (b) => b.brandName?.toLowerCase() === urlBrand.toLowerCase(),
+      );
+
+      if (!matchingBrand) {
+        // Brand does not exist anymore – reset brand and dependent filters
+        setSelectedBrand('all');
+        setSelectedGroup('all');
+        setSelectedKeyword('all');
+        hasValidatedUrlFiltersRef.current = true;
+        return;
+      }
+
+      effectiveBrand = matchingBrand.brandName;
+      setSelectedBrand((prev) => {
+        if (!prev || prev === 'all') return matchingBrand.brandName;
+        if (prev.toLowerCase() === matchingBrand.brandName.toLowerCase()) return matchingBrand.brandName;
+        return prev;
+      });
+    }
+
+    // 2) Validate and normalize keyword group from URL
+    let effectiveGroupId = selectedGroup;
+    if (urlGroup) {
+      let groupName = urlGroup;
+      let groupBrand = null;
+
+      if (urlGroup.includes('::')) {
+        [groupBrand, groupName] = urlGroup.split('::');
+      } else if (effectiveBrand && effectiveBrand !== 'all') {
+        groupBrand = effectiveBrand;
+      }
+
+      const group = keywordGroups.find((g) => {
+        const gName = g.groupName || g.name;
+        if (groupBrand) {
+          // When brand is specified, match both brand and group name if brandName is present
+          if (g.brandName) {
+            return gName === groupName && g.brandName === groupBrand;
+          }
+          return gName === groupName;
+        }
+        return gName === groupName;
+      });
+
+      if (!group) {
+        // Group no longer exists – clear group and dependent keyword filter
+        setSelectedGroup('all');
+        if (urlKeyword && urlKeyword !== 'all') {
+          setSelectedKeyword('all');
+        }
+        hasValidatedUrlFiltersRef.current = true;
+        return;
+      }
+
+      const normalizedName = group.groupName || group.name;
+      if ((effectiveBrand === 'all' || !effectiveBrand) && group.brandName) {
+        // When viewing all brands, use compound ID so groups from different brands are distinct
+        effectiveGroupId = `${group.brandName}::${normalizedName}`;
+      } else {
+        effectiveGroupId = normalizedName;
+      }
+
+      setSelectedGroup(effectiveGroupId);
+    }
+
+    // 3) Validate keyword from URL against available keywords for the resolved selection
+    if (urlKeyword && urlKeyword !== 'all') {
+      const keywordLower = urlKeyword.toLowerCase().trim();
+      const exists = availableKeywords.some((k) =>
+        (k || '').toString().trim().toLowerCase() === keywordLower,
+      );
+
+      if (!exists) {
+        setSelectedKeyword('all');
+      } else {
+        setSelectedKeyword(urlKeyword);
+      }
+    }
+
+    hasValidatedUrlFiltersRef.current = true;
+  }, [brands, keywordGroups, availableKeywords, selectedBrand, selectedGroup]);
   const filteredPosts = React.useMemo(() => {
     let filtered = [...analyzedPosts];
     if (selectedPlatform !== 'all') {
@@ -1719,5 +1829,22 @@ export default function AnalyticsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// Wrap the searchParams-using content in a Suspense boundary so that
+// Next.js can safely prerender / hydrate the page without a CSR bailout.
+export default function AnalyticsPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-black text-white flex items-center justify-center">
+          <DottedBackground />
+          <div className="relative z-10">Loading analytics...</div>
+        </div>
+      )}
+    >
+      <AnalyticsPageContent />
+    </Suspense>
   );
 }

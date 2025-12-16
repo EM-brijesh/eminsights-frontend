@@ -535,19 +535,15 @@ function EmailModal({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-8">
-      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute right-2 top-1  rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white transition hover:border-white/30 hover:bg-white/10"
-        >
-          Close
-        </button>
+      <div className="relative w-full max-w-5xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
         <div className="rounded-2xl border border-white/5 bg-[#0a0a0a]">
-         
+          
+            
+          
 
-          <div className="space-y-4 px-5 py-4 text-sm">
-            <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
-              <label className="text-gray-400">To</label>
+          <div className="space-y-3 px-6 py-3 text-sm">
+            <div className="grid items-center gap-2 md:grid-cols-[110px,1fr]">
+              <label className="text-gray-200">To</label>
               <input
                 value={recipient}
                 onChange={(e) => onRecipientChange(e.target.value)}
@@ -555,29 +551,30 @@ function EmailModal({
                 className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
               />
             </div>
-            <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
-              <label className="text-gray-400">Subject</label>
+            <div className="grid items-center gap-2 md:grid-cols-[110px,1fr]">
+              <label className="text-gray-200">Subject</label>
               <input
                 value={subject}
                 onChange={(e) => onSubjectChange(e.target.value)}
                 className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
               />
             </div>
-            <div className="grid items-start gap-2 md:grid-cols-[80px,1fr]">
-              <label className="mt-1 text-gray-400">Message</label>
+            <div className="grid items-start gap-1.5 md:grid-cols-[110px,1fr]">
+              <label className="pt-1 text-gray-200">Message</label>
               <div className="w-full">
-                <div className="min-h-[160px] w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200">
+                <div className="min-h-[120px] w-full rounded-lg border border-white/10 bg-black/50 px-3 pt-1.5 pb-0.5 text-sm text-gray-200">
                   <div
                     ref={editorRef}
                     contentEditable
                     suppressContentEditableWarning
-                    className="min-h-[80px] w-full outline-none focus-visible:outline-none"
+                    className="min-h-[60px] w-full outline-none focus-visible:outline-none"
                     onInput={syncMessageFromEditor}
                   />
                   {post && (
-                    <div className="mt-3 border-t border-white/10 pt-2 text-xs text-gray-200">
+                    <div className="mt-2 border-t border-white/10 pt-2 text-xs text-gray-200">
                       <div
                         className="text-sm leading-relaxed text-gray-100"
+                        style={{ transform: 'scale(0.92)', transformOrigin: 'top left' }}
                         // Preview of the full email HTML built the same way as in the backend template
                         dangerouslySetInnerHTML={{ __html: emailHtmlPreview }}
                       />
@@ -586,7 +583,7 @@ function EmailModal({
                 </div>
               </div>
             </div>
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-2 text-xs text-gray-200">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2 text-xs text-gray-200">
               <div className="relative flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -660,21 +657,39 @@ function EmailModal({
                   ☰
                 </button>
               </div>
-              <span className="text-[11px] font-medium text-gray-300"></span>
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-gray-200 transition hover:border-white/20 hover:bg-white/10"
+                  onClick={() => {
+                    if (fileInputRef.current) {
+                      fileInputRef.current.click();
+                    }
+                  }}
+                >
+                  <img src="/file.svg" alt="Attach" className="h-4 w-4" />
+                  Attach Media
+                </button>
+              </div>
+              <div className="ml-auto flex items-center gap-1.5 text-sm">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-lg border border-white/10 px-2.5 py-1 text-gray-200 transition hover:border-white/20 hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSend(attachments, () => setAttachments([]))}
+                  disabled={sending}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-1 text-[13px] font-semibold text-indigo-100 transition hover:border-indigo-300 hover:bg-indigo-500/30 disabled:opacity-60"
+                >
+                  {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Send
+                </button>
+              </div>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-200">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 transition hover:border-white/20 hover:bg-white/10"
-                onClick={() => {
-                  if (fileInputRef.current) {
-                    fileInputRef.current.click();
-                  }
-                }}
-              >
-                <img src="/file.svg" alt="Attach" className="h-4 w-4" />
-                Attach Media
-              </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -690,7 +705,7 @@ function EmailModal({
               }}
             />
             {attachments.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-300">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-300">
                 {attachments.map((file, index) => (
                   <div
                     key={`${file.name}-${index}`}
@@ -712,7 +727,6 @@ function EmailModal({
                 ))}
               </div>
             )}
-            </div>
           </div>
 
           {error && (
@@ -726,22 +740,7 @@ function EmailModal({
             </div>
           )}
 
-          <footer className="flex items-center justify-end gap-3 border-t border-white/5 px-5 py-3 text-sm">
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-white/10 px-4 py-2 text-gray-200 transition hover:border-white/20 hover:bg-white/10"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => onSend(attachments, () => setAttachments([]))}
-              disabled={sending}
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-4 py-2 font-semibold text-indigo-100 transition hover:border-indigo-300 hover:bg-indigo-500/30 disabled:opacity-60"
-            >
-              {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Send Email
-            </button>
-          </footer>
+          {/* Inline send/cancel controls are in the toolbar above; footer buttons removed */}
         </div>
       </div>
     </div>

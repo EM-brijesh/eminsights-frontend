@@ -535,15 +535,15 @@ function EmailModal({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-8">
-      <div className="relative w-full max-w-5xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
         <div className="rounded-2xl border border-white/5 bg-[#0a0a0a]">
           
             
           
 
           <div className="space-y-3 px-6 py-3 text-sm">
-            <div className="grid items-center gap-2 md:grid-cols-[110px,1fr]">
-              <label className="text-gray-200">To</label>
+            <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
+              <label className="text-gray-400">To</label>
               <input
                 value={recipient}
                 onChange={(e) => onRecipientChange(e.target.value)}
@@ -551,16 +551,16 @@ function EmailModal({
                 className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
               />
             </div>
-            <div className="grid items-center gap-2 md:grid-cols-[110px,1fr]">
-              <label className="text-gray-200">Subject</label>
+            <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
+              <label className="text-gray-400">Subject</label>
               <input
                 value={subject}
                 onChange={(e) => onSubjectChange(e.target.value)}
                 className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
               />
             </div>
-            <div className="grid items-start gap-1.5 md:grid-cols-[110px,1fr]">
-              <label className="pt-1 text-gray-200">Message</label>
+            <div className="grid items-start gap-1.5 md:grid-cols-[80px,1fr]">
+              <label className="mt-1 text-gray-400">Message</label>
               <div className="w-full">
                 <div className="min-h-[120px] w-full rounded-lg border border-white/10 bg-black/50 px-3 pt-1.5 pb-0.5 text-sm text-gray-200">
                   <div

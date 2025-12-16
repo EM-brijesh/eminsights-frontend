@@ -2093,15 +2093,17 @@ function InboxPageContent() {
 
   // Consolidate URL parsing and validation
   // This ensures that navigating (changing URL) always triggers validation against loaded data
+  // Consolidate URL parsing and validation
+  // This ensures that navigating (changing URL) always triggers validation against loaded data
   useEffect(() => {
     const sentiment = searchParams.getAll('sentiment');
     const brand = searchParams.getAll('brand');
     const platform = searchParams.getAll('platform');
-    const keywordGroup = searchParams.get('keywordGroup') ? decodeURIComponent(searchParams.get('keywordGroup')) : null;
-    const keyword = searchParams.get('keyword');
+    const keywordGroupsRaw = searchParams.getAll('keywordGroup').map(k => decodeURIComponent(k)).filter(Boolean);
+    const keywordsRaw = searchParams.getAll('keyword').filter(Boolean);
     const durationParam = searchParams.get('duration');
 
-    // 1. Apply Independent Filters (Sentiment, Duration, Platform) directly
+    // 1. Apply Independent Filters (Sentiment, Duration, Platform)
     const validSentiments = sentiment.filter(s => ['positive', 'neutral', 'negative'].includes(s.toLowerCase()));
     setSelectedSentiments(prev => {
       const isSame = prev.length === validSentiments.length && prev.every(p => validSentiments.includes(p));
@@ -2121,13 +2123,11 @@ function InboxPageContent() {
 
     const validPlatforms = platform.filter(p => p !== 'all').map(p => p.toLowerCase());
     setSelectedChannels(prev => {
-      // Simple equality check
-      if (prev.length === validPlatforms.length && prev.every(p => validPlatforms.includes(p))) return prev;
-      return validPlatforms;
+      const isSame = prev.length === validPlatforms.length && prev.every(p => validPlatforms.includes(p));
+      return isSame ? prev : validPlatforms;
     });
 
     // 2. Apply Dependent Filters (Brands, KeywordGroups, Keywords) ONLY if data is available
-    // If data isn't loaded yet, we wait. This prevents invalid "raw" states.
     if (!assignedBrandDetails?.length) return;
 
     // Validate Brands
@@ -2145,115 +2145,140 @@ function InboxPageContent() {
 
     // Update Selected Brands
     setSelectedBrands(prev => {
-      // Avoid redundant updates - use copy for safe sort
       if (JSON.stringify([...prev].sort()) === JSON.stringify([...validBrands].sort())) return prev;
       return validBrands;
     });
 
-    // If brands are valid (or empty/cleared), proceed to Keyword Group
-    // Logic: If brands didn't match URL, validBrands is empty -> we might have cleared it.
+    // Validate Keyword Groups (Multi-Select)
+    const validGroupIds = [];
+    // Groups that we should search keywords within
+    const targetGroupsForKeywords = [];
 
-    // Validate Keyword Group
-    // If URL has keywordGroup
-    if (keywordGroup) {
-      // Determine effective Keyword Group ID (Compound)
-      let resolvedGroupId = null;
-      let targetGroup = null;
+    // Identify target brands for group resolution (either selected brands or all brands)
+    const targetBrandsForGroup = validBrands.length > 0
+      ? assignedBrandDetails.filter(b => validBrands.includes(b.brandName))
+      : assignedBrandDetails;
 
-      // Case A: ID is already compound
-      if (keywordGroup.includes('::')) {
-        const [brandName, groupName] = keywordGroup.split('::');
-        const brandDetail = assignedBrandDetails.find(b => b.brandName?.toLowerCase() === brandName?.toLowerCase());
-        if (brandDetail) {
-          const group = brandDetail.keywordGroups?.find(g => (g.groupName || g.name || '').toLowerCase() === groupName?.toLowerCase());
-          if (group) {
-            resolvedGroupId = makeGroupId(brandDetail.brandName, group);
-            targetGroup = group;
+    if (keywordGroupsRaw.length > 0) {
+      keywordGroupsRaw.forEach(kGroup => {
+        let resolvedGroupId = null;
+        let targetGroup = null;
+
+        // Case A: Compound ID
+        if (kGroup.includes('::')) {
+          const [brandName, groupName] = kGroup.split('::');
+          const brandDetail = assignedBrandDetails.find(b => b.brandName?.toLowerCase() === brandName?.toLowerCase());
+          if (brandDetail) {
+            const group = brandDetail.keywordGroups?.find(g => (g.groupName || g.name || '').toLowerCase() === groupName?.toLowerCase());
+            if (group) {
+              resolvedGroupId = makeGroupId(brandDetail.brandName, group);
+              targetGroup = group;
+            }
           }
         }
-      }
-      // Case B: Simple name, check selected brand (if ambiguous/single) or scan all
-      else {
-        const targetBrands = validBrands.length > 0
-          ? assignedBrandDetails.filter(b => validBrands.includes(b.brandName))
-          : assignedBrandDetails;
-
-        for (const brandDetail of targetBrands) {
-          const group = brandDetail.keywordGroups?.find(g => (g.groupName || g.name || '').toLowerCase() === keywordGroup.toLowerCase());
-          if (group) {
-            resolvedGroupId = makeGroupId(brandDetail.brandName, group);
-            targetGroup = group;
-            break; // Take first match
+        // Case B: Simple Name (Scan target brands)
+        else {
+          for (const brandDetail of targetBrandsForGroup) {
+            const group = brandDetail.keywordGroups?.find(g => (g.groupName || g.name || '').toLowerCase() === kGroup.toLowerCase());
+            if (group) {
+              resolvedGroupId = makeGroupId(brandDetail.brandName, group);
+              targetGroup = group;
+              // If we found a match for this simple name, we stop scanning for *this* kGroup 
+              // (Ambiguity handling: taking first match, consistent with previous behavior)
+              break;
+            }
           }
         }
-      }
 
-      if (resolvedGroupId && targetGroup) {
-        setSelectedKeywordGroups(prev => {
-          if (prev.includes(resolvedGroupId)) return prev;
-          return [resolvedGroupId]; // Single selection mode from URL
-        });
-
-        // Expand it
-        setExpandedKeywordGroups(prev => ({ ...prev, [resolvedGroupId]: true }));
-
-        // Handle Keyword (if provided) or Populate All
-        if (keyword && keyword !== 'all') {
-          const keywordId = `${resolvedGroupId}::${keyword.toLowerCase().trim()}`;
-          setSelectedKeywordsFilter([keywordId]);
-        } else {
-          // Populate all keywords from group
-          const andKeywords = Array.isArray(targetGroup?.keywords) ? targetGroup.keywords : [];
-          const orKeywords = Array.isArray(targetGroup?.includeKeywords) ? targetGroup.includeKeywords : [];
-          const merged = [...andKeywords, ...orKeywords].filter(Boolean);
-          const keywordIds = merged.map(k => `${resolvedGroupId}::${k.toString().toLowerCase().trim()}`);
-          setSelectedKeywordsFilter(keywordIds);
+        if (resolvedGroupId && targetGroup) {
+          if (!validGroupIds.includes(resolvedGroupId)) validGroupIds.push(resolvedGroupId);
+          targetGroupsForKeywords.push({ groupId: resolvedGroupId, groupObj: targetGroup });
         }
-      } else {
-        // Group invalid or not found
-        setSelectedKeywordGroups([]);
-        setSelectedKeywordsFilter([]);
-      }
+      });
     }
-    // If NO keywordGroup but KEYWORD provided (Global search within selected brands)
-    else if (keyword && keyword !== 'all') {
-      const keywordLower = keyword.toLowerCase().trim();
-      const matchingIds = [];
-      const groupsToExpand = new Set();
 
-      assignedBrandDetails.forEach(brandDetail => {
-        // If brands filtered, skip others
-        if (validBrands.length > 0 && !validBrands.includes(brandDetail.brandName)) return;
+    // Update Keyword Groups State
+    setSelectedKeywordGroups(prev => {
+      if (JSON.stringify([...prev].sort()) === JSON.stringify([...validGroupIds].sort())) return prev;
+      return validGroupIds;
+    });
 
-        brandDetail.keywordGroups?.forEach(group => {
-          const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
-          const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
-          const merged = [...andKeywords, ...orKeywords].map(k => (k || '').toString().toLowerCase().trim());
-          if (merged.includes(keywordLower)) {
-            const gid = makeGroupId(brandDetail.brandName, group);
-            matchingIds.push(`${gid}::${keywordLower}`);
-            groupsToExpand.add(gid);
+    // Expand Valid Groups
+    if (validGroupIds.length > 0) {
+      setExpandedKeywordGroups(prev => {
+        const next = { ...prev };
+        let changed = false;
+        validGroupIds.forEach(id => {
+          if (!next[id]) { next[id] = true; changed = true; }
+        });
+        return changed ? next : prev;
+      });
+    }
+
+    // Validate Keywords (Multi-Select)
+    let validKeywordIds = [];
+
+    // If we have groups selected, scope keyword search to those groups?
+    // Actually, `keyword` param usually implies searching for a specific keyword *within* the selected context.
+    // If no specific `keyword` param is provided BUT we have groups, we populate ALL keywords from those groups (existing logic).
+
+    if (keywordsRaw.length > 0) {
+      // Search for these keywords in valid groups (if exist) OR global valid brands (if no groups)
+      // If groups are selected, keywords MUST belong to those groups? 
+      // User behavior: Select Group A -> Select Keyword X in A. URL: group=A&keyword=X.
+      // If I select Group A and Group B, and Keyword Y (in B). URL: group=A&group=B&keyword=Y.
+
+      // Strategy: Scan all "Available" scope for matches.
+      // Available Scope = `targetGroupsForKeywords` (if any) OR `targetBrandsForGroup` (if no groups).
+
+      const scopeItems = targetGroupsForKeywords.length > 0
+        ? targetGroupsForKeywords.map(item => ({
+          type: 'group',
+          groupId: item.groupId,
+          keywords: [...(Array.isArray(item.groupObj?.keywords) ? item.groupObj.keywords : []), ...(Array.isArray(item.groupObj?.includeKeywords) ? item.groupObj.includeKeywords : [])]
+        }))
+        : targetBrandsForGroup.flatMap(b => (b.keywordGroups || []).map(g => ({
+          type: 'group',
+          groupId: makeGroupId(b.brandName, g),
+          keywords: [...(Array.isArray(g?.keywords) ? g.keywords : []), ...(Array.isArray(g?.includeKeywords) ? g.includeKeywords : [])]
+        })));
+
+      keywordsRaw.forEach(kw => {
+        const kwLower = kw.toLowerCase().trim();
+        // Find ALL matches for this keyword in scope (could be in multiple groups if duplicate names?)
+        // Usually we only need one ID per unique keyword value to activate the filter, OR we activate all occurrences?
+        // `selectedKeywordsFilter` stores compound IDs. If "soda" is in Group A and Group B, and I select "soda", do I select both?
+        // The UI usually filters by *value*. 
+        // Let's select all matching compound IDs to be safe.
+
+        scopeItems.forEach(scopeItem => {
+          const scopeKw = scopeItem.keywords.map(k => (k || '').toString().toLowerCase().trim());
+          if (scopeKw.includes(kwLower)) {
+            const id = `${scopeItem.groupId}::${kwLower}`;
+            if (!validKeywordIds.includes(id)) validKeywordIds.push(id);
           }
         });
       });
 
-      if (matchingIds.length > 0) {
-        setSelectedKeywordsFilter(matchingIds);
-        if (groupsToExpand.size > 0) {
-          setExpandedKeywordGroups(prev => {
-            const next = { ...prev };
-            groupsToExpand.forEach(id => { next[id] = true; });
-            return next;
-          });
-        }
-      } else {
-        setSelectedKeywordsFilter([]);
-      }
-    } else {
-      // Clear if neither group nor keyword
-      if (!keywordGroup) setSelectedKeywordGroups([]);
-      if (!keyword) setSelectedKeywordsFilter([]);
+    } else if (validGroupIds.length > 0) {
+      // No specific keywords -> Populate ALL from selected groups
+      targetGroupsForKeywords.forEach(item => {
+        const keywords = [...(Array.isArray(item.groupObj?.keywords) ? item.groupObj.keywords : []), ...(Array.isArray(item.groupObj?.includeKeywords) ? item.groupObj.includeKeywords : [])];
+        keywords.forEach(k => {
+          const kStr = (k || '').toString().toLowerCase().trim();
+          if (kStr) {
+            const id = `${item.groupId}::${kStr}`;
+            if (!validKeywordIds.includes(id)) validKeywordIds.push(id);
+          }
+        });
+      });
     }
+
+    // Update Keywords State
+    setSelectedKeywordsFilter(prev => {
+      if (JSON.stringify([...prev].sort()) === JSON.stringify([...validKeywordIds].sort())) return prev;
+      return validKeywordIds;
+    });
 
     setIsUrlInitialized(true);
 
@@ -2288,18 +2313,19 @@ function InboxPageContent() {
 
     // 5. Keyword Groups
     if (selectedKeywordGroups.length > 0) {
-      const groupToSync = selectedKeywordGroups[0];
-      params.set('keywordGroup', groupToSync);
+      selectedKeywordGroups.forEach((g) => params.append('keywordGroup', g));
     }
 
     // 6. Keywords
     if (selectedKeywordsFilter.length > 0) {
-      const { keywordValue } = splitKeywordCompoundId(selectedKeywordsFilter[0]);
-      if (keywordValue) {
-        params.set('keyword', keywordValue);
-      }
+      // Extract unique keyword values (names) to avoid duplicates in URL
+      const uniqueKeywords = new Set();
+      selectedKeywordsFilter.forEach((k) => {
+        const { keywordValue } = splitKeywordCompoundId(k);
+        if (keywordValue) uniqueKeywords.add(keywordValue);
+      });
+      uniqueKeywords.forEach((k) => params.append('keyword', k));
     }
-
     const newQuery = params.toString();
     const currentQuery = searchParams.toString();
 

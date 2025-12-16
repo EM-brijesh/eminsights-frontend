@@ -1,7 +1,7 @@
 'use client';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import {
   RefreshCw,
@@ -234,6 +234,17 @@ function AnalyticsMentionCard({ post }) {
 }
 export default function AnalyticsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Keep track of filters that came from the URL so we can validate them once data loads
+  const urlFiltersRef = useRef({
+    brand: null,
+    platform: null,
+    keywordGroup: null,
+    keyword: null,
+  });
+  // Avoid writing query params back to the URL during the very first render
+  const hasInitializedFiltersRef = useRef(false);
+
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [brandKeywords, setBrandKeywords] = useState([]);
@@ -252,6 +263,33 @@ export default function AnalyticsPage() {
   const [sentimentWarning, setSentimentWarning] = useState('');
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
 
+  // Read URL parameters and initialize filters so refresh preserves current selection
+  useEffect(() => {
+    if (!searchParams) return;
+
+    const brand = searchParams.get('brand');
+    const platform = searchParams.get('platform');
+    // URL decode the keywordGroup to handle encoded colons (::), mirroring Inbox behavior
+    const keywordGroup = searchParams.get('keywordGroup')
+      ? decodeURIComponent(searchParams.get('keywordGroup'))
+      : null;
+    const keyword = searchParams.get('keyword');
+
+    urlFiltersRef.current = { brand, platform, keywordGroup, keyword };
+
+    if (brand && brand !== 'all') {
+      setSelectedBrand(brand);
+    }
+    if (platform && platform !== 'all') {
+      setSelectedPlatform(platform);
+    }
+    if (keywordGroup) {
+      setSelectedGroup(keywordGroup);
+    }
+    if (keyword && keyword !== 'all') {
+      setSelectedKeyword(keyword);
+    }
+  }, [searchParams]);
   // Handle sentiment card click - navigate to inbox with filters
   const handleSentimentClick = useCallback((sentiment) => {
     const params = new URLSearchParams();
@@ -350,6 +388,24 @@ export default function AnalyticsPage() {
       }
       const fetchedBrands = data?.brands || [];
       setBrands(fetchedBrands);
+
+      // Validate and apply brand coming from URL (case-insensitive), if any
+      const urlBrand = urlFiltersRef.current.brand;
+      if (fetchedBrands.length > 0 && urlBrand && urlBrand !== 'all') {
+        const matchingBrand = fetchedBrands.find(
+          (b) => b.brandName?.toLowerCase() === urlBrand.toLowerCase(),
+        );
+        if (matchingBrand) {
+          setSelectedBrand((prev) => {
+            // Prefer previously selected non-default brand over URL if already set
+            if (prev && prev !== 'all' && prev.toLowerCase() === matchingBrand.brandName.toLowerCase()) {
+              return prev;
+            }
+            return matchingBrand.brandName;
+          });
+        }
+      }
+
       if (fetchedBrands.length > 0) {
         setSelectedBrand((prev) => {
           if (prev === 'all') return prev;
@@ -749,6 +805,38 @@ export default function AnalyticsPage() {
     }
     return filtered;
   }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups]);
+
+  // Keep analytics URL in sync with the current filter selection so refresh preserves state
+  const updateUrlWithFilters = useCallback(() => {
+    // Build query params based on active (non-default) filters
+    const params = new URLSearchParams();
+
+    if (selectedBrand && selectedBrand !== 'all') {
+      params.set('brand', selectedBrand);
+    }
+    if (selectedPlatform && selectedPlatform !== 'all') {
+      params.set('platform', selectedPlatform);
+    }
+    if (selectedGroup && selectedGroup !== 'all') {
+      params.set('keywordGroup', selectedGroup);
+    }
+    if (selectedKeyword && selectedKeyword !== 'all') {
+      params.set('keyword', selectedKeyword);
+    }
+
+    const query = params.toString();
+    // Use replace to avoid polluting history, mirroring typical filter behavior
+    router.replace(query ? `/analytics?${query}` : '/analytics');
+  }, [router, selectedBrand, selectedPlatform, selectedGroup, selectedKeyword]);
+
+  // After the initial mount, whenever filters change, push them into the URL
+  useEffect(() => {
+    if (!hasInitializedFiltersRef.current) {
+      hasInitializedFiltersRef.current = true;
+      return;
+    }
+    updateUrlWithFilters();
+  }, [selectedBrand, selectedPlatform, selectedGroup, selectedKeyword, updateUrlWithFilters]);
   const clientStats = useMemo(() => {
     return {
       total: filteredPosts.length,

@@ -246,10 +246,27 @@ function AnalyticsPageContent() {
     keywordGroup: null,
     keyword: null,
   });
-  // Avoid writing query params back to the URL during the very first render
-  const hasInitializedFiltersRef = useRef(false);
   // Ensure we only run URL-derived filter validation once after data has loaded
   const hasValidatedUrlFiltersRef = useRef(false);
+
+  // Helper to merge filter updates into the current query string and push to URL
+  const updateURL = useCallback(
+    (updates) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (!value || value === 'all') {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+
+      const queryString = params.toString();
+      router.push(queryString ? `?${queryString}` : '?', { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('all');
@@ -916,37 +933,6 @@ function AnalyticsPageContent() {
     return filtered;
   }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups]);
 
-  // Keep analytics URL in sync with the current filter selection so refresh preserves state
-  const updateUrlWithFilters = useCallback(() => {
-    // Build query params based on active (non-default) filters
-    const params = new URLSearchParams();
-
-    if (selectedBrand && selectedBrand !== 'all') {
-      params.set('brand', selectedBrand);
-    }
-    if (selectedPlatform && selectedPlatform !== 'all') {
-      params.set('platform', selectedPlatform);
-    }
-    if (selectedGroup && selectedGroup !== 'all') {
-      params.set('keywordGroup', selectedGroup);
-    }
-    if (selectedKeyword && selectedKeyword !== 'all') {
-      params.set('keyword', selectedKeyword);
-    }
-
-    const query = params.toString();
-    // Use replace to avoid polluting history, mirroring typical filter behavior
-    router.replace(query ? `/analytics?${query}` : '/analytics');
-  }, [router, selectedBrand, selectedPlatform, selectedGroup, selectedKeyword]);
-
-  // After the initial mount, whenever filters change, push them into the URL
-  useEffect(() => {
-    if (!hasInitializedFiltersRef.current) {
-      hasInitializedFiltersRef.current = true;
-      return;
-    }
-    updateUrlWithFilters();
-  }, [selectedBrand, selectedPlatform, selectedGroup, selectedKeyword, updateUrlWithFilters]);
   const clientStats = useMemo(() => {
     return {
       total: filteredPosts.length,
@@ -1214,9 +1200,15 @@ function AnalyticsPageContent() {
                 <select
                   value={selectedBrand}
                   onChange={(e) => {
-                    setSelectedBrand(e.target.value);
+                    const value = e.target.value;
+                    setSelectedBrand(value);
                     setSelectedGroup('all');
                     setSelectedKeyword('all');
+                    updateURL({
+                      brand: value,
+                      keywordGroup: 'all',
+                      keyword: 'all',
+                    });
                   }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                 >
@@ -1232,7 +1224,11 @@ function AnalyticsPageContent() {
                 <label className="block text-sm font-medium mb-2">Platform</label>
                 <select
                   value={selectedPlatform}
-                  onChange={(e) => setSelectedPlatform(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedPlatform(value);
+                    updateURL({ platform: value });
+                  }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                 >
                   <option value="all">All Platforms</option>
@@ -1247,8 +1243,13 @@ function AnalyticsPageContent() {
                 <select
                   value={selectedGroup}
                   onChange={(e) => {
-                    setSelectedGroup(e.target.value);
+                    const value = e.target.value;
+                    setSelectedGroup(value);
                     setSelectedKeyword('all');
+                    updateURL({
+                      keywordGroup: value,
+                      keyword: 'all',
+                    });
                   }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                   disabled={keywordGroups.length === 0}
@@ -1286,7 +1287,9 @@ function AnalyticsPageContent() {
                 <select
                   value={selectedKeyword}
                   onChange={(e) => {
-                    setSelectedKeyword(e.target.value);
+                    const value = e.target.value;
+                    setSelectedKeyword(value);
+                    updateURL({ keyword: value });
                   }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
                 >

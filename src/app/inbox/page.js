@@ -368,8 +368,6 @@ function EmailModal({
   message,
   onSubjectChange,
   onMessageChange,
-  sendToGroups,
-  onToggleSendToGroups,
   onSend,
   sending,
   error,
@@ -378,8 +376,10 @@ function EmailModal({
   if (!open) return null;
 
   const editorRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
   const [fontLabel, setFontLabel] = useState('Font');
+  const [attachments, setAttachments] = useState([]);
 
   useEffect(() => {
     if (!open || !editorRef.current) return;
@@ -566,28 +566,58 @@ function EmailModal({
                   ☰
                 </button>
               </div>
-              <span className="text-[11px] font-medium text-gray-300">body</span>
+              <span className="text-[11px] font-medium text-gray-300"></span>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-200">
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 transition hover:border-white/20 hover:bg-white/10"
                 onClick={() => {
-                  // Placeholder: media attach not implemented yet
+                  if (fileInputRef.current) {
+                    fileInputRef.current.click();
+                  }
                 }}
               >
                 <img src="/file.svg" alt="Attach" className="h-4 w-4" />
                 Attach Media
               </button>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-400 bg-black text-indigo-500 focus:ring-indigo-400"
-                  checked={sendToGroups}
-                  onChange={() => onToggleSendToGroups?.(!sendToGroups)}
-                />
-                <span>Send to Groups</span>
-              </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              // Support all file types: images, video, audio, docs, etc.
+              accept="*/*"
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length) {
+                  setAttachments((prev) => [...prev, ...files]);
+                }
+              }}
+            />
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-300">
+                {attachments.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/40 px-2 py-1"
+                  >
+                    <span className="max-w-[140px] truncate">{file.name}</span>
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-red-300"
+                      onClick={() => {
+                        setAttachments((prev) =>
+                          prev.filter((_, i) => i !== index),
+                        );
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             </div>
           </div>
 
@@ -610,7 +640,7 @@ function EmailModal({
               Cancel
             </button>
             <button
-              onClick={onSend}
+              onClick={() => onSend(attachments, () => setAttachments([]))}
               disabled={sending}
               className="inline-flex items-center gap-2 rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-4 py-2 font-semibold text-indigo-100 transition hover:border-indigo-300 hover:bg-indigo-500/30 disabled:opacity-60"
             >
@@ -779,7 +809,7 @@ function MentionCard({ post, onDelete }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  const handleSendEmail = async () => {
+  const handleSendEmail = async (attachments = [], onClearAttachments) => {
     if (sendingEmail) return;
 
     const recipients = emailRecipient
@@ -807,19 +837,26 @@ function MentionCard({ post, onDelete }) {
       let failCount = 0;
 
       for (const email of recipients) {
-        const payload = {
-          email,
-          postId: post?._id,
-          subject: emailSubject?.trim() || 'Important Social Media Post',
-          message:
-            emailMessage?.trim() ||
+        const formData = new FormData();
+        formData.append('email', email);
+        formData.append('postId', post?._id);
+        formData.append('subject', emailSubject?.trim() || 'Important Social Media Post');
+        formData.append(
+          'message',
+          emailMessage?.trim() ||
             'Please review this post. It looks important and may need action.',
-        };
+        );
+
+        // Attach any selected files; backend accepts any file type
+        attachments.forEach((file) => {
+          if (file) {
+            formData.append('attachments', file);
+          }
+        });
 
         const res = await fetch(`${API_BASE_URL}/api/brands/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: formData,
         });
 
         if (res.ok) {
@@ -844,6 +881,9 @@ function MentionCard({ post, onDelete }) {
         setEmailSuccess('');
         setEmailRecipient('');
         setSendToGroups(false);
+        if (typeof onClearAttachments === 'function') {
+          onClearAttachments();
+        }
       }, 1200);
     } catch (err) {
       setEmailError(err?.message || 'Failed to send email');

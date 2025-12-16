@@ -359,6 +359,90 @@ function VideoModal({ modalContent, onClose }) {
   );
 }
 
+// Match backend email layout (see buildPostEmailHTML in dashboard.controllers.js),
+// but styled to fit the app's dark background for preview purposes.
+function buildPostEmailHTMLPreview(post, userMessage) {
+  if (!post) return '';
+
+  const authorName = post.author?.name || 'Unknown';
+  const content = post.content?.text || '';
+  const platform = post.platform;
+  const createdAt = post.createdAt;
+  const mentionId = post._id;
+  const postUrl = post.sourceUrl || post.content?.url || '';
+
+  const message =
+    (typeof userMessage === 'string' && userMessage.trim()) ||
+    'Kindly assist on the below case:';
+
+  return `
+  <div style="font-family: Arial, Helvetica, sans-serif; background:transparent; padding:0;">
+    <div style="max-width:720px;margin:0 auto;">
+      <p style="font-size:14px; color:#e5e7eb; margin:0 0 8px 0;">Hi Team,</p>
+      <p style="font-size:14px; color:#e5e7eb; margin:0 0 16px 0;">
+        ${message}
+      </p>
+
+      <hr style="border:none;border-top:1px solid #1f2937;margin:20px 0;" />
+
+      <div style="background:#020617;border-radius:12px;padding:16px;">
+        <div style="background:#020617;border:1px solid #111827;border-radius:12px;padding:16px;">
+          <!-- Header -->
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin:0 0 4px 0;">
+            <tr>
+              <td style="font-weight:600;font-size:14px;color:#f9fafb;padding:0;margin:0;">
+                ${authorName}
+              </td>
+              <td style="font-size:12px;color:#9ca3af;text-align:right;white-space:nowrap;padding:0;margin:0;">
+                ${createdAt ? new Date(createdAt).toLocaleString() : ''}
+              </td>
+            </tr>
+          </table>
+
+          <!-- Content -->
+          <div style="margin-top:12px;font-size:14px;color:#e5e7eb;line-height:1.6;">
+            ${content}
+          </div>
+
+          <hr style="border:none;border-top:1px solid #1f2937;margin:16px 0;" />
+
+          <!-- Footer / CTA (centered, email-client friendly button) -->
+          <div style="text-align:center;font-size:13px;color:#e5e7eb;margin-top:8px;">
+            <div style="margin-bottom:8px;">
+              <strong>${platform === 'twitter' ? 'X' : platform}</strong>
+              <span style="color:#9ca3af;"> · Mention ID: ${mentionId}</span>
+            </div>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;">
+              <tr>
+                <td bgcolor="#2563eb" align="center" style="border-radius:999px;">
+                  <a
+                    href="${postUrl || '#'}"
+                    target="_blank"
+                    style="
+                      display:inline-block;
+                      padding:10px 28px;
+                      border-radius:999px;
+                      background-color:#2563eb;
+                      color:#ffffff;
+                      font-size:14px;
+                      font-weight:600;
+                      text-decoration:none;
+                      white-space:nowrap;
+                    "
+                  >
+                    View Post
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  `;
+}
+
 function EmailModal({
   open,
   onClose,
@@ -372,6 +456,7 @@ function EmailModal({
   sending,
   error,
   success,
+  post,
 }) {
   if (!open) return null;
 
@@ -380,6 +465,7 @@ function EmailModal({
   const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
   const [fontLabel, setFontLabel] = useState('Font');
   const [attachments, setAttachments] = useState([]);
+  const emailHtmlPreview = post ? buildPostEmailHTMLPreview(post, message) : '';
 
   useEffect(() => {
     if (!open || !editorRef.current) return;
@@ -449,18 +535,15 @@ function EmailModal({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-8">
-      <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute right-3 top-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white transition hover:border-white/30 hover:bg-white/10"
+          className="absolute right-2 top-1  rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white transition hover:border-white/30 hover:bg-white/10"
         >
           Close
         </button>
         <div className="rounded-2xl border border-white/5 bg-[#0a0a0a]">
-          <header className="flex items-center justify-between border-b border-white/5 px-5 py-3">
-            <div className="text-sm font-semibold text-white">Send Email</div>
-            
-          </header>
+         
 
           <div className="space-y-4 px-5 py-4 text-sm">
             <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
@@ -483,13 +566,24 @@ function EmailModal({
             <div className="grid items-start gap-2 md:grid-cols-[80px,1fr]">
               <label className="mt-1 text-gray-400">Message</label>
               <div className="w-full">
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="min-h-[140px] w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
-                  onInput={syncMessageFromEditor}
-                />
+                <div className="min-h-[160px] w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200">
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="min-h-[80px] w-full outline-none focus-visible:outline-none"
+                    onInput={syncMessageFromEditor}
+                  />
+                  {post && (
+                    <div className="mt-3 border-t border-white/10 pt-2 text-xs text-gray-200">
+                      <div
+                        className="text-sm leading-relaxed text-gray-100"
+                        // Preview of the full email HTML built the same way as in the backend template
+                        dangerouslySetInnerHTML={{ __html: emailHtmlPreview }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-2 text-xs text-gray-200">
@@ -1038,6 +1132,7 @@ function MentionCard({ post, onDelete }) {
         sending={sendingEmail}
         error={emailError}
         success={emailSuccess}
+        post={post}
       />
     </article>
   );

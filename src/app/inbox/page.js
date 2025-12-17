@@ -37,13 +37,13 @@ const DURATION_PRESETS = [
   { label: 'Last 30 Days', value: '30' },
   { label: 'Last 60 Days', value: '60' },
   { label: 'All Time', value: 'all-time' },
- 
+
 
 ];
 
 const TABS = [
   //  { key: 'tickets', label: 'Tickets', icon: Inbox },
- // { key: 'all', label: 'All Mentions', icon: ActivitySquare },
+  // { key: 'all', label: 'All Mentions', icon: ActivitySquare },
   // { key: 'user', label: 'User Activity', icon: Users },
   // { key: 'brand', label: 'Brand Activity', icon: ActivitySquare },
   // { key: 'actionable', label: 'Actionable', icon: CheckCircle2 },
@@ -55,8 +55,8 @@ const PLATFORM_OPTIONS = [
   { value: 'youtube', label: 'YouTube' },
   { value: 'reddit', label: 'Reddit' },
   { value: 'google', label: 'Google' },
-  {value:  'facebook', label: 'Facebook' },
-  {value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'instagram', label: 'Instagram' },
 ];
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v'];
@@ -110,7 +110,7 @@ const buildRangeFromDuration = (days) => {
   if (Number.isNaN(durationNum) || durationNum <= 0) {
     return createDefaultDateRange();
   }
-  
+
   // For very large durations (>= 3650 days ~10 years), use same "all-time" behavior
   // This ensures consistency when redirecting from analytics with large duration values
   if (durationNum >= 3650) {
@@ -118,7 +118,7 @@ const buildRangeFromDuration = (days) => {
     const start = new Date(2000, 0, 1);
     return { start: formatDateInput(start), end: formatDateInput(end) };
   }
-  
+
   const end = new Date();
   const start = new Date();
   start.setDate(end.getDate() - durationNum + 1);
@@ -359,131 +359,88 @@ function VideoModal({ modalContent, onClose }) {
   );
 }
 
-// Match backend email layout exactly (see buildPostEmailHTML in dashboard.controllers.js)
-// so what you preview here is what actually gets emailed.
+// Match backend email layout (see buildPostEmailHTML in dashboard.controllers.js),
+// but styled to fit the app's dark background for preview purposes.
 function buildPostEmailHTMLPreview(post, userMessage) {
   if (!post) return '';
 
-  const {
-    platform,
-    author = {},
-    content = {},
-    metrics = {},
-    sourceUrl,
-    createdAt,
-    analysis = {},
-  } = post;
+  const authorName = post.author?.name || 'Unknown';
+  const content = post.content?.text || '';
+  const platform = post.platform;
+  const createdAt = post.createdAt;
+  const mentionId = post._id;
+  const postUrl = post.sourceUrl || post.content?.url || '';
 
-  const isYouTube = platform === 'youtube';
-  const ytId = (() => {
-    if (!isYouTube || !sourceUrl) return null;
-    const match = sourceUrl.match(/(?:youtube\.com\/.*v=|youtu\.be\/)([^&?/]+)/);
-    return match ? match[1] : null;
-  })();
-
-  const ytThumb = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null;
-
-  const sentimentColor =
-    analysis.sentiment === 'positive'
-      ? '#22c55e'
-      : analysis.sentiment === 'negative'
-      ? '#ef4444'
-      : '#eab308';
-
-  const trimmedMessage =
-    typeof userMessage === 'string' && userMessage.trim().length > 0
-      ? userMessage.trim()
-      : '';
+  const message =
+    (typeof userMessage === 'string' && userMessage.trim()) ||
+    'Kindly assist on the below case:';
 
   return `
-<table width="100%" height="40%"  style=" max-width:600px ;margin:auto; font-family:Arial,sans-serif;color:#e5e7eb;">
-  <tr width="80%" height="40%">
-    <td align="center" style="padding:16px" >
-      <table  style="background:#020617; margin:auto;>
+  <div style="font-family: Arial, Helvetica, sans-serif; background:transparent; padding:0;">
+    <div style="max-width:720px;margin:0 auto;">
+      <p style="font-size:14px; color:#e5e7eb; margin:0 0 8px 0;">Hi Team,</p>
+      <p style="font-size:14px; color:#e5e7eb; margin:0 0 16px 0;">
+        ${message}
+      </p>
 
-        <!-- Header -->
-        <tr>
-          <td style="font-size:10px;font-weight:bold;padding-bottom:1px">
-               🔔 NEW ${platform ? platform.toUpperCase() : ''} MENTION
-          </td>
-        </tr>
+      <hr style="border:none;border-top:1px solid #1f2937;margin:20px 0;" />
 
-        <!-- User Message -->
-        ${
-          trimmedMessage
-            ? `<tr><td style="background:#020617;border-left:4px solid #38bdf8;padding:12px;margin-bottom:16px">
-                <strong>User message:</strong><br/>${trimmedMessage}
-              </td></tr>`
-            : ''
-        }
+      <div style="background:#020617;border-radius:12px;padding:16px;">
+        <div style="background:#020617;border:1px solid #111827;border-radius:12px;padding:16px;">
+          <!-- Header -->
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin:0 0 4px 0;">
+            <tr>
+              <td style="font-weight:600;font-size:14px;color:#f9fafb;padding:0;margin:0;">
+                ${authorName}
+              </td>
+              <td style="font-size:12px;color:#9ca3af;text-align:right;white-space:nowrap;padding:0;margin:0;">
+                ${createdAt ? new Date(createdAt).toLocaleString() : ''}
+              </td>
+            </tr>
+          </table>
 
-        <!-- Author -->
-        <tr>
-          <td style="padding-top:0px">
-            <strong>${author.name || 'Unknown'}</strong>
-            <span style="color:#94a3b8"> @${author.username || 'user'}</span>
-          </td>
-        </tr>
+          <!-- Content -->
+          <div style="margin-top:12px;font-size:14px;color:#e5e7eb;line-height:1.6;">
+            ${content}
+          </div>
 
-        <!-- Content -->
-        <tr>
-          <td style="padding:10px ">
-            ${content.text || ''}
-          </td>
-        </tr>
+          <hr style="border:none;border-top:1px solid #1f2937;margin:16px 0;" />
 
-        <!-- YouTube Preview -->
-        ${
-          ytThumb
-            ? `<tr >
-                <td>
-                  <a href="${sourceUrl || '#'}" target="_blank">
-                    <img src="${ytThumb}" alt="YouTube thumbnail"
-                      style= />
+          <!-- Footer / CTA (centered, email-client friendly button) -->
+          <div style="text-align:center;font-size:13px;color:#e5e7eb;margin-top:8px;">
+            <div style="margin-bottom:8px;">
+              <strong>${platform === 'twitter' ? 'X' : platform}</strong>
+              <span style="color:#9ca3af;"> · Mention ID: ${mentionId}</span>
+            </div>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;">
+              <tr>
+                <td bgcolor="#2563eb" align="center" style="border-radius:999px;">
+                  <a
+                    href="${postUrl || '#'}"
+                    target="_blank"
+                    style="
+                      display:inline-block;
+                      padding:10px 28px;
+                      border-radius:999px;
+                      background-color:#2563eb;
+                      color:#ffffff;
+                      font-size:14px;
+                      font-weight:600;
+                      text-decoration:none;
+                      white-space:nowrap;
+                    "
+                  >
+                    View Post
                   </a>
                 </td>
-              </tr>`
-            : ''
-        }
-
-        <!-- Metrics -->
-        <tr>
-          <td style="padding:12px 0;color:#cbd5f5;font-size:14px">
-            👍 ${metrics.likes || 0}
-            &nbsp;&nbsp;💬 ${metrics.comments || 0}
-            &nbsp;&nbsp;👁️ ${metrics.views || 0}
-          </td>
-        </tr>
-
-        <!-- Sentiment -->
-        ${
-          analysis.sentiment
-            ? `<tr>
-                <td style="padding:8px 0">
-                  <span style="background:${sentimentColor};color:#020617;padding:6px 10px;border-radius:999px;font-size:12px">
-                    ${analysis.sentiment.toUpperCase()}
-                  </span>
-                </td>
-              </tr>`
-            : ''
-        }
-
-        <!-- Footer -->
-        <tr>
-          <td style="padding-top:0px;font-size:12px;color:#64748b">
-            ${createdAt ? `Posted on ${new Date(createdAt).toLocaleString()}` : ''}
-            <br/>
-            <a href="${sourceUrl || '#'}" target="_blank" style="color:#38bdf8">
-              View original post
-            </a>
-          </td>
-        </tr>
-
-      </table>
-    </td>
-  </tr>
-</table>
-`;
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  `;
 }
 
 function EmailModal({
@@ -533,7 +490,7 @@ function EmailModal({
         data: { htmlLength: html?.length ?? 0, sample: html?.slice(0, 80) ?? '' },
         timestamp: Date.now(),
       }),
-    }).catch(() => {});
+    }).catch(() => { });
     // #endregion agent log
 
     onMessageChange?.(html);
@@ -568,7 +525,7 @@ function EmailModal({
           data: { command, value },
           timestamp: Date.now(),
         }),
-      }).catch(() => {});
+      }).catch(() => { });
       // #endregion agent log
       syncMessageFromEditor();
     } catch {
@@ -577,21 +534,21 @@ function EmailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-4">
-      <div className="relative w-full max-w-4xl h-[80%] overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
-        <div className=" h-full overflow-y-auto rounded-2xl border border-white/5 bg-[#0a0a0a]">
-          
-          
-          
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-8">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0c0c0c] p-0 shadow-2xl">
+        <div className="rounded-2xl border border-white/5 bg-[#0a0a0a]">
 
-          <div className="space-y-3 px-1 py-1 text-[12px]">
-            <div className="grid items-center gap-1 md:grid-cols-[5px,1fr]">
-              <label className="text-gray-400 mt-1">To</label>
+
+
+
+          <div className="space-y-3 px-6 py-3 text-sm">
+            <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
+              <label className="text-gray-400">To</label>
               <input
                 value={recipient}
                 onChange={(e) => onRecipientChange(e.target.value)}
                 placeholder="Enter one or more emails, separated by comma"
-                className="w-half rounded-lg border border-white/10 bg-black/50 px-3 py-0.5 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
+                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
               />
             </div>
             <div className="grid items-center gap-2 md:grid-cols-[80px,1fr]">
@@ -599,25 +556,25 @@ function EmailModal({
               <input
                 value={subject}
                 onChange={(e) => onSubjectChange(e.target.value)}
-                className="w-half rounded-lg border border-white/10 bg-black/50 px-3 py-0.2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
+                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
               />
             </div>
             <div className="grid items-start gap-1.5 md:grid-cols-[80px,1fr]">
-              <label className="mt-0 text-gray-400">Message</label>
-              <div className="">
-                <div className=" rounded-lg border border-white/10 bg-black/50 px-2 py-0.2 text-sm text-gray-200">
+              <label className="mt-1 text-gray-400">Message</label>
+              <div className="w-full">
+                <div className="min-h-[120px] w-full rounded-lg border border-white/10 bg-black/50 px-3 pt-1.5 pb-0.5 text-sm text-gray-200">
                   <div
                     ref={editorRef}
                     contentEditable
                     suppressContentEditableWarning
-                    className=" outline-none focus-visible:outline-none"
+                    className="min-h-[60px] w-full outline-none focus-visible:outline-none"
                     onInput={syncMessageFromEditor}
                   />
                   {post && (
-                    <div className="mt-1 border-t border-white/10 pt-3 text-xss text-gray-200">
+                    <div className="mt-2 border-t border-white/10 pt-2 text-xs text-gray-200">
                       <div
-                        className="text-sm leading-tight text-gray-100"
-                        style={{ transform: 'scale(0.9)', transformOrigin: 'top left' }}
+                        className="text-sm leading-relaxed text-gray-100"
+                        style={{ transform: 'scale(0.92)', transformOrigin: 'top left' }}
                         // Preview of the full email HTML built the same way as in the backend template
                         dangerouslySetInnerHTML={{ __html: emailHtmlPreview }}
                       />
@@ -980,7 +937,7 @@ function MentionCard({ post, onDelete }) {
         formData.append(
           'message',
           emailMessage?.trim() ||
-            'Please review this post. It looks important and may need action.',
+          'Please review this post. It looks important and may need action.',
         );
 
         // Attach any selected files; backend accepts any file type
@@ -1152,7 +1109,6 @@ function MentionCard({ post, onDelete }) {
         )}
       </footer>
       <EmailModal
-      
         open={isEmailOpen}
         onClose={() => {
           if (!sendingEmail) {
@@ -1453,7 +1409,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
       const hasEnd = prev?.end;
       const prevStartStr = prev?.start;
       const prevEndStr = prev?.end;
-      
+
       // Check if both dates are already selected and different
       if (hasStart && hasEnd && prevStartStr !== prevEndStr) {
         // If clicking a different date, reset to new "from" date only
@@ -1463,7 +1419,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
           end: dateStr
         };
       }
-      
+
       // If start and end are the same (single day range) or only start is set
       if (hasStart) {
         // If clicking the same date as start (double-click), keep both as that date
@@ -1481,7 +1437,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
           end: dateStr
         };
       }
-      
+
       // No dates selected, set as start date (single day range initially)
       setLastClickedDate(dateStr);
       return {
@@ -1660,7 +1616,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
 
       {open && (
         <div className="absolute left-1/2 z-[200] mt-2 w-[580px] min-w-[50px] max-w-[50vw] -translate-x-1/2 rounded-xl border border-white/10 bg-[#080808] p-2.5 shadow-2xl shadow-black/50">
-          
+
 
           <div className="mb-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[10px]">
             <div className="flex items-center gap-2">
@@ -1716,7 +1672,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
                   </div>
                   <div className="space-y-0">
                     <div className="text-xss text-gray-400">
-                      
+
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <select
@@ -1747,7 +1703,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
             </div>
 
             <div className="flex flex-col gap-2 text-[10px]">
-              
+
               <div className="flex-1 space-y-1 overflow-y-auto pr-1">
                 {quickRanges.map((option) => (
                   <button
@@ -2028,6 +1984,7 @@ function InboxPageContent() {
   const [postsLimit, setPostsLimit] = useState(DEFAULT_POSTS_LIMIT);
   const [selectedSentiments, setSelectedSentiments] = useState([]);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [isUrlInitialized, setIsUrlInitialized] = useState(false);
 
   // Refs for race condition prevention and memory leak protection
   const fetchDataCallIdRef = useRef(0);
@@ -2134,318 +2091,262 @@ function InboxPageContent() {
   const searchParams = useSearchParams();
   const urlParamsRef = useRef({ sentiment: null, brand: null, platform: null, keywordGroup: null, keyword: null });
 
+  // Consolidate URL parsing and validation
+  // This ensures that navigating (changing URL) always triggers validation against loaded data
+  // Consolidate URL parsing and validation
+  // This ensures that navigating (changing URL) always triggers validation against loaded data
   useEffect(() => {
-    const sentiment = searchParams.get('sentiment');
-    const brand = searchParams.get('brand');
-    const platform = searchParams.get('platform');
-    // URL decode the keywordGroup to handle encoded colons (::)
-    const keywordGroup = searchParams.get('keywordGroup') ? decodeURIComponent(searchParams.get('keywordGroup')) : null;
-    const keyword = searchParams.get('keyword');
+    const sentiment = searchParams.getAll('sentiment');
+    const brand = searchParams.getAll('brand');
+    const platform = searchParams.getAll('platform');
+    const keywordGroupsRaw = searchParams.getAll('keywordGroup').map(k => decodeURIComponent(k)).filter(Boolean);
+    const keywordsRaw = searchParams.getAll('keyword').map(k => decodeURIComponent(k)).filter(Boolean);
     const durationParam = searchParams.get('duration');
 
-    // Store URL params in ref for later use
-    urlParamsRef.current = { sentiment, brand, platform, keywordGroup, keyword };
+    // 1. Apply Independent Filters (Sentiment, Duration, Platform)
+    const validSentiments = sentiment.filter(s => ['positive', 'neutral', 'negative'].includes(s.toLowerCase()));
+    setSelectedSentiments(prev => {
+      const isSame = prev.length === validSentiments.length && prev.every(p => validSentiments.includes(p));
+      return isSame ? prev : validSentiments;
+    });
 
-    // Set sentiment filter (support single value from URL, convert to array)
-    if (sentiment && ['positive', 'neutral', 'negative'].includes(sentiment.toLowerCase())) {
-      setSelectedSentiments([sentiment.toLowerCase()]);
-    } else {
-      setSelectedSentiments([]);
-    }
-
-    // Set duration filter - if coming from analytics (sentiment param exists), use duration from URL
-    // Accept any valid number (not just presets) to allow showing all posts
     if (durationParam) {
       const durationNum = Number(durationParam);
       if (!isNaN(durationNum) && durationNum > 0) {
         setDuration(durationParam);
         setDateRange(buildRangeFromDuration(durationNum));
       }
-    } else if (sentiment) {
-      // If sentiment filter is set but no duration, set to large value to show all matching posts
-      // User can manually change duration later if needed
+    } else if (validSentiments.length > 0) {
       setDuration('3650');
       setDateRange(buildRangeFromDuration(3650));
     }
 
-    // Set brand filter (will be validated when brands are loaded)
-    // Note: Brand will be matched case-insensitively and set with correct case after brands load
-    if (brand && brand !== 'all') {
-      setSelectedBrands([brand]);
-    }
+    const validPlatforms = platform.filter(p => p !== 'all').map(p => p.toLowerCase());
+    setSelectedChannels(prev => {
+      const isSame = prev.length === validPlatforms.length && prev.every(p => validPlatforms.includes(p));
+      return isSame ? prev : validPlatforms;
+    });
 
-    // Set platform/channel filter
-    if (platform && platform !== 'all') {
-      setSelectedChannels([platform.toLowerCase()]);
-    }
-
-    // Set keyword group filter (will be validated when brands are loaded)
-    if (keywordGroup) {
-      let groupIdToSet = null;
-      // Check if it's already in compound format (brandName::groupName)
-      if (keywordGroup.includes('::')) {
-        groupIdToSet = keywordGroup;
-        setSelectedKeywordGroups([keywordGroup]);
-      } else if (brand && brand !== 'all') {
-        // Construct compound ID format
-        groupIdToSet = `${brand}::${keywordGroup}`;
-        setSelectedKeywordGroups([groupIdToSet]);
-      } else {
-        // Store for later validation when brands are loaded
-        setSelectedKeywordGroups([keywordGroup]);
-      }
-      // Expand the keyword group so it's visible when the brand button is opened
-      if (groupIdToSet) {
-        setExpandedKeywordGroups((prev) => ({
-          ...prev,
-          [groupIdToSet]: true,
-        }));
-      }
-    }
-
-    // Set keyword filter
-    if (keyword && keyword !== 'all') {
-      // If keywordGroup is provided, construct compound keyword ID: groupId::keywordValue
-      if (keywordGroup) {
-        const groupId = keywordGroup.includes('::')
-          ? keywordGroup
-          : (brand && brand !== 'all' ? `${brand}::${keywordGroup}` : keywordGroup);
-        const keywordId = `${groupId}::${keyword.toLowerCase().trim()}`;
-        setSelectedKeywordsFilter([keywordId]);
-      }
-      // If no keywordGroup, we'll need to find matching keywords when brands are loaded
-    }
-  }, [searchParams]);
-
-  // Validate and apply filters after brands are loaded
-  useEffect(() => {
+    // 2. Apply Dependent Filters (Brands, KeywordGroups, Keywords) ONLY if data is available
     if (!assignedBrandDetails?.length) return;
 
-    const { keywordGroup, brand, keyword } = urlParamsRef.current;
-
-    // Validate brand filter
-    if (brand && brand !== 'all') {
-      // Use case-insensitive matching to find the brand
-      const matchingBrand = assignedBrandDetails.find(b => 
-        b.brandName?.toLowerCase() === brand?.toLowerCase()
-      );
-      
-      if (!matchingBrand) {
-        // Brand doesn't exist, clear brand filter
-        setSelectedBrands([]);
-        // Also clear keyword group and keyword filters since they depend on brand
-        if (keywordGroup) {
-          setSelectedKeywordGroups([]);
-          if (keyword) {
-            setSelectedKeywordsFilter([]);
-          }
-        }
-        return;
-      } else {
-        // Brand exists, ensure it's selected with the correct case from database
-        setSelectedBrands((prev) => {
-          // Check if the correct brand name is already selected
-          if (prev.includes(matchingBrand.brandName)) {
-            return prev;
-          }
-          // Replace any case-variant of the brand with the correct one
-          const filtered = prev.filter(b => 
-            b?.toLowerCase() !== brand?.toLowerCase()
+    // Validate Brands
+    const validBrands = [];
+    if (brand && brand.length > 0) {
+      brand.forEach(bName => {
+        if (bName && bName !== 'all') {
+          const matchingBrand = assignedBrandDetails.find(b =>
+            b.brandName?.toLowerCase() === bName?.toLowerCase()
           );
-          return [...filtered, matchingBrand.brandName];
-        });
-      }
+          if (matchingBrand) validBrands.push(matchingBrand.brandName);
+        }
+      });
     }
 
-    // Handle keyword-only filtering (when keyword is provided but no keywordGroup)
-    if (!keywordGroup && keyword && keyword !== 'all') {
-      const keywordLower = keyword.toLowerCase().trim();
-      const matchingKeywordIds = [];
+    // Update Selected Brands
+    setSelectedBrands(prev => {
+      if (JSON.stringify([...prev].sort()) === JSON.stringify([...validBrands].sort())) return prev;
+      return validBrands;
+    });
 
-      // Find all groups that contain this keyword
-      assignedBrandDetails.forEach((brandDetail) => {
-        // Skip if brand filter is set and this brand doesn't match
-        if (brand && brand !== 'all' && brandDetail.brandName !== brand) {
-          return;
+    // Validate Keyword Groups (Multi-Select)
+    const validGroupIds = [];
+    // Groups that we should search keywords within
+    const targetGroupsForKeywords = [];
+
+    // Identify target brands for group resolution (either selected brands or all brands)
+    const targetBrandsForGroup = validBrands.length > 0
+      ? assignedBrandDetails.filter(b => validBrands.includes(b.brandName))
+      : assignedBrandDetails;
+
+    if (keywordGroupsRaw.length > 0) {
+      keywordGroupsRaw.forEach(kGroup => {
+        let resolvedGroupId = null;
+        let targetGroup = null;
+
+        // Case A: Compound ID
+        if (kGroup.includes('::')) {
+          const [brandName, groupName] = kGroup.split('::');
+          const brandDetail = assignedBrandDetails.find(b => b.brandName?.toLowerCase() === brandName?.toLowerCase());
+          if (brandDetail) {
+            const group = brandDetail.keywordGroups?.find(g => (g._id && String(g._id) === groupName) || (g.groupName || g.name || '').toLowerCase() === groupName?.toLowerCase());
+            if (group) {
+              resolvedGroupId = makeGroupId(brandDetail.brandName, group);
+              targetGroup = group;
+            }
+          }
+        }
+        // Case B: Simple Name (Scan target brands)
+        else {
+          for (const brandDetail of targetBrandsForGroup) {
+            const group = brandDetail.keywordGroups?.find(g => (g.groupName || g.name || '').toLowerCase() === kGroup.toLowerCase());
+            if (group) {
+              resolvedGroupId = makeGroupId(brandDetail.brandName, group);
+              targetGroup = group;
+              // If we found a match for this simple name, we stop scanning for *this* kGroup 
+              // (Ambiguity handling: taking first match, consistent with previous behavior)
+              break;
+            }
+          }
         }
 
-        brandDetail.keywordGroups?.forEach((group) => {
-          const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
-          const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
-          const merged = [...andKeywords, ...orKeywords];
-          const groupKeywords = merged.map((k) => (k || '').toString().trim().toLowerCase()).filter(Boolean);
+        if (resolvedGroupId && targetGroup) {
+          if (!validGroupIds.includes(resolvedGroupId)) validGroupIds.push(resolvedGroupId);
+          targetGroupsForKeywords.push({ groupId: resolvedGroupId, groupObj: targetGroup });
+        }
+      });
+    }
 
-          // Check if this group contains the keyword
-          if (groupKeywords.includes(keywordLower)) {
-            const groupId = makeGroupId(brandDetail.brandName, group);
-            matchingKeywordIds.push(`${groupId}::${keywordLower}`);
+    // Update Keyword Groups State
+    setSelectedKeywordGroups(prev => {
+      if (JSON.stringify([...prev].sort()) === JSON.stringify([...validGroupIds].sort())) return prev;
+      return validGroupIds;
+    });
+
+    // Expand Valid Groups
+    if (validGroupIds.length > 0) {
+      setExpandedKeywordGroups(prev => {
+        const next = { ...prev };
+        let changed = false;
+        validGroupIds.forEach(id => {
+          if (!next[id]) { next[id] = true; changed = true; }
+        });
+        return changed ? next : prev;
+      });
+    }
+
+    // Validate Keywords (Multi-Select)
+    let validKeywordIds = [];
+
+    if (keywordsRaw.length > 0) {
+      keywordsRaw.forEach(kw => {
+        // Check if it's a specific Compound ID
+        if (kw.includes('::')) {
+          const { groupId, keywordValue } = splitKeywordCompoundId(kw);
+          if (groupId && keywordValue) {
+            const [brandName, groupName] = groupId.split('::');
+            const brandDetail = assignedBrandDetails.find(b => b.brandName?.toLowerCase() === brandName?.toLowerCase());
+            if (brandDetail) {
+              const group = brandDetail.keywordGroups?.find(g => (g._id && String(g._id) === groupName) || (g.groupName || g.name || '').toLowerCase() === groupName?.toLowerCase());
+              if (group) {
+                const keywords = [...(Array.isArray(group?.keywords) ? group.keywords : []), ...(Array.isArray(group?.includeKeywords) ? group.includeKeywords : [])];
+                const kMatch = keywords.find(k => (k || '').toString().toLowerCase().trim() === keywordValue.toLowerCase().trim());
+                if (kMatch) {
+                  const actualGroupId = makeGroupId(brandDetail.brandName, group);
+                  const actualId = `${actualGroupId}::${kMatch.toString().toLowerCase().trim()}`;
+                  if (!validKeywordIds.includes(actualId)) validKeywordIds.push(actualId);
+                }
+              }
+            }
+          }
+        }
+        // Fallback: Simple Value (Global Search)
+        else {
+          const kwLower = kw.toLowerCase().trim();
+          const scopeItems = targetGroupsForKeywords.length > 0
+            ? targetGroupsForKeywords.map(item => ({
+              type: 'group',
+              groupId: item.groupId,
+              keywords: [...(Array.isArray(item.groupObj?.keywords) ? item.groupObj.keywords : []), ...(Array.isArray(item.groupObj?.includeKeywords) ? item.groupObj.includeKeywords : [])]
+            }))
+            : targetBrandsForGroup.flatMap(b => (b.keywordGroups || []).map(g => ({
+              type: 'group',
+              groupId: makeGroupId(b.brandName, g),
+              keywords: [...(Array.isArray(g?.keywords) ? g.keywords : []), ...(Array.isArray(g?.includeKeywords) ? g.includeKeywords : [])]
+            })));
+
+          scopeItems.forEach(scopeItem => {
+            const scopeKw = scopeItem.keywords.map(k => (k || '').toString().toLowerCase().trim());
+            if (scopeKw.includes(kwLower)) {
+              const id = `${scopeItem.groupId}::${kwLower}`;
+              if (!validKeywordIds.includes(id)) validKeywordIds.push(id);
+            }
+          });
+        }
+      });
+    } else if (validGroupIds.length > 0) {
+      // No specific keywords -> Populate ALL from selected groups
+      targetGroupsForKeywords.forEach(item => {
+        const keywords = [...(Array.isArray(item.groupObj?.keywords) ? item.groupObj.keywords : []), ...(Array.isArray(item.groupObj?.includeKeywords) ? item.groupObj.includeKeywords : [])];
+        keywords.forEach(k => {
+          const kStr = (k || '').toString().toLowerCase().trim();
+          if (kStr) {
+            const id = `${item.groupId}::${kStr}`;
+            if (!validKeywordIds.includes(id)) validKeywordIds.push(id);
           }
         });
       });
-
-      if (matchingKeywordIds.length > 0) {
-        setSelectedKeywordsFilter(matchingKeywordIds);
-        // Extract unique group IDs from matching keyword IDs and expand them
-        const groupIdsToExpand = new Set();
-        matchingKeywordIds.forEach((keywordId) => {
-          const { groupId } = splitKeywordCompoundId(keywordId);
-          if (groupId) {
-            groupIdsToExpand.add(groupId);
-          }
-        });
-        // Expand all groups that contain the matching keyword
-        if (groupIdsToExpand.size > 0) {
-          setExpandedKeywordGroups((prev) => {
-            const next = { ...prev };
-            let changed = false;
-            groupIdsToExpand.forEach((groupId) => {
-              if (next[groupId] === undefined) {
-                next[groupId] = true;
-                changed = true;
-              }
-            });
-            return changed ? next : prev;
-          });
-        }
-      } else {
-        // Keyword not found in any group, clear filter
-        setSelectedKeywordsFilter([]);
-      }
-      return;
     }
 
-    // Validate keyword group filter
-    if (!keywordGroup) return;
+    // Update Keywords State
+    setSelectedKeywordsFilter(prev => {
+      if (JSON.stringify([...prev].sort()) === JSON.stringify([...validKeywordIds].sort())) return prev;
+      return validKeywordIds;
+    });
 
-    // Helper function to populate keywords from a group
-    const populateKeywordsFromGroup = (groupId, group) => {
-      const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
-      const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
-      const merged = [...andKeywords, ...orKeywords];
-      const groupKeywords = merged.map((k) => (k || '').toLowerCase().trim()).filter(Boolean);
+    setIsUrlInitialized(true);
 
-      // If a specific keyword is provided in URL, use only that
-      if (urlParamsRef.current.keyword) {
-        const keywordId = `${groupId}::${urlParamsRef.current.keyword.toLowerCase().trim()}`;
-        setSelectedKeywordsFilter([keywordId]);
-      } else {
-        // Otherwise, populate all keywords from the group
-        const keywordIds = groupKeywords.map((keyword) => `${groupId}::${keyword}`);
-        setSelectedKeywordsFilter(keywordIds);
-      }
-      
-      // Expand the keyword group so it's visible when the brand button is opened
-      setExpandedKeywordGroups((prev) => ({
-        ...prev,
-        [groupId]: true,
-      }));
-    };
+  }, [searchParams, assignedBrandDetails]);
 
-    // If keyword group is already in compound format, validate it exists
-    if (keywordGroup.includes('::')) {
-      const [brandName, groupName] = keywordGroup.split('::');
-      const brandDetail = assignedBrandDetails.find(b => 
-        b.brandName?.toLowerCase() === brandName?.toLowerCase()
-      );
-      if (brandDetail) {
-        // Case-insensitive group name matching
-        const group = brandDetail.keywordGroups?.find(
-          g => {
-            const gName = (g.groupName || g.name || '').toLowerCase();
-            return gName === groupName?.toLowerCase();
-          }
-        );
-        if (group) {
-          // Use the actual group name from the data to ensure consistency
-          const actualGroupId = makeGroupId(brandDetail.brandName, group);
-          // Group exists, replace any old ID (including case variants) with the actual one
-          setSelectedKeywordGroups((prev) => {
-            // Remove any ID that matches the keywordGroup (case-insensitive) or the actualGroupId
-            const filtered = prev.filter(id => {
-              const idLower = (id || '').toLowerCase();
-              const keywordGroupLower = (keywordGroup || '').toLowerCase();
-              const actualGroupIdLower = (actualGroupId || '').toLowerCase();
-              return idLower !== keywordGroupLower && idLower !== actualGroupIdLower;
-            });
-            // Add the actual group ID if not already present
-            if (!filtered.includes(actualGroupId)) {
-              return [...filtered, actualGroupId];
-            }
-            return filtered;
-          });
-          populateKeywordsFromGroup(actualGroupId, group);
-        } else {
-          // Group doesn't exist, clear the filter
-          setSelectedKeywordGroups([]);
-          setSelectedKeywordsFilter([]);
-        }
-      }
-    } else if (brand && brand !== 'all') {
-      // Validate the group exists for the specified brand
-      const brandDetail = assignedBrandDetails.find(b => 
-        b.brandName?.toLowerCase() === brand?.toLowerCase()
-      );
-      if (brandDetail) {
-        // Case-insensitive group name matching
-        const group = brandDetail.keywordGroups?.find(
-          g => {
-            const gName = (g.groupName || g.name || '').toLowerCase();
-            return gName === keywordGroup?.toLowerCase();
-          }
-        );
-        if (group) {
-          // Update to compound format using actual brand name and group name
-          const groupId = makeGroupId(brandDetail.brandName, group);
-          setSelectedKeywordGroups([groupId]);
-          // Populate keywords from the group and expand it
-          populateKeywordsFromGroup(groupId, group);
-        } else {
-          // Group doesn't exist, clear the filter
-          setSelectedKeywordGroups([]);
-          setSelectedKeywordsFilter([]);
-        }
-      }
-    } else {
-      // No brand specified, try to find matching groups across all brands (case-insensitive)
-      let foundGroupId = null;
-      let foundGroup = null;
-      const keywordGroupLower = (keywordGroup || '').toLowerCase();
-      for (const brandDetail of assignedBrandDetails) {
-        const group = brandDetail.keywordGroups?.find(
-          g => {
-            const gName = (g.groupName || g.name || '').toLowerCase();
-            return gName === keywordGroupLower;
-          }
-        );
-        if (group) {
-          foundGroupId = makeGroupId(brandDetail.brandName, group);
-          foundGroup = group;
-          break;
-        }
-      }
-      if (foundGroupId && foundGroup) {
-        // Replace any old ID with the found one
-        setSelectedKeywordGroups((prev) => {
-          const filtered = prev.filter(id => {
-            const idLower = (id || '').toLowerCase();
-            const keywordGroupLower = (keywordGroup || '').toLowerCase();
-            const foundGroupIdLower = (foundGroupId || '').toLowerCase();
-            return idLower !== keywordGroupLower && idLower !== foundGroupIdLower;
-          });
-          if (!filtered.includes(foundGroupId)) {
-            return [...filtered, foundGroupId];
-          }
-          return filtered;
-        });
-        // Populate keywords from the group and expand it
-        populateKeywordsFromGroup(foundGroupId, foundGroup);
-      } else {
-        // Group not found, clear the filter
-        setSelectedKeywordGroups([]);
-        setSelectedKeywordsFilter([]);
-      }
+  // Helper to update URL query parameters based on current state
+  const updateURL = useCallback(() => {
+    // Don't update URL while data is loading initially or if brands haven't loaded yet
+    if (!assignedBrandDetails?.length || !isUrlInitialized) return;
+
+    const params = new URLSearchParams();
+
+    // 1. Sentiment
+    if (selectedSentiments.length > 0) {
+      selectedSentiments.forEach((s) => params.append('sentiment', s));
     }
-  }, [assignedBrandDetails]);
+
+    // 2. Duration
+    if (duration && duration !== 'custom') {
+      params.set('duration', duration);
+    }
+
+    // 3. Brands
+    if (selectedBrands.length > 0) {
+      selectedBrands.forEach((b) => params.append('brand', b));
+    }
+
+    // 4. Platforms
+    if (selectedChannels.length > 0) {
+      selectedChannels.forEach((p) => params.append('platform', p));
+    }
+
+    // 5. Keyword Groups
+    if (selectedKeywordGroups.length > 0) {
+      selectedKeywordGroups.forEach((g) => params.append('keywordGroup', g));
+    }
+
+    // 6. Keywords
+    if (selectedKeywordsFilter.length > 0) {
+      // Store full compound IDs to allow determining exactly which group's keyword is selected
+      selectedKeywordsFilter.forEach((k) => params.append('keyword', k));
+    }
+    const newQuery = params.toString();
+    const currentQuery = searchParams.toString();
+
+    if (newQuery !== currentQuery) {
+      router.push(newQuery ? `?${newQuery}` : '?', { scroll: false });
+    }
+  }, [
+    assignedBrandDetails,
+    selectedSentiments,
+    duration,
+    selectedBrands,
+    selectedChannels,
+    selectedKeywordGroups,
+    selectedKeywordsFilter,
+    router,
+    searchParams,
+  ]);
+
+  // Synchronize URL with state changes
+  useEffect(() => {
+    updateURL();
+  }, [updateURL]);
 
   useEffect(() => {
     if (loadings) return;
@@ -2931,6 +2832,16 @@ function InboxPageContent() {
       upper.setHours(endHour, endMinute, 59, 999);
     }
 
+    // Identify brands that have at least one keyword selected
+    const brandsWithActiveKeywords = new Set();
+    selectedKeywordsFilter.forEach(k => {
+      const { groupId } = splitKeywordCompoundId(k);
+      if (groupId) {
+        const [bName] = groupId.split('::');
+        if (bName) brandsWithActiveKeywords.add((bName || '').trim().toLowerCase());
+      }
+    });
+
     return posts.filter((post) => {
       const brandName = post?.brand?.brandName;
       const normalize = (v) => (v || '').toString().trim().toLowerCase();
@@ -2957,10 +2868,12 @@ function InboxPageContent() {
       const matchesKeyword =
         selectedKeywordsFilter.length === 0
           ? true
-          : (keywordValue && selectedKeywordsFilter.some((compoundId) => {
-            const { keywordValue: compoundKeyword } = splitKeywordCompoundId(compoundId);
-            return compoundKeyword === keywordValue;
-          }));
+          : ((brandsWithActiveKeywords.has((brandName || '').trim().toLowerCase())
+            ? (keywordValue && selectedKeywordsFilter.some((compoundId) => {
+              const { keywordValue: compoundKeyword } = splitKeywordCompoundId(compoundId);
+              return compoundKeyword === keywordValue;
+            }))
+            : true));
 
       if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel || !matchesKeyword) return false;
 
@@ -3013,7 +2926,7 @@ function InboxPageContent() {
       <FilterDrawer open={isFilterDrawerOpen} onClose={() => setIsFilterDrawerOpen(false)} />
       <div className="relative z-1 mx-auto max-w-7xl px-10 py-10">
         <header className="">
-          
+
           <div className="flex flex-wrap items-center gap-3">
             {TABS.map(({ key, label, icon: Icon }) => {
               const isClickable = key === 'all';

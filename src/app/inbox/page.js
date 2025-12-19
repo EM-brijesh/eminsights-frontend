@@ -1649,11 +1649,11 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
     <div className="relative duration-picker w-full min-w-[220px] sm:w-auto">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex w-full min-w-[220px] items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xss font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
+        className="inline-flex w-full min-w-[220px] items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-1 text-xss font-medium text-white transition hover:border-white/20 hover:bg-white/10 sm:w-auto"
       >
         <span className="flex flex-col items-start leading-tight">
           <span className="text-sm uppercase tracking-widest text-gray-400">Date </span>
-          <span className="text-[15px]">{buttonLabel}</span>
+          <span className="text-[13px]">{buttonLabel}</span>
         </span>
         <Calendar className="h-4 w-4 text-gray-300" />
       </button>
@@ -3011,7 +3011,7 @@ function InboxPageContent() {
     <div className="relative min-h-screen overflow-hidden bg-[#020202] text-white">
       <DottedBackground />
       <FilterDrawer open={isFilterDrawerOpen} onClose={() => setIsFilterDrawerOpen(false)} />
-      <div className="relative z-1 mx-auto max-w-7xl px-10 py-10">
+      <div className="relative z-10 mx-auto max-w-7xl px-2 py-2">
         <header className="">
           
           <div className="flex flex-wrap items-center gap-3">
@@ -3020,7 +3020,7 @@ function InboxPageContent() {
               return (
                 <button
                   key={key}
-                  onClick={() => isClickable && setActiveTab(key)}
+                  onClick={() => setActiveTab(key)}
                   disabled={!isClickable}
                   className={clsx(
                     'group flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition cursor-pointer',
@@ -3065,13 +3065,13 @@ function InboxPageContent() {
               timeRange={timeRange}
               onTimeChange={setTimeRange}
             />
-            <label className="flex min-w-[200px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">
+            <label className="flex min-w-[200px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm   text-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/30">
               <Search className="h-4 w-4 text-gray-400" />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search mentions, authors or keywords"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-gray-500 sm:w-64 lg:w-72"
+                className="w-full bg-transparent text-[12px] outline-none placeholder:text-gray-500 sm:w-64 lg:w-72"
               />
             </label>
           </div>
@@ -3121,7 +3121,7 @@ function InboxPageContent() {
                 }
               }}
               disabled={manualRefreshLoading}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:opacity-60 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:opacity-60 cursor-pointer"
             >
               <RefreshCcw className={`h-4 w-4 ${manualRefreshLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -3129,7 +3129,7 @@ function InboxPageContent() {
             <div className="relative channel-menu">
               <button
                 onClick={() => setIsChannelMenuOpen((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 cursor-pointer"
               >
                 Channels
                 {selectedChannels.length > 0 && (
@@ -3180,7 +3180,7 @@ function InboxPageContent() {
             <div className="relative filter-menu">
               <button
                 onClick={() => setIsFilterMenuOpen((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 cursor-pointer"
               >
                 <Filter className="h-4 w-4" />
                 Filter

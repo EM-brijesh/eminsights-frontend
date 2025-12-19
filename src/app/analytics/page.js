@@ -201,9 +201,6 @@ function AnalyticsMentionCard({ post }) {
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-xs md:text-sm text-gray-400">
           <span className="font-semibold text-white">{author}</span>
-          <span className="text-[10px] md:text-xs uppercase tracking-widest text-gray-500">
-            • {platform}
-          </span>
         </div>
         <p className="text-sm md:text-base leading-relaxed text-gray-100 line-clamp-3">{mainText}</p>
 

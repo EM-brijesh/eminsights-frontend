@@ -1,30 +1,54 @@
-import { Circle } from 'lucide-react';
 import clsx from 'clsx';
 
 // Shared platform badge used across Inbox, Analytics, etc.
-// Matches the visual style of the Inbox badges.
-const PlatformBadge = ({ platform }) => {
-  const map = {
-    twitter: { label: 'Public Tweets', color: 'bg-sky-500/15 text-sky-200 border-sky-500/40' },
-    youtube: { label: 'YouTube', color: 'bg-red-500/15 text-red-200 border-red-500/40' },
-    reddit: { label: 'Reddit', color: 'bg-orange-500/15 text-orange-200 border-orange-500/40' },
-    news:   { label: 'News', color:     'bg-indigo-500/10 text-indigo-100 border-indigo-400/60' },
-  };
+// Matches the visual style of the Inbox badges with logos.
+const PLATFORM_META = {
+  twitter: {
+    label: 'Public Tweets',
+    logo: '/X.jpg',
+    className: 'bg-sky-500/15 text-sky-200 border-sky-500/40',
+  },
+  youtube: {
+    label: 'YouTube',
+    logo: '/youtube-logo.svg',
+    className: 'bg-red-500/15 text-red-200 border-red-500/40',
+  },
+  reddit: {
+    label: 'Reddit',
+    logo: '/reddit-4.svg',
+    className: 'bg-orange-500/10 text-orange-200 border-orange-400/60',
+  },
+  google: {
+    label: 'Google',
+    logo: '/google-logo.svg',
+    className: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60',
+  },
+};
 
-  // Treat Google/web results like "news" so they match Inbox
-  const raw = platform?.toLowerCase();
-  const key = raw === 'google' ? 'news' : raw;
-  const info = map[key] || map.news;
+const PlatformBadge = ({ platform, size = 'md' }) => {
+  const platformMeta = PLATFORM_META[platform?.toLowerCase()] || PLATFORM_META.google;
+  
+  const sizeClasses = {
+    xs: 'px-2 py-2',
+    sm: 'px-2.5 py-2.5',
+    md: 'px-2 py-2',
+  };
+  
+  const logoSizeClasses = {
+    xs: 'h-5 w-6',
+    sm: 'h-6 w-7',
+    md: 'h-5 w-6',
+  };
 
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide',
-        info.color,
+        'inline-flex items-center gap-1.5 rounded-full border text-xs',
+        platformMeta.className,
+        sizeClasses[size] || sizeClasses.md,
       )}
     >
-      <Circle className="h-2 w-2" />
-      {info.label}
+      <img src={platformMeta.logo} alt={platformMeta.label} className={clsx('object-contain', logoSizeClasses[size] || logoSizeClasses.md)} />
     </span>
   );
 };

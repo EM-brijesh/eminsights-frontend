@@ -1539,35 +1539,40 @@ function AnalyticsPageContent() {
                 <AreaChart data={timelineChartData}>
                   <defs>
                     <linearGradient id="colorPositive" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.65} />
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorNeutral" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.65} />
                       <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorNegative" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.65} />
                       <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <CartesianGrid strokeDasharray="2 6" stroke="#374151" opacity={0.25}  />
                   {/* Phase 1.2: Improved angle and font size */}
                   <XAxis
                     dataKey="date"
                     stroke="#9ca3af"
-                    angle={-30}
-                    textAnchor="end"
-                    height={80}
                     tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    interval="preserveStartEnd"
+                    tickformatter={(date) =>
+                      new Date(date).toLocaleDateString('en-In',{
+                      day:2-digit,
+                      month:'short',
+                      
+                    })}
+                    
                   />
                   <YAxis stroke="#9ca3af" />
                   <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                  <Legend />
+                  <Legend verticalAlign="bottom align=center" icontype="circle" wrapperStyle={{ paddingTop: '16px' }}/>
                   <Area
                     type="monotone"
                     dataKey="positive"
-                    stackId="1"
+                    
                     stroke="#10b981"
                     strokeWidth={2}
                     fillOpacity={1}
@@ -1577,7 +1582,7 @@ function AnalyticsPageContent() {
                   <Area
                     type="monotone"
                     dataKey="neutral"
-                    stackId="1"
+                    
                     stroke="#f59e0b"
                     strokeWidth={2}
                     fillOpacity={1}
@@ -1587,7 +1592,7 @@ function AnalyticsPageContent() {
                   <Area
                     type="monotone"
                     dataKey="negative"
-                    stackId="1"
+                    
                     stroke="#ef4444"
                     strokeWidth={2}
                     fillOpacity={1}
@@ -1630,6 +1635,21 @@ function AnalyticsPageContent() {
             <CardTitle>Sentiment Distribution by Platform</CardTitle>
           </CardHeader>
           <CardContent>
+                          <div className="flex gap-4 mb-4 text-xs text-gray-400">
+                  <span className="flex items-center gap-1">
+                    <span className="h-2.5 w-2.5 rounded bg-emerald-500" />
+                    Positive
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2.5 w-2.5 rounded bg-amber-500" />
+                    Neutral
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2.5 w-2.5 rounded bg-red-500" />
+                    Negative
+                  </span>
+                </div>
+
             {sentimentByPlatformData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={sentimentByPlatformData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -1647,17 +1667,17 @@ function AnalyticsPageContent() {
                       <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                  <CartesianGrid strokeDasharray="2 6" stroke="#374151"  vertical={false} horizontal={true} opacity={0.25} />
                   <XAxis dataKey="platform" stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
-                  <YAxis stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
+                  <YAxis stroke="#9ca3af" domain={['dataMin', 'dataMax+50']} tick={{ fill: '#9ca3af',fontsize:12 }} axisLine={{ stroke: '#4b5563' }} />
                   <Tooltip
                     content={<SentimentByPlatformTooltip />}
                     cursor={{ fill: 'rgba(15, 23, 42, 0.6)' }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" radius={[0, 0, 0, 0]} activeBar={false} />
-                  <Bar dataKey="neutral" stackId="a" fill="url(#gradientNeu)" radius={[0, 0, 0, 0]} activeBar={false} />
-                  <Bar dataKey="negative" stackId="a" fill="url(#gradientNeg)" radius={[8, 8, 0, 0]} activeBar={false} />
+                  <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" opacity={0.9} radius={[0, 0, 0, 0]} activeBar={false} />
+                  <Bar dataKey="neutral" stackId="a" fill="url(#gradientNeu)" opacity={0.85} radius={[0, 0, 0, 0]} activeBar={false} />
+                  <Bar dataKey="negative" stackId="a" fill="url(#gradientNeg)" opacity={0.95} radius={[8, 8, 0, 0]} activeBar={false} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1692,39 +1712,36 @@ function AnalyticsPageContent() {
                       return (
                         <tr key={index} className="border-b border-gray-800 hover:bg-gray-800/50 transition">
                           <td className="p-3 font-medium">{item.keyword}</td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center">
+                          <td className="p-3">
+                            <div className="relative h-7 w-full rounded overflow-hidden bg-gray-800">
                               <div
-                                className="h-6 rounded px-2 text-xs font-semibold flex items-center justify-center text-white"
+                                className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white transition-all"
                                 style={{
-                                  backgroundColor: `rgba(16, 185, 129, ${0.3 + (item.positive / maxValue) * 0.7})`,
-                                  minWidth: '60px'
+                                  backgroundColor: `rgba(16, 185, 129, ${0.25 + (item.positive / item.total) * 0.75})`,
                                 }}
                               >
                                 {item.positive}
                               </div>
                             </div>
                           </td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center">
+                          <td className="p-3">
+                            <div className="relative h-7 w-full rounded overflow-hidden bg-gray-800">
                               <div
-                                className="h-6 rounded px-2 text-xs font-semibold flex items-center justify-center text-white"
+                                className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white transition-all"
                                 style={{
-                                  backgroundColor: `rgba(245, 158, 11, ${0.3 + (item.neutral / maxValue) * 0.7})`,
-                                  minWidth: '60px'
+                                  backgroundColor: `rgba(245, 158, 11, ${0.25 + (item.neutral / item.total) * 0.75})`,
                                 }}
                               >
                                 {item.neutral}
                               </div>
                             </div>
                           </td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center">
+                          <td className="p-3">
+                            <div className="relative h-7 w-full rounded overflow-hidden bg-gray-800">
                               <div
-                                className="h-6 rounded px-2 text-xs font-semibold flex items-center justify-center text-white"
+                                className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white transition-all"
                                 style={{
-                                  backgroundColor: `rgba(239, 68, 68, ${0.3 + (item.negative / maxValue) * 0.7})`,
-                                  minWidth: '60px'
+                                  backgroundColor: `rgba(239, 68, 68, ${0.25 + (item.negative / item.total) * 0.75})`,
                                 }}
                               >
                                 {item.negative}
@@ -1752,10 +1769,14 @@ function AnalyticsPageContent() {
             <CardTitle>Top Keywords by Volume</CardTitle>
           </CardHeader>
           <CardContent>
-            {keywordChartData.length > 0 ? (
+            {keywordChartData.length > 0 ? (() => {
+              const sortedKeywordData = [...keywordChartData].sort(
+                (a, b) => b.posts - a.posts
+              );
+              return (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={keywordChartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                <BarChart data={sortedKeywordData} layout="vertical">
+                  <CartesianGrid strokeDasharray="2 6" stroke="#374151" horizontal vertical={false} opacity={0.25} />
                   <XAxis
                     type="number"
                     stroke="#9ca3af"
@@ -1766,8 +1787,8 @@ function AnalyticsPageContent() {
                     type="category"
                     dataKey="name"
                     stroke="#9ca3af"
-                    width={120}
-                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    width={150}
+                    tick={{ fill: '#e5e7eb', fontSize: 13,fontWeight:500 }}
                     axisLine={{ stroke: '#4b5563' }}
                   />
                   <Tooltip
@@ -1784,15 +1805,18 @@ function AnalyticsPageContent() {
                   </defs>
                   <Bar
                     dataKey="posts"
+                    label={{position: 'right',fontSize: 11,fontWeight:500,fill:'#e5e7eb' }}
                     fill="url(#gradientKeyword)"
-                    radius={[0, 8, 8, 0]}
+                    radius={[0, 10, 10, 0]}
                     animationDuration={800}
+                    style={{ filter: 'drop-shadow(0 2px 6px rgba(139, 92, 246, 0.35))' }}
                     animationBegin={0}
                     activeBar={false}
                   />
                 </BarChart>
               </ResponsiveContainer>
-            ) : (
+              );
+            })() : (
               <EmptyState
                 message="No keyword volume data"
                 helpText="Top performing keywords will be ranked here by post volume."

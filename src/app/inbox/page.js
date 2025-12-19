@@ -291,23 +291,39 @@ function formatRelative(date) {
   return formatter.format(value, 'week');
 }
 
+export const PLATFORM_META = {
+  twitter: {
+    label: 'Public Tweets',
+    logo: '/X.jpg',
+    className: 'bg-sky-500/15 text-sky-200 border-sky-500/40',
+  },
+  youtube: {
+    label: 'YouTube',
+    logo: '/youtube-logo.svg',
+    className: 'bg-red-500/15 text-red-200 border-red-500/40',
+  },
+  reddit: {
+    label: 'Reddit',
+    logo: '/reddit-4.svg',
+    className: 'bg-orange-500/10 text-orange-200 border-orange-400/60',
+  },
+  google: {
+    label: 'Google',
+    logo: '/google-logo.svg',
+    className: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60',
+  },
+};
+
 function PlatformBadge({ platform }) {
-  const map = {
-    twitter: { label: 'Public Tweets', color: 'bg-sky-500/15 text-sky-200 border-sky-500/40' },
-    youtube: { label: 'YouTube', color: 'bg-red-500/15 text-red-200 border-red-500/40' },
-    reddit: { label: 'Reddit', color: 'bg-orange-500/15 text-orange-200 border-orange-500/40' },
-    google: { label: 'Google', color: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60' },
-  };
-  const info = map[platform?.toLowerCase()] || map.google;
+  const platformMeta = PLATFORM_META[platform?.toLowerCase()] || PLATFORM_META.google;
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide',
-        info.color,
+        'inline-flex items-center gap-1.5 rounded-full border px-2 py-2 text-xs',
+        platformMeta.className,
       )}
     >
-      <Circle className="h-2 w-2" />
-      {info.label}
+      <img src={platformMeta.logo} alt={platformMeta.label} className="h-5 w-6 object-contain" />
     </span>
   );
 }

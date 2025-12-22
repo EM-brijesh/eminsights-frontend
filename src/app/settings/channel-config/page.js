@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 
-const BACKEND = "https://api.eminsights.in ";
+const BACKEND = "https://api.eminsights.in";
 
 export default function ChannelConfigPage() {
   const [loadingLogin, setLoadingLogin] = useState(false);

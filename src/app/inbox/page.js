@@ -294,8 +294,8 @@ function formatRelative(date) {
 export const PLATFORM_META = {
   twitter: {
     label: 'Public Tweets',
-    logo: '/X.jpg',
-    className: 'bg-sky-500/15 text-sky-200 border-sky-500/40',
+    logo: '/X-logo.svg',
+    className: 'bg-white/10 border-white/50',
   },
   youtube: {
     label: 'YouTube',

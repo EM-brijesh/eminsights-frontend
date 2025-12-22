@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import ReactWordcloud from "react-wordcloud";
 import clsx from 'clsx';
 import {
   RefreshCw,
@@ -14,12 +15,16 @@ import {
   Clock,
   ExternalLink,
   Users,
+  MoreVertical,
+  ChevronDown,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
 import DottedBackground from '@/components/DottedBackground';
 import PlatformBadge from '@/components/PlatformBadge';
+import WordCloud from '@/components/WordCloud';
 import {
   PieChart, Pie, Cell,
   LineChart, Line, BarChart, Bar,
@@ -281,6 +286,12 @@ function AnalyticsPageContent() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
   const [sentimentWarning, setSentimentWarning] = useState('');
+  const [topKeywordsPage, setTopKeywordsPage] = useState(1);
+  const [topKeywordsRowsPerPage, setTopKeywordsRowsPerPage] = useState(10);
+  const [wordCloudColorScheme, setWordCloudColorScheme] = useState('multiple');
+  const [wordCloudColorMenuOpen, setWordCloudColorMenuOpen] = useState(false);
+  const [wordCloudMenuOpen, setWordCloudMenuOpen] = useState(false);
+  const [topKeywordsMenuOpen, setTopKeywordsMenuOpen] = useState(false);
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
 
   // Read URL parameters and initialize filters so refresh preserves current selection
@@ -1019,6 +1030,52 @@ function AnalyticsPageContent() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([name, value]) => ({ name, posts: value })), [stats.byKeyword]);
+  
+  // Keyword frequency for word cloud
+  const keywordFrequency = useMemo(() => {
+    const frequency = {};
+    filteredPosts.forEach((post) => {
+      const keyword = post.keyword || 'unknown';
+      frequency[keyword] = (frequency[keyword] || 0) + 1;
+    });
+    return frequency;
+  }, [filteredPosts]);
+  
+  // Top keywords data for table (sorted by frequency)
+  const topKeywordsData = useMemo(() => {
+    return Object.entries(keywordFrequency)
+      .map(([keyword, count]) => ({ keyword, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [keywordFrequency]);
+  
+  // Paginated top keywords
+  const paginatedTopKeywords = useMemo(() => {
+    const start = (topKeywordsPage - 1) * topKeywordsRowsPerPage;
+    const end = start + topKeywordsRowsPerPage;
+    return topKeywordsData.slice(start, end);
+  }, [topKeywordsData, topKeywordsPage, topKeywordsRowsPerPage]);
+  
+  const totalTopKeywordsPages = useMemo(() => {
+    return Math.ceil(topKeywordsData.length / topKeywordsRowsPerPage);
+  }, [topKeywordsData.length, topKeywordsRowsPerPage]);
+  
+  // Export function for top keywords
+  const handleExportTopKeywords = useCallback(() => {
+    const csvContent = [
+      ['Top Keywords', 'Mentions Count'],
+      ...topKeywordsData.map(({ keyword, count }) => [keyword, count])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `top-keywords-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [topKeywordsData]);
   const clientTimelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
     if (post.createdAt) {
       const date = new Date(post.createdAt).toLocaleDateString();
@@ -1763,67 +1820,8 @@ function AnalyticsPageContent() {
             )}
           </CardContent>
         </Card>
-        {/* Top Keywords */}
-        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
-          <CardHeader>
-            <CardTitle>Top Keywords by Volume</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {keywordChartData.length > 0 ? (() => {
-              const sortedKeywordData = [...keywordChartData].sort(
-                (a, b) => b.posts - a.posts
-              );
-              return (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sortedKeywordData} layout="vertical">
-                  <CartesianGrid strokeDasharray="2 6" stroke="#374151" horizontal vertical={false} opacity={0.25} />
-                  <XAxis
-                    type="number"
-                    stroke="#9ca3af"
-                    tick={{ fill: '#9ca3af' }}
-                    axisLine={{ stroke: '#4b5563' }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    stroke="#9ca3af"
-                    width={150}
-                    tick={{ fill: '#e5e7eb', fontSize: 13,fontWeight:500 }}
-                    axisLine={{ stroke: '#4b5563' }}
-                  />
-                  <Tooltip
-                    contentStyle={CHART_TOOLTIP_STYLE}
-                    formatter={(value) => [value, 'Posts']}
-                    labelFormatter={(label) => `Keyword: ${label}`}
-                    cursor={{ fill: 'rgba(15, 23, 42, 0.6)' }}
-                  />
-                  <defs>
-                    <linearGradient id="gradientKeyword" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={1} />
-                      <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.8} />
-                    </linearGradient>
-                  </defs>
-                  <Bar
-                    dataKey="posts"
-                    label={{position: 'right',fontSize: 11,fontWeight:500,fill:'#e5e7eb' }}
-                    fill="url(#gradientKeyword)"
-                    radius={[0, 10, 10, 0]}
-                    animationDuration={800}
-                    style={{ filter: 'drop-shadow(0 2px 6px rgba(139, 92, 246, 0.35))' }}
-                    animationBegin={0}
-                    activeBar={false}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-              );
-            })() : (
-              <EmptyState
-                message="No keyword volume data"
-                helpText="Top performing keywords will be ranked here by post volume."
-              />
-            )}
-          </CardContent>
-        </Card>
+        {/* Word Cloud and Top Keywords */}
+       
         {/* Recent Posts */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
           <CardHeader>

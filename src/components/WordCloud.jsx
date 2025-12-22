@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-export default function WordCloud({ keywordFrequency }) {
+export default function WordCloud({ keywordFrequency, colorScheme = 'multiple' }) {
   const [hoveredWord, setHoveredWord] = useState(null);
 
   // Transform keywordFrequency object into format for rendering
@@ -27,30 +27,35 @@ export default function WordCloud({ keywordFrequency }) {
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
     
+    // Color palette
+    const colors = [
+      '#10B981', // green
+      '#3B82F6', // blue  
+      '#8B5CF6', // purple
+      '#F59E0B', // amber
+      '#EF4444', // red
+      '#EC4899', // pink
+      '#06B6D4', // cyan
+    ];
+    
     // Add scaled size and color to each word
     return entries.map((word, index) => {
       const scale = maxValue === minValue ? 1 : (word.value - minValue) / (maxValue - minValue);
       const fontSize = 16 + scale * 48; // 16px to 64px range
       
-      // Color palette
-      const colors = [
-        '#10B981', // green
-        '#3B82F6', // blue  
-        '#8B5CF6', // purple
-        '#F59E0B', // amber
-        '#EF4444', // red
-        '#EC4899', // pink
-        '#06B6D4', // cyan
-      ];
+      // Use single color if colorScheme is 'single', otherwise use multiple colors
+      const color = colorScheme === 'single' 
+        ? '#3B82F6' // Use blue as default single color
+        : colors[index % colors.length];
       
       return {
         ...word,
         fontSize,
-        color: colors[index % colors.length],
+        color,
         rotation: Math.random() > 0.5 ? 0 : -90, // Random rotation
       };
     });
-  }, [keywordFrequency]);
+  }, [keywordFrequency, colorScheme]);
 
   if (words.length === 0) {
     return (

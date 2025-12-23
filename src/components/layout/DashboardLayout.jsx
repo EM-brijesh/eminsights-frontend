@@ -1,15 +1,12 @@
-"use client";
+'use client';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-
 import {
-  LayoutDashboard,
   BarChart3,
   Settings,
   Bell,
-  User,
   Menu,
   X,
   ChevronDown,
@@ -18,13 +15,13 @@ import {
   Inbox,
   Building2,
   Plug,
-  Tag
+  Tag,
+  UserPlus,
+  User
 } from 'lucide-react';
-import { UserPlus } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [sidebarProfileOpen, setSidebarProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -34,7 +31,7 @@ export default function DashboardLayout({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const isLoggedIn = typeof document !== 'undefined' && document.cookie.includes('auth=');
 
-  // Compute user display name
+  // Compute user display name and initials
   const computeDisplayName = (user) => {
     if (!user) return "User";
     if (user.name && user.name.trim()) return user.name.trim();
@@ -52,7 +49,9 @@ export default function DashboardLayout({ children }) {
     try {
       const raw = localStorage.getItem("user");
       if (raw) setCurrentUser(JSON.parse(raw));
-    } catch {}
+    } catch (err) {
+      console.error("Failed to parse user from storage", err);
+    }
   }, []);
 
   // Auto-open settings dropdown when on settings-related pages
@@ -76,48 +75,31 @@ export default function DashboardLayout({ children }) {
   };
 
   const navigationItems = [
-    {
-      title: "Inbox",
-      icon: Inbox,
-      href: "/inbox",
-      active: pathname === "/inbox",
-      disabled: false
-    },
-    {
-      title: "Analytics",
-      icon: BarChart3,
-      href: "/analytics",
-      active: pathname === "/analytics",
-      disabled: false
-    },
-    {
-      title: "Reports",
-      icon: FileText,
-      href: "/reports",
-      active: pathname.startsWith("/collection/"),
-      disabled: true
+    { title: "Inbox", icon: Inbox, href: "/inbox", active: pathname === "/inbox" },
+    { title: "Analytics", icon: BarChart3, href: "/analytics", active: pathname === "/analytics" },
+    { 
+      title: "Reports", 
+      icon: FileText, 
+      href: "/reports", 
+      active: pathname.startsWith("/collection/"), 
+      disabled: true 
     }
   ];
 
-  const settingsNavActive =
-    pathname === "/keywords" || pathname.startsWith("/settings/");
+  const settingsNavActive = pathname === "/keywords" || pathname.startsWith("/settings/");
 
   return (
-    <div className="flex min-h-dvh dark">
+    <div className="flex min-h-dvh dark bg-black text-white">
       {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-20 bg-black border-r border-gray-800 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-
-        {/* Mobile Close */}
+        {/* Mobile Close Button */}
         <div className="flex items-center justify-center p-4 border-b border-gray-800 lg:hidden">
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="text-gray-400 hover:text-white"
-          >
-            <X className="w-5 h-5" />
+          <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-white">
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -126,29 +108,16 @@ export default function DashboardLayout({ children }) {
           {navigationItems.map((item) => {
             const content = (
               <>
-                <item.icon
-                  className={`w-6 h-6 flex-shrink-0 ${
-                    item.active ? "text-black" : "text-gray-300"
-                  }`}
-                />
-                <span
-                  className={`text-xs mt-2 font-medium ${
-                    item.active ? "text-black" : "text-gray-300"
-                  }`}
-                >
+                <item.icon className={`w-6 h-6 flex-shrink-0 ${item.active ? "text-black" : "text-gray-300"}`} />
+                <span className={`text-xs mt-2 font-medium ${item.active ? "text-black" : "text-gray-300"}`}>
                   {item.title}
                 </span>
               </>
             );
 
-            // disabled items
             if (item.disabled) {
               return (
-                <div
-                  key={item.title}
-                  title={`${item.title} (coming soon)`}
-                  className="flex flex-col items-center justify-center w-full py-3 rounded-lg text-gray-500 opacity-60 cursor-not-allowed"
-                >
+                <div key={item.title} title={`${item.title} (Coming Soon)`} className="flex flex-col items-center justify-center w-full py-3 rounded-lg text-gray-500 opacity-50 cursor-not-allowed">
                   {content}
                 </div>
               );
@@ -156,12 +125,10 @@ export default function DashboardLayout({ children }) {
 
             return (
               <Link
-                key={item.title}
+                key={item.href}
                 href={item.href}
                 className={`flex flex-col items-center justify-center w-full py-3 rounded-lg transition-colors ${
-                  item.active
-                    ? "bg-white text-black"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                  item.active ? "bg-white text-black" : "text-gray-300 hover:bg-gray-800 hover:text-white"
                 }`}
               >
                 {content}
@@ -169,135 +136,101 @@ export default function DashboardLayout({ children }) {
             );
           })}
 
-          {/* Settings Button */}
+          {/* Settings Section */}
           <div className="w-full">
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
-              title="Settings"
               className={`flex flex-col items-center justify-center w-full py-3 rounded-lg transition-colors ${
-                settingsNavActive
-                  ? "bg-white text-black"
-                  : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                settingsNavActive ? "bg-white text-black" : "text-gray-300 hover:bg-gray-800 hover:text-white"
               }`}
             >
-              <Settings
-                className={`w-6 h-6 ${
-                  settingsNavActive ? "text-black" : "text-gray-300"
-                }`}
-              />
+              <Settings className="w-6 h-6" />
               <span className="text-xs mt-2 font-medium">Settings</span>
             </button>
 
-            {/* Settings Dropdown */}
             {settingsOpen && (
               <div className="mt-2 w-full space-y-2">
-
-                {/* Keywords */}
-                <Link
-                  href="/keywords"
-                  className={`flex flex-col items-center justify-center w-full py-2 rounded-lg transition-colors ${
-                    pathname === "/keywords"
-                      ? "bg-gray-800 text-white"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
+                <Link href="/keywords" className={`flex flex-col items-center justify-center w-full py-2 rounded-lg ${pathname === "/keywords" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white"}`}>
                   <Tag className="w-4 h-4 mb-1" />
-                  <span className="text-[10px] font-medium">Keywords</span>
+                  <span className="text-[10px]">Keywords</span>
                 </Link>
-
-                {/* UPDATED — Channel Config (CLICKABLE) */}
-                <Link
-                  href="/settings/channel-config"
-                  title="Channel Configuration"
-                  className="flex flex-col items-center justify-center w-full py-2 rounded-lg opacity-80 hover:opacity-100 transition-colors text-gray-300 hover:bg-gray-800 hover:text-white"
-                >
+                <Link href="/settings/channel-config" className={`flex flex-col items-center justify-center w-full py-2 rounded-lg ${pathname === "/settings/channel-config" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white"}`}>
                   <Plug className="w-4 h-4 mb-1" />
-                  <span className="text-[10px] font-medium text-center">
-                    Channel Configuration
-                  </span>
+                  <span className="text-[10px]">Channels</span>
                 </Link>
-
-                {/* Category Mapping */}
-                <Link
-                  href="/settings/category"
-                  className={`flex flex-col items-center justify-center w-full py-2 rounded-lg transition-colors ${
-                    pathname === "/settings/category"
-                      ? "bg-gray-800 text-white"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <Building2 className="w-4 h-4 mb-1" />
-                  <span className="text-[10px] font-medium">Category</span>
-                </Link>
-
-                {/* Alerts */}
-                <Link
-                  href="/settings/alert"
-                  className={`flex flex-col items-center justify-center w-full py-2 rounded-lg transition-colors ${
-                    pathname === "/settings/alert"
-                      ? "bg-gray-800 text-white"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <Bell className="w-4 h-4 mb-1" />
-                  <span className="text-[10px] font-medium">Alerts</span>
-                </Link>
-
               </div>
             )}
           </div>
         </nav>
 
-        {/* Sidebar Bottom — User Menu */}
+        {/* Bottom Section */}
         <div className="p-4 border-t border-gray-800 flex flex-col items-center gap-4">
-          <button className="flex flex-col items-center justify-center w-full py-2 text-gray-300 hover:bg-gray-800 rounded-lg">
+          <button className="text-gray-400 hover:text-white transition-colors">
             <Bell className="w-6 h-6" />
           </button>
-
-          {/* User Avatar */}
-          <div className="relative w-full flex flex-col items-center">
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => setSidebarProfileOpen(!sidebarProfileOpen)}
-                className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center"
-              >
-                {userInitials}
-              </button>
-
-              <button
-                onClick={() => setSidebarProfileOpen(!sidebarProfileOpen)}
-                className="p-1 rounded hover:bg-gray-800/60"
-              >
-                <ChevronDown
-                  className={`w-3.5 h-3.5 text-gray-400 transition-transform ${
-                    sidebarProfileOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
+          
+          {/* User Profile Section with Chevron Trigger */}
+          <div className="relative w-full flex flex-col items-center gap-1">
+            <div
+              className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center font-bold shadow-md cursor-default"
+            >
+              {userInitials}
             </div>
 
-            {/* Profile Dropdown */}
+            {/* THE ARROW (CHEVRON) BUTTON */}
+            <button
+              onClick={() => setSidebarProfileOpen(!sidebarProfileOpen)}
+              className="p-1 rounded hover:bg-gray-800 transition-colors focus:outline-none"
+              aria-label="Toggle user menu"
+            >
+              <ChevronDown 
+                className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+                  sidebarProfileOpen ? 'rotate-180' : ''
+                }`} 
+              />
+            </button>
+
             {sidebarProfileOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setSidebarProfileOpen(false)} />
-
-                <div className="absolute left-full bottom-0 mb-4 ml-3 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50">
-                  <div className="p-3 border-b border-gray-700">
-                    <div className="font-medium text-white">{userDisplayName}</div>
-                    <div className="text-sm text-gray-400">{currentUser?.email}</div>
+                <div className="absolute left-full bottom-0 mb-2 ml-4 w-64 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200">
+                  <div className="p-4 border-b border-gray-800 bg-gray-900/50">
+                    <p className="font-semibold text-white truncate">{userDisplayName}</p>
+                    <p className="text-xs text-gray-400 truncate">{currentUser?.email}</p>
+                    {currentUser?.role === 'admin' && (
+                      <span className="mt-2 inline-block text-[10px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded border border-purple-500/30 font-medium uppercase tracking-wider">
+                        Administrator
+                      </span>
+                    )}
                   </div>
-
-                  <div className="p-2">
-                    <Link href="/brands" className="flex items-center gap-3 px-3 py-2 hover:bg-gray-700 rounded">
-                      <Building2 className="w-4 h-4" />
-                      Manage Brands
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-3 px-3 py-2 text-red-400 hover:bg-gray-700 rounded"
+                  
+                  <div className="p-2 space-y-1">
+                    <Link 
+                      href="/brands" 
+                      onClick={() => setSidebarProfileOpen(false)} 
+                      className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
                     >
-                      <LogOut className="w-4 h-4" />
-                      Logout
+                      <Building2 className="w-4 h-4" /> Manage Brands
+                    </Link>
+
+                    {/* ADMIN ONLY LOGIC */}
+                    {currentUser?.role === 'admin' && (
+                      <Link 
+                        href="/settings/users" 
+                        onClick={() => setSidebarProfileOpen(false)} 
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                      >
+                        <UserPlus className="w-4 h-4" /> Create User
+                      </Link>
+                    )}
+
+                    <div className="my-1 border-t border-gray-800" />
+
+                    <button 
+                      onClick={handleLogout} 
+                      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" /> Logout
                     </button>
                   </div>
                 </div>
@@ -307,23 +240,17 @@ export default function DashboardLayout({ children }) {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-20">
-        {/* Mobile Top Bar */}
-        <div className="lg:hidden sticky top-0 z-40 bg-black/80 border-b border-gray-800">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="text-gray-300 hover:text-white"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-            <span className="text-sm text-gray-400">{currentUser?.email}</span>
-          </div>
-        </div>
-
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:ml-20">
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-black border-b border-gray-800 sticky top-0 z-30">
+          <button onClick={() => setSidebarOpen(true)} className="text-gray-300 hover:text-white">
+            <Menu className="w-6 h-6" />
+          </button>
+          <span className="text-xs text-gray-500 truncate max-w-[150px]">{currentUser?.email}</span>
+        </header>
+        
+        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+          <div className="max-w-7xl mx-auto">
             {children}
           </div>
         </main>
@@ -331,9 +258,9 @@ export default function DashboardLayout({ children }) {
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm" 
+          onClick={() => setSidebarOpen(false)} 
         />
       )}
     </div>

@@ -24,7 +24,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
 import DottedBackground from '@/components/DottedBackground';
 import PlatformBadge from '@/components/PlatformBadge';
-import WordCloud from '@/components/WordCloud';
 import {
   PieChart, Pie, Cell,
   LineChart, Line, BarChart, Bar,

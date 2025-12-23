@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import ReactWordcloud from "react-wordcloud";
+
 import clsx from 'clsx';
 import {
   RefreshCw,

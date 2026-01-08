@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 
-const BACKEND = "http://localhost:5050";
+const BACKEND = "https://api.eminsights.in"
 
 export default function ChannelConfigPage() {
   const searchParams = useSearchParams();

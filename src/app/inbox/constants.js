@@ -42,6 +42,8 @@ export const PLATFORM_OPTIONS = [
   { value: 'twitter', label: 'X (Twitter)' },
   { value: 'youtube', label: 'YouTube' },
   { value: 'reddit', label: 'Reddit' },
+  { value: 'instagram', label: 'Instagram' },
+  
 ];
 
 // Platform badge configuration
@@ -61,6 +63,10 @@ export const PLATFORM_BADGES = {
   news: {
     label: 'News',
     color: 'bg-amber-500/15 text-amber-200 border-amber-500/40',
+  },
+  instagram: {
+    label: 'Instagram',
+    color: 'bg-pink-500/15 text-pink-200 border-pink-500/40',
   },
 };
 

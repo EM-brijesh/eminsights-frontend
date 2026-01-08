@@ -15,12 +15,13 @@ import { useSearchParams } from 'next/navigation';
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] });
 
-const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google'];
+const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google' , 'instagram'];
 const PLATFORM_LABELS = {
   twitter: 'Twitter',
   youtube: 'YouTube',
   reddit: 'Reddit',
   google: 'Google',
+  instagram: 'Instagram',
 };
 
 const MESSAGE_VARIANTS = {
@@ -188,6 +189,21 @@ const PlatformIcon = ({ platform, isSelected, onClick }) => {
       bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
       hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
       name: 'Google',
+    },
+    instagram: {
+      component: (
+        <Image
+          src="/instagram-logo.svg"
+          alt="Instagram"
+          width={40}
+          height={40}
+          className="object-contain"
+          style={{ filter: 'grayscale(0.2) brightness(0.9)' }}
+        />
+      ),
+      bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
+      hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
+      name: 'Instagram',
     },
   };
 
@@ -691,6 +707,7 @@ export default function KeywordsPageClient() {
         if (k === 'youtube') return 'youtube';
         if (k === 'reddit' || k === 'quora') return 'reddit';
         if (k === 'google') return 'google';
+        if (k === 'instagram') return 'instagram';
         return 'twitter';
       });
 
@@ -810,7 +827,7 @@ export default function KeywordsPageClient() {
       const totalPosts = (summary.youtube || 0) + (summary.twitter || 0) + (summary.reddit || 0 + (summary.google || 0));
 
       showMessage(
-        `✅ Search completed!\nFound ${totalPosts} posts:\n• YouTube: ${summary.youtube || 0}\n• Twitter: ${summary.twitter || 0}\n• Reddit: ${summary.reddit || 0}\n• Google: ${summary.google || 0}`,
+        `✅ Search completed!\nFound ${totalPosts} posts:\n• YouTube: ${summary.youtube || 0}\n• Twitter: ${summary.twitter || 0}\n• Reddit: ${summary.reddit || 0}\n• Google: ${summary.google || 0} \n Instagram: ${summary.instagram || 0}`,
         'success'
       );
 
@@ -1269,6 +1286,9 @@ export default function KeywordsPageClient() {
                           <><Image key={ch} src="/reddit-logo.svg" alt="Reddit" width={16} height={16} /><Image key={ch} src="/google-logo.svg" alt="Google" width={16} height={16} /></>
                         ) : ch === 'quora' ? (
                           <Image key={ch} src="/quora-logo.svg" alt="Quora" width={16} height={16} />
+                        ) : null,
+                        ch === 'instagram' ? (
+                          <Image key={ch} src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />
                         ) : null
                       )}
                       {selectedFilterChannels.length > 4 && <span className="text-[10px]">+{selectedFilterChannels.length - 4}</span>}
@@ -1286,7 +1306,7 @@ export default function KeywordsPageClient() {
                       { key: 'twitter', label: 'X (Twitter)', src: '/x-logo.svg', wh: [14, 14] },
                       { key: 'reddit', label: 'Reddit', src: '/reddit-logo.svg', wh: [16, 16] },
                       //{ key: 'facebook', label: 'Facebook', src: '/facebook-logo.svg', wh: [16, 16] },
-                     // { key: 'instagram', label: 'Instagram', src: '/instagram-logo.svg', wh: [16, 16] },
+                      { key: 'instagram', label: 'Instagram', src: '/instagram-logo.svg', wh: [16, 16] },
                      // { key: 'quora', label: 'Quora', src: '/quora-logo.svg', wh: [16, 16] },
                       { key: 'google', label: 'Google', src: '/google-logo.svg', wh: [16, 16] },
                     ].map((p) => (
@@ -1418,6 +1438,7 @@ export default function KeywordsPageClient() {
                             {plat === 'youtube' && <Image src="/youtube-logo.svg" alt="YouTube" width={16} height={16} />}
                             {plat === 'twitter' && <Image src="/x-logo.svg" alt="X" width={14} height={14} />}
                             {plat === 'reddit' && <Image src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />}
+                            {plat === 'instagram' && <Image src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />}
                             
                             {plat === 'google' && <Image src="/google-logo.svg" alt="Quora" width={16} height={16} />}
                           </span>
@@ -1546,6 +1567,7 @@ export default function KeywordsPageClient() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {[
                           { key: 'twitter', title: 'Twitter', desc: 'Tweets, Replies, Mentions', logo: '/x-logo.svg', size: 16 },
+                          { key: 'instagram', title: 'Instagram', desc: 'Posts', logo: '/instagram-logo.svg', size: 16 },
                           
                           { key: 'youtube', title: 'YouTube', desc: 'Video post only', logo: '/youtube-logo.svg', size: 18 },
                           { key: 'reddit', title: 'Reddit', desc: 'Communities & comments', logo: '/reddit-logo.svg', size: 18 },

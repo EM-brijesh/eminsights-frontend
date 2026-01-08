@@ -307,6 +307,11 @@ export const PLATFORM_META = {
     logo: '/reddit-4.svg',
     className: 'bg-orange-500/10 text-orange-200 border-orange-400/60',
   },
+  instagram: {
+    label: 'Instagram',
+    logo: '/instagram-logo.svg',
+    className: 'bg-pink-500/10 text-pink-200 border-pink-400/60',
+  },
   google: {
     label: 'Google',
     logo: '/google-logo.svg',

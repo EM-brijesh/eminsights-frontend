@@ -4,17 +4,24 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 
-const BACKEND = "https://api.eminsights.in"
+const BACKEND = "http://localhost:5050";
 
 export default function ChannelConfigClient() {
   const searchParams = useSearchParams();
   const metaToken = searchParams.get("metaToken");
 
+  /* -------------------- STATE -------------------- */
+
   const [loadingLogin, setLoadingLogin] = useState(false);
-  const [loadingPages, setLoadingPages] = useState(false);
+
   const [pages, setPages] = useState([]);
-  const [error, setError] = useState("");
+  const [loadingPages, setLoadingPages] = useState(false);
+
+  const [connectedAccounts, setConnectedAccounts] = useState([]);
+  const [loadingConnected, setLoadingConnected] = useState(false);
+
   const [connectingPage, setConnectingPage] = useState(null);
+  const [error, setError] = useState("");
 
   /* -------------------- LOGIN -------------------- */
 
@@ -23,7 +30,31 @@ export default function ChannelConfigClient() {
     window.location.href = `${BACKEND}/meta/auth/login`;
   };
 
-  /* -------------------- FETCH PAGES -------------------- */
+  /* -------------------- FETCH CONNECTED ACCOUNTS (DB) -------------------- */
+
+  const fetchConnectedAccounts = async () => {
+    try {
+      setLoadingConnected(true);
+
+      const res = await fetch(`${BACKEND}/meta/connected-accounts`, {
+        cache: "no-store"
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch connected accounts");
+      }
+
+      setConnectedAccounts(data.accounts || []);
+    } catch (err) {
+      console.error("Connected accounts error:", err.message);
+    } finally {
+      setLoadingConnected(false);
+    }
+  };
+
+  /* -------------------- FETCH FACEBOOK PAGES (META) -------------------- */
 
   const fetchPages = async (token) => {
     try {
@@ -61,7 +92,7 @@ export default function ChannelConfigClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: "64f000000000000000000001", // 🔴 replace with real userId
+          userId: "64f000000000000000000001",
           pageId: page.id,
           pageName: page.name,
           pageAccessToken: page.access_token
@@ -75,6 +106,8 @@ export default function ChannelConfigClient() {
       }
 
       alert("Instagram account connected successfully ✅");
+
+      await fetchConnectedAccounts();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -82,8 +115,23 @@ export default function ChannelConfigClient() {
     }
   };
 
-  /* -------------------- EFFECT -------------------- */
+  /* -------------------- HELPERS -------------------- */
 
+  const formatDate = (date) =>
+    new Date(date).toLocaleDateString();
+
+  const connectedPageIds = new Set(
+    connectedAccounts.map((a) => a.pageId)
+  );
+
+  /* -------------------- EFFECTS -------------------- */
+
+  // Always load DB data
+  useEffect(() => {
+    fetchConnectedAccounts();
+  }, []);
+
+  // Load Meta pages only when token exists
   useEffect(() => {
     if (metaToken) {
       fetchPages(metaToken);
@@ -110,54 +158,96 @@ export default function ChannelConfigClient() {
           </button>
         </div>
 
-        {/* CARD */}
-        <div className="bg-[#101218] p-6 rounded-xl border border-gray-800">
+        {/* CONNECTED ACCOUNTS (ALWAYS SHOWN) */}
+        <div className="bg-[#101218] p-6 rounded-xl border border-gray-800 mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <FaInstagram className="text-pink-500" />
+            Connected Instagram Accounts ({connectedAccounts.length})
+          </h2>
 
-          <div className="flex items-center gap-3 mb-5">
-            <FaFacebook className="text-blue-500" size={22} />
-            <FaInstagram className="text-pink-500" size={22} />
-            <h2 className="text-xl font-semibold">
-              Facebook Pages ({pages.length})
-            </h2>
-          </div>
-
-          {/* STATES */}
-          {loadingPages && <p className="text-gray-400">Loading pages...</p>}
-          {error && <p className="text-red-500">{error}</p>}
-          {!loadingPages && pages.length === 0 && metaToken && (
-            <p className="text-gray-400">No pages found.</p>
+          {loadingConnected && (
+            <p className="text-gray-400">Loading connected accounts...</p>
           )}
 
-          {/* PAGES */}
-          <div className="grid md:grid-cols-2 gap-6 mt-6">
-            {pages.map((page) => (
+          {!loadingConnected && connectedAccounts.length === 0 && (
+            <p className="text-gray-500 text-sm">
+              No Instagram accounts connected yet.
+            </p>
+          )}
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {connectedAccounts.map((acc) => (
               <div
-                key={page.id}
+                key={acc._id}
                 className="bg-[#161922] border border-gray-800 p-5 rounded-xl"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <FaFacebook className="text-blue-500" />
-                  <h3 className="font-semibold">{page.name}</h3>
+                  <FaInstagram className="text-pink-500" />
+                  <h3 className="font-semibold">{acc.pageName}</h3>
                 </div>
 
-                <p className="text-xs text-gray-400 mb-4">
-                  Page ID: {page.id}
+                <p className="text-xs text-gray-400">
+                  Page ID: {acc.pageId}
                 </p>
 
-                <button
-                  onClick={() => connectInstagram(page)}
-                  disabled={connectingPage === page.id}
-                  className="bg-pink-600 px-4 py-2 rounded-md hover:bg-pink-700 transition text-sm font-semibold"
-                >
-                  {connectingPage === page.id
-                    ? "Connecting..."
-                    : "Connect Instagram"}
-                </button>
+                <p className="text-green-500 text-sm mt-2">
+                  ✅ Instagram Connected
+                </p>
+
+                <p className="text-gray-400 text-xs">
+                  IG Business ID: {acc.instagramBusinessId}
+                </p>
+
+                <p className="text-gray-500 text-xs">
+                  Connected on: {formatDate(acc.connectedAt)}
+                </p>
               </div>
             ))}
           </div>
-
         </div>
+
+        {/* META PAGES (OAUTH FLOW) */}
+        {metaToken && (
+          <div className="bg-[#101218] p-6 rounded-xl border border-gray-800">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <FaFacebook className="text-blue-500" />
+              Facebook Pages ({pages.length})
+            </h2>
+
+            {loadingPages && (
+              <p className="text-gray-400">Loading pages...</p>
+            )}
+            {error && <p className="text-red-500">{error}</p>}
+
+            <div className="grid md:grid-cols-2 gap-6 mt-6">
+              {pages.map((page) => (
+                <div
+                  key={page.id}
+                  className="bg-[#161922] border border-gray-800 p-5 rounded-xl"
+                >
+                  <h3 className="font-semibold mb-2">{page.name}</h3>
+
+                  {connectedPageIds.has(page.id) && (
+                    <p className="text-green-500 text-sm mb-2">
+                      ✅ Already connected
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => connectInstagram(page)}
+                    className="bg-pink-600 px-4 py-2 rounded-md hover:bg-pink-700 transition text-sm font-semibold"
+                  >
+                    {connectingPage === page.id
+                      ? "Connecting..."
+                      : "Connect Instagram"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

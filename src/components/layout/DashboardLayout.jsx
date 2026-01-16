@@ -75,7 +75,6 @@ export default function DashboardLayout({ children }) {
   };
 
   const navigationItems = [
-<<<<<<< Updated upstream
     { title: "Inbox", icon: Inbox, href: "/inbox", active: pathname === "/inbox" },
     { title: "Analytics", icon: BarChart3, href: "/analytics", active: pathname === "/analytics" },
     { 
@@ -84,26 +83,6 @@ export default function DashboardLayout({ children }) {
       href: "/reports", 
       active: pathname.startsWith("/collection/"), 
       disabled: true 
-=======
-    {
-      title: 'Inbox',
-      icon: Inbox,
-      href: '/inbox',
-      active: pathname === '/inbox'
-    },
-    {
-      title: 'Analytics',
-      icon: BarChart3,
-      href: '/analytics',
-      active: pathname === '/analytics'
-    },
-    {
-      title: 'Reports',
-      icon: FileText,
-      href: '/reports',
-      active: pathname?.startsWith('/collection/'),
-      disabled: true
->>>>>>> Stashed changes
     }
   ];
 
@@ -127,7 +106,6 @@ export default function DashboardLayout({ children }) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-6 px-2 space-y-6 flex flex-col items-center">
           {navigationItems.map((item) => {
-<<<<<<< Updated upstream
             const content = (
               <>
                 <item.icon className={`w-6 h-6 flex-shrink-0 ${item.active ? "text-black" : "text-gray-300"}`} />
@@ -136,45 +114,6 @@ export default function DashboardLayout({ children }) {
                 </span>
               </>
             );
-=======
-            const baseClasses = `flex flex-col items-center justify-center w-full py-3 rounded-lg transition-colors ${
-              item.active
-                ? 'bg-white text-black'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            }`;
-
-            const content = (
-              <>
-                <item.icon className={`w-6 h-6 flex-shrink-0 ${item.active ? 'text-black' : 'text-gray-300'}`} />
-                <span className={`text-xs mt-2 font-medium ${item.active ? 'text-black' : 'text-gray-300'}`}>{item.title}</span>
-              </>
-            );
-
-            if (item.disabled) {
-              return (
-                <div
-                  key={item.title}
-                  title={`${item.title} (coming soon)`}
-                  aria-disabled="true"
-                  className={`${baseClasses} cursor-not-allowed opacity-60 focus-visible:outline-none`}
-                >
-                  {content}
-                </div>
-              );
-            }
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.title}
-                className={`${baseClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50`}
-              >
-                {content}
-              </Link>
-            );
-          })}
->>>>>>> Stashed changes
 
             if (item.disabled) {
               return (

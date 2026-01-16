@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 
-const BACKEND = "http://localhost:5050";
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export default function ChannelConfigClient() {
   const searchParams = useSearchParams();

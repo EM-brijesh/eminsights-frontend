@@ -22,6 +22,7 @@ export default function ChannelConfigClient() {
 
   const [connectingPage, setConnectingPage] = useState(null);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   /* -------------------- LOGIN -------------------- */
 

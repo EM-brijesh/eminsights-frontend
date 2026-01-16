@@ -42,8 +42,9 @@ export const PLATFORM_OPTIONS = [
   { value: 'twitter', label: 'X (Twitter)' },
   { value: 'youtube', label: 'YouTube' },
   { value: 'reddit', label: 'Reddit' },
+  { value: 'google', label: 'Google' },
+  { value: 'facebook', label: 'Facebook' },
   { value: 'instagram', label: 'Instagram' },
-  
 ];
 
 // Platform badge configuration

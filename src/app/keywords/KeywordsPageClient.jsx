@@ -9,37 +9,17 @@ import api, { API_BASE_URL, getAuthToken } from '@/lib/api';
 import DottedBackground from '@/components/DottedBackground';
 import Image from 'next/image';
 import { Inter } from 'next/font/google';
-import COUNTRIES from '@/lib/countries';
 import { useSearchParams } from 'next/navigation';
-
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] });
 
-const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google' , 'instagram'];
-const PLATFORM_LABELS = {
-  twitter: 'Twitter',
-  youtube: 'YouTube',
-  reddit: 'Reddit',
-  google: 'Google',
-  instagram: 'Instagram',
-};
+const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google', 'instagram'];
 
 const MESSAGE_VARIANTS = {
   success: 'bg-emerald-900/40 border-emerald-500/70 text-emerald-100',
   error: 'bg-red-900/40 border-red-500/70 text-red-100',
   warning: 'bg-amber-900/40 border-amber-500/70 text-amber-100',
   info: 'bg-blue-900/40 border-blue-500/70 text-blue-100',
-};
-
-const formatPostDate = (value) => {
-  if (!value) return 'Unknown date';
-  try {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleString();
-  } catch {
-    return String(value);
-  }
 };
 
 const deriveGroupCreatedAt = (group) => {
@@ -127,107 +107,6 @@ const serializeGroupForBackend = (group, fallbackPlatforms = [], fallbackFrequen
 const serializeGroupsForBackend = (groups, fallbackPlatforms = [], fallbackFrequency = '30m') =>
   (groups || []).map((group) => serializeGroupForBackend(group, fallbackPlatforms, fallbackFrequency));
 
-// Platform icon component with tooltip
-const PlatformIcon = ({ platform, isSelected, onClick }) => {
-  const icons = {
-    youtube: {
-      component: (
-        <Image
-          src="/youtube-logo.svg"
-          alt="YouTube"
-          width={48}
-          height={48}
-          className="object-contain"
-          style={{ filter: 'grayscale(0.2) brightness(0.9)' }}
-        />
-      ),
-      bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
-      hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
-      name: 'YouTube',
-    },
-    twitter: {
-      component: (
-        <Image
-          src="/x-logo.svg"
-          alt="X (Twitter)"
-          width={40}
-          height={40}
-          className="object-contain"
-          style={{ filter: 'grayscale(0) brightness(1.1)' }}
-        />
-      ),
-      bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
-      hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
-      name: 'X (Twitter)',
-    },
-    reddit: {
-      component: (
-        <Image
-          src="/reddit-logo.svg"
-          alt="Reddit"
-          width={48}
-          height={48}
-          className="object-contain"
-          style={{ filter: 'grayscale(0.2) brightness(0.9)' }}
-        />
-      ),
-      bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
-      hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
-      name: 'Reddit',
-    },
-    google: {
-      component: (
-        <Image
-          src="/google-logo.svg"
-          alt="Google"
-          width={48}
-          height={48}
-          className="object-contain"
-          style={{ filter: 'grayscale(0.2) brightness(0.9)' }}
-        />
-      ),
-      bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
-      hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
-      name: 'Google',
-    },
-    instagram: {
-      component: (
-        <Image
-          src="/instagram-logo.svg"
-          alt="Instagram"
-          width={40}
-          height={40}
-          className="object-contain"
-          style={{ filter: 'grayscale(0.2) brightness(0.9)' }}
-        />
-      ),
-      bgColor: isSelected ? 'bg-white/10 border-white' : 'bg-gray-800/50 border-gray-700',
-      hoverBg: 'hover:bg-white/10 hover:border-white hover:scale-105',
-      name: 'Instagram',
-    },
-  };
-
-  const icon = icons[platform] || icons.twitter;
-
-  return (
-    <div className="group relative">
-      <button
-        type="button"
-        onClick={onClick}
-        className={`p-5 rounded-xl border-2 transition-all duration-200 flex items-center justify-center min-w-[90px] min-h-[90px] ${icon.bgColor} ${icon.hoverBg} shadow-md hover:shadow-lg`}
-        title={icon.name}
-      >
-        {icon.component}
-      </button>
-      {/* Tooltip */}
-      <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-white font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10 shadow-xl">
-        {icon.name}
-        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 border-b border-r border-gray-600 rotate-45" />
-      </div>
-    </div>
-  );
-};
-
 // Lightweight chips input for keywords (Enter to add, click x to remove)
 function KeywordChips({ value = [], onAdd, onRemove, placeholder }) {
   const [input, setInput] = useState('');
@@ -312,7 +191,6 @@ export default function KeywordsPageClient() {
   }, [clearMessageTimer]);
 
   // Configuration state
-  const [configKeywords, setConfigKeywords] = useState('');
   const [configPlatforms, setConfigPlatforms] = useState([]);
   const [configFrequency, setConfigFrequency] = useState('30m');
   const [configStatus, setConfigStatus] = useState('');
@@ -321,13 +199,7 @@ export default function KeywordsPageClient() {
   const [andKeywords, setAndKeywords] = useState([]);
   const [orKeywords, setOrKeywords] = useState([]);
   const [notKeywords, setNotKeywords] = useState([]);
-  const [andMode, setAndMode] = useState('AND'); // AND | OR radio for AND group
   const [countries, setCountries] = useState([]);
-  const handleAddCountry = (code) => {
-    if (!code) return;
-    if (!countries.includes(code)) setCountries([...countries, code]);
-  };
-  const removeCountry = (code) => setCountries(countries.filter((c) => c !== code));
   const [languages, setLanguages] = useState([]);
   const [keywordGroups, setKeywordGroups] = useState([]);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -447,7 +319,6 @@ export default function KeywordsPageClient() {
     };
 
     setSelectedBrandData(brand);
-    setConfigKeywords(Array.isArray(brand.keywords) ? brand.keywords.join(', ') : '');
     setConfigPlatforms(Array.isArray(brand.platforms) ? brand.platforms : []);
     setConfigFrequency(brand.frequency || '30m');
 
@@ -746,7 +617,6 @@ export default function KeywordsPageClient() {
       // If we're currently viewing this brand specifically, sync local state
       if (selectedBrand === effectiveBrandName && selectedBrand !== 'all') {
         setSelectedBrandData(updatedBrand);
-        setConfigKeywords(Array.isArray(updatedBrand.keywords) ? updatedBrand.keywords.join(', ') : '');
         setConfigPlatforms(Array.isArray(updatedBrand.platforms) ? updatedBrand.platforms : []);
         setConfigFrequency(updatedBrand.frequency || '30m');
         setKeywordGroups(backendGroups);
@@ -824,7 +694,7 @@ export default function KeywordsPageClient() {
       setStatus('done');
 
       const summary = response.summary || {};
-      const totalPosts = (summary.youtube || 0) + (summary.twitter || 0) + (summary.reddit || 0 + (summary.google || 0));
+      const totalPosts = (summary.youtube || 0) + (summary.twitter || 0) + (summary.reddit || 0) + (summary.google || 0) + (summary.instagram || 0);
 
       showMessage(
         `✅ Search completed!\nFound ${totalPosts} posts:\n• YouTube: ${summary.youtube || 0}\n• Twitter: ${summary.twitter || 0}\n• Reddit: ${summary.reddit || 0}\n• Google: ${summary.google || 0} \n Instagram: ${summary.instagram || 0}`,
@@ -932,32 +802,6 @@ export default function KeywordsPageClient() {
     const channels = row.channels || [];
     return channels.some((ch) => selectedFilterChannels.includes(ch));
   });
-
-  const handleCopyGroup = async (row) => {
-    try {
-      if (!row?.query) {
-        throw new Error('No query to copy');
-      }
-      await navigator.clipboard.writeText(row.query);
-      showMessage('Copied to clipboard', 'success');
-    } catch (e) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Copy failed', e);
-      }
-      showMessage(`Failed to copy: ${e?.message || 'Unknown error'}`, 'error');
-    }
-  };
-
-  const getCurrentBrandPlatforms = useCallback(() => {
-    const brandRecord = (brands || []).find((b) => b.brandName === selectedBrand);
-    if (Array.isArray(brandRecord?.platforms) && brandRecord.platforms.length > 0) {
-      return brandRecord.platforms;
-    }
-    if (Array.isArray(selectedBrandData?.platforms) && selectedBrandData.platforms.length > 0) {
-      return selectedBrandData.platforms;
-    }
-    return [];
-  }, [brands, selectedBrand, selectedBrandData]);
 
   const handleDeleteGroup = async (row) => {
     const targetBrandName = selectedBrand === 'all' ? row.brandName : selectedBrand;
@@ -1075,6 +919,12 @@ export default function KeywordsPageClient() {
           action,
         }),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Failed to toggle group status' }));
+        showMessage(`❌ ${errorData.message || 'Failed to toggle group status'}`, 'error');
+        return;
+      }
 
       const data = await res.json();
       if (!data.success) {
@@ -1283,11 +1133,10 @@ export default function KeywordsPageClient() {
                         ) : ch === 'twitter' ? (
                           <Image key={ch} src="/x-logo.svg" alt="X" width={14} height={14} />
                         ) : ch === 'reddit' ? (
-                          <><Image key={ch} src="/reddit-logo.svg" alt="Reddit" width={16} height={16} /><Image key={ch} src="/google-logo.svg" alt="Google" width={16} height={16} /></>
-                        ) : ch === 'quora' ? (
-                          <Image key={ch} src="/quora-logo.svg" alt="Quora" width={16} height={16} />
-                        ) : null,
-                        ch === 'instagram' ? (
+                          <Image key={ch} src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />
+                        ) : ch === 'google' ? (
+                          <Image key={ch} src="/google-logo.svg" alt="Google" width={16} height={16} />
+                        ) : ch === 'instagram' ? (
                           <Image key={ch} src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />
                         ) : null
                       )}
@@ -1339,24 +1188,26 @@ export default function KeywordsPageClient() {
                 )}
               </div>
 
-              <Button
-                onClick={() => {
-                  setEditingGroup(null);
-                  setEditingBrandName(selectedBrand === 'all' ? '' : selectedBrand);
-                  setGroupName('');
-                  setAndKeywords([]);
-                  setOrKeywords([]);
-                  setNotKeywords([]);
-                  setConfigPlatforms([]);
-                  setCountries([]);
-                  setLanguages([]);
-                  setConfigFrequency(selectedBrandData?.frequency || '30m');
-                  setShowConfig(true);
-                }}
-                className="bg-white text-black hover:bg-white/90 shadow"
-              >
-                Add Keywords/Social Profiles
-              </Button>
+              {selectedBrand && selectedBrand !== 'all' && (
+                <Button
+                  onClick={() => {
+                    setEditingGroup(null);
+                    setEditingBrandName(selectedBrand);
+                    setGroupName('');
+                    setAndKeywords([]);
+                    setOrKeywords([]);
+                    setNotKeywords([]);
+                    setConfigPlatforms([]);
+                    setCountries([]);
+                    setLanguages([]);
+                    setConfigFrequency(selectedBrandData?.frequency || '30m');
+                    setShowConfig(true);
+                  }}
+                  className="bg-white text-black hover:bg-white/90 shadow"
+                >
+                  Add Keywords/Social Profiles
+                </Button>
+              )}
               {/* <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
                 Run Search
               </Button> */}
@@ -1439,8 +1290,7 @@ export default function KeywordsPageClient() {
                             {plat === 'twitter' && <Image src="/x-logo.svg" alt="X" width={14} height={14} />}
                             {plat === 'reddit' && <Image src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />}
                             {plat === 'instagram' && <Image src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />}
-                            
-                            {plat === 'google' && <Image src="/google-logo.svg" alt="Quora" width={16} height={16} />}
+                            {plat === 'google' && <Image src="/google-logo.svg" alt="Google" width={16} height={16} />}
                           </span>
                         ))}
                       </div>
@@ -1515,7 +1365,7 @@ export default function KeywordsPageClient() {
         </div>
 
         {/* Configuration Panel (Add Keywords/Social Profiles) */}
-        {showConfig && selectedBrand && (
+        {showConfig && selectedBrand && selectedBrand !== 'all' && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setShowConfig(false)}>
             <div className="bg-gray-900 border border-gray-800 text-white rounded-lg max-w-6xl w-[95vw] mx-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
@@ -1545,7 +1395,7 @@ export default function KeywordsPageClient() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left Side */}
                   <div className="space-y-4">
-                    <div className="bg-gray-850/40 border border-gray-800 rounded-lg p-4">
+                    <div className="bg-gray-800/40 border border-gray-800 rounded-lg p-4">
                       <Label className="text-sm mb-2 block">Name Your Keywords Group</Label>
                       <p className="text-xs text-gray-400 mb-2">Add a title that explains the purpose of the Keywords group.</p>
                       <div className="relative">
@@ -1560,7 +1410,7 @@ export default function KeywordsPageClient() {
                       </div>
                     </div>
 
-                    <div className="bg-gray-850/40 border border-gray-800 rounded-lg p-4">
+                    <div className="bg-gray-800/40 border border-gray-800 rounded-lg p-4">
                       <Label className="text-sm mb-2 block">Pick Your Channels</Label>
                       <p className="text-xs text-gray-400 mb-3">Select at least one network to listen to.</p>
 
@@ -1597,7 +1447,7 @@ export default function KeywordsPageClient() {
                       </div>
                     </div>
 
-                    <div className="bg-gray-850/40 border border-gray-800 rounded-lg p-4">
+                    <div className="bg-gray-800/40 border border-gray-800 rounded-lg p-4">
                       <Label className="text-sm mb-2 block">Monitoring Frequency</Label>
                       <select
                         id="config-frequency"
@@ -1614,18 +1464,16 @@ export default function KeywordsPageClient() {
 
                   {/* Right Side */}
                   <div className="space-y-4">
-                    <div className="bg-gray-850/40 border border-gray-800 rounded-lg p-4">
+                    <div className="bg-gray-800/40 border border-gray-800 rounded-lg p-4">
                       <div className="flex items-center gap-3 mb-3">
                         <button className={`px-3 py-1.5 rounded-md text-sm ${queryTab === 'basic' ? 'bg-white text-black' : 'bg-gray-800 text-gray-300'}`} onClick={() => setQueryTab('basic')}>
                           Basic Query Builder
                         </button>
-                       
                       </div>
 
                       <div className="mb-3">
                         <div className="flex items-center gap-3 mb-2">
                           <Label className="text-sm">Included Keywords (AND)</Label>
-                          
                         </div>
                         <KeywordChips value={andKeywords} onAdd={(k) => setAndKeywords([...andKeywords, k])} onRemove={(k) => setAndKeywords(andKeywords.filter((x) => x !== k))} placeholder="Add New Keyword" />
                       </div>
@@ -1639,11 +1487,6 @@ export default function KeywordsPageClient() {
                         <Label className="text-sm">Excluded Keywords (NOT)</Label>
                         <KeywordChips value={notKeywords} onAdd={(k) => setNotKeywords([...notKeywords, k])} onRemove={(k) => setNotKeywords(notKeywords.filter((x) => x !== k))} placeholder="Add New Keyword" />
                       </div>
-
-                     
-                      
-                      
-                    
                     </div>
 
                     <div className="flex justify-end gap-3">

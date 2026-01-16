@@ -23,6 +23,11 @@ const PLATFORM_META = {
     logo: '/google-logo.svg',
     className: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60',
   },
+  instagram: {
+    label: 'Instagram',
+    logo: '/instagram-logo.svg',
+    className: 'bg-pink-500/20 text-pink-100 border-pink-400/60',
+  },
 };
 
 const PlatformBadge = ({ platform, size = 'md' }) => {

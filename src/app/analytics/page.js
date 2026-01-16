@@ -1289,6 +1289,7 @@ function AnalyticsPageContent() {
                   <option value="youtube">YouTube</option>
                   <option value="reddit">Reddit</option>
                   <option value="google">Google</option>
+                  <option value="instagram">Instagram</option>
                 </select>
               </div>
               <div>

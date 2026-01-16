@@ -1858,17 +1858,26 @@ function KeywordTree({
               {groups.map((group) => {
                 const groupId = makeGroupId(brand.brandName, group);
                 const expanded = expandedGroups[groupId] ?? true;
+<<<<<<< Updated upstream
                 const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
                 const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
                 const keywords = [...andKeywords, ...orKeywords];
                 // Check if group is explicitly selected OR if all keywords in this group are selected
                 const isGroupExplicitlySelected = selectedGroups.includes(groupId);
+=======
+                const keywords = group?.keywords || [];
+                // Check if all keywords in this group are selected
+>>>>>>> Stashed changes
                 const allKeywordsSelected = keywords.length > 0 && keywords.every((keyword) => {
                   const keywordValue = (keyword || '').toLowerCase().trim();
                   const keywordId = `${groupId}::${keywordValue}`;
                   return selectedKeywords.includes(keywordId);
                 });
+<<<<<<< Updated upstream
                 const selectedGroup = isGroupExplicitlySelected || allKeywordsSelected;
+=======
+                const selectedGroup = allKeywordsSelected;
+>>>>>>> Stashed changes
 
                 return (
                   <div key={groupId} className="rounded-xl border border-white/5 bg-white/5 p-2">
@@ -2768,8 +2777,14 @@ function InboxPageContent() {
   useEffect(() => {
     setSelectedKeywordsFilter((prev) => {
       return prev.filter((compoundId) => {
+<<<<<<< Updated upstream
         const { keywordValue } = splitKeywordCompoundId(compoundId);
         if (!keywordValue) return false;
+=======
+        const parts = compoundId.split('::');
+        if (parts.length !== 2) return false;
+        const keywordValue = parts[1];
+>>>>>>> Stashed changes
         return visibleKeywordValues.has(keywordValue);
       });
     });
@@ -2796,19 +2811,30 @@ function InboxPageContent() {
       });
       return changed ? next : prev;
     });
+<<<<<<< Updated upstream
   }, [visibleGroupIds, selectedKeywordGroups]);
   // Handler for toggling keyword groups
   const handleToggleKeywordGroup = useCallback((groupId) => {
     // Find the group and its keywords (AND + OR) from brandDetails
+=======
+  }, [visibleGroupIds]);
+  // Handler for toggling keyword groups
+  const handleToggleKeywordGroup = useCallback((groupId) => {
+    // Find the group and its keywords from brandDetails
+>>>>>>> Stashed changes
     let groupKeywords = [];
     assignedBrandDetails.forEach((brand) => {
       brand?.keywordGroups?.forEach((group) => {
         const currentGroupId = makeGroupId(brand.brandName, group);
         if (currentGroupId === groupId) {
+<<<<<<< Updated upstream
           const andKeywords = Array.isArray(group?.keywords) ? group.keywords : [];
           const orKeywords = Array.isArray(group?.includeKeywords) ? group.includeKeywords : [];
           const merged = [...andKeywords, ...orKeywords];
           groupKeywords = merged.map((k) => (k || '').toLowerCase().trim()).filter(Boolean);
+=======
+          groupKeywords = (group?.keywords || []).map((k) => (k || '').toLowerCase().trim()).filter(Boolean);
+>>>>>>> Stashed changes
         }
       });
     });
@@ -2816,7 +2842,11 @@ function InboxPageContent() {
     setSelectedKeywordsFilter((prev) => {
       // Check if all keywords in this group are currently selected
       const allKeywordsInGroup = groupKeywords.map((kw) => `${groupId}::${kw}`);
+<<<<<<< Updated upstream
       const allSelected = allKeywordsInGroup.length > 0 &&
+=======
+      const allSelected = allKeywordsInGroup.length > 0 && 
+>>>>>>> Stashed changes
         allKeywordsInGroup.every((id) => prev.includes(id));
 
       if (allSelected) {
@@ -2828,16 +2858,27 @@ function InboxPageContent() {
       } else {
         // Select all keywords in this group
         // groupKeywords are already lowercased and trimmed, so use them directly
+<<<<<<< Updated upstream
         const newKeywords = groupKeywords.map((keyword) =>
           `${groupId}::${keyword}`
         );
 
+=======
+        const newKeywords = groupKeywords.map((keyword) => 
+          `${groupId}::${keyword}`
+        );
+        
+>>>>>>> Stashed changes
         // Remove any existing keywords from this group, then add all new ones
         const updatedKeywords = [
           ...prev.filter((kw) => !kw.startsWith(`${groupId}::`)),
           ...newKeywords
         ];
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
         // Update group state - React will batch these
         setSelectedKeywordGroups((groupPrev) => {
           if (!groupPrev.includes(groupId)) {
@@ -2845,7 +2886,11 @@ function InboxPageContent() {
           }
           return groupPrev;
         });
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
         return updatedKeywords;
       }
     });
@@ -2854,8 +2899,16 @@ function InboxPageContent() {
   // Handler for toggling individual keywords
   const handleToggleKeyword = useCallback((keywordId) => {
     if (!keywordId || typeof keywordId !== 'string') return;
+<<<<<<< Updated upstream
 
     const { groupId, keywordValue } = splitKeywordCompoundId(keywordId);
+=======
+    
+    const parts = keywordId.split('::');
+    if (parts.length !== 2) return;
+    const [groupId, keywordValue] = parts;
+    
+>>>>>>> Stashed changes
     if (!groupId || !keywordValue) return;
 
     // Use functional update to ensure we have the latest state
@@ -2865,6 +2918,7 @@ function InboxPageContent() {
         // Exact match first
         if (kw === keywordId) return true;
         // Also check if format matches (handle any edge cases)
+<<<<<<< Updated upstream
         const { groupId: kwGroupId, keywordValue: kwValue } = splitKeywordCompoundId(kw);
         if (kwGroupId && kwValue) {
           return kwGroupId === groupId && kwValue === keywordValue;
@@ -2872,10 +2926,21 @@ function InboxPageContent() {
         return false;
       });
 
+=======
+        const kwParts = kw.split('::');
+        if (kwParts.length === 2) {
+          const [kwGroupId, kwValue] = kwParts;
+          return kwGroupId === groupId && (kwValue || '').toLowerCase().trim() === (keywordValue || '').toLowerCase().trim();
+        }
+        return false;
+      });
+      
+>>>>>>> Stashed changes
       if (isSelected) {
         // Remove the keyword - filter out exact match and any format variations
         const newKeywords = prev.filter((kw) => {
           if (kw === keywordId) return false; // Exact match
+<<<<<<< Updated upstream
           const { groupId: kwGroupId, keywordValue: kwValue } = splitKeywordCompoundId(kw);
           if (kwGroupId && kwValue) {
             // Don't remove if it's a different keyword (even if same group)
@@ -2887,18 +2952,40 @@ function InboxPageContent() {
         // Check if any keywords remain in this group
         const remainingInGroup = newKeywords.filter((kw) => kw.startsWith(`${groupId}::`));
 
+=======
+          const kwParts = kw.split('::');
+          if (kwParts.length === 2) {
+            const [kwGroupId, kwValue] = kwParts;
+            // Don't remove if it's a different keyword (even if same group)
+            return !(kwGroupId === groupId && (kwValue || '').toLowerCase().trim() === (keywordValue || '').toLowerCase().trim());
+          }
+          return true; // Keep invalid formats
+        });
+        
+        // Check if any keywords remain in this group
+        const remainingInGroup = newKeywords.filter((kw) => kw.startsWith(`${groupId}::`));
+        
+>>>>>>> Stashed changes
         // Update group state - remove group if no keywords remain
         if (remainingInGroup.length === 0) {
           setSelectedKeywordGroups((groupPrev) => groupPrev.filter((id) => id !== groupId));
         }
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
         return newKeywords;
       } else {
         // Add the keyword - check if it already exists to avoid duplicates
         if (prev.includes(keywordId)) {
           return prev; // Already exists
         }
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
         // Ensure parent group is selected
         setSelectedKeywordGroups((groupPrev) => {
           if (!groupPrev.includes(groupId)) {
@@ -2906,7 +2993,11 @@ function InboxPageContent() {
           }
           return groupPrev;
         });
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
         return [...prev, keywordId];
       }
     });
@@ -2979,9 +3070,17 @@ function InboxPageContent() {
         selectedKeywordsFilter.length === 0
           ? true
           : (keywordValue && selectedKeywordsFilter.some((compoundId) => {
+<<<<<<< Updated upstream
             const { keywordValue: compoundKeyword } = splitKeywordCompoundId(compoundId);
             return compoundKeyword === keywordValue;
           }));
+=======
+              // Extract keyword value from compound ID (groupId::keywordValue)
+              const parts = compoundId.split('::');
+              if (parts.length !== 2) return false;
+              return parts[1] === keywordValue;
+            }));
+>>>>>>> Stashed changes
 
       if (!matchesBrand || !matchesDate || !matchesSearch || !matchesChannel || !matchesKeyword) return false;
 

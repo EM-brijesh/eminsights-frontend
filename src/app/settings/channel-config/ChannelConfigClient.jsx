@@ -24,6 +24,13 @@ export default function ChannelConfigClient() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+    /* -------------------- FACEBOOK PAGE POSTS -------------------- */
+
+    const [pagePosts, setPagePosts] = useState([]);
+    const [loadingPosts, setLoadingPosts] = useState(false);
+    const [postError, setPostError] = useState("");
+  
+
   /* -------------------- LOGIN -------------------- */
 
   const handleFacebookLogin = () => {
@@ -82,6 +89,37 @@ export default function ChannelConfigClient() {
       setLoadingPages(false);
     }
   };
+    /* -------------------- FETCH FACEBOOK PAGE POSTS -------------------- */
+
+    const fetchFacebookPagePosts = async () => {
+      try {
+        setLoadingPosts(true);
+        setPostError("");
+  
+        const res = await fetch(`${BACKEND}/meta/page-posts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            limit: 10,
+            brand: { brandName: "Default Brand" }
+          })
+        });
+  
+        const data = await res.json();
+  
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to fetch page posts");
+        }
+  
+        setPagePosts(data.posts || []);
+      } catch (err) {
+        setPostError(err.message);
+        setPagePosts([]);
+      } finally {
+        setLoadingPosts(false);
+      }
+    };
+  
 
   /* -------------------- CONNECT INSTAGRAM -------------------- */
 
@@ -155,7 +193,7 @@ export default function ChannelConfigClient() {
             className="bg-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2"
           >
             <FaFacebook size={18} />
-            {loadingLogin ? "Redirecting..." : "Add Meta Channel"}
+            {loadingLogin ? "Redirecting..." : "Facebook Login"}
           </button>
         </div>
 
@@ -248,6 +286,71 @@ export default function ChannelConfigClient() {
             </div>
           </div>
         )}
+                {/* FACEBOOK PAGE POSTS */}
+                <div className="bg-[#101218] p-6 rounded-xl border border-gray-800 mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <FaFacebook className="text-blue-500" />
+              Facebook Page Posts
+            </h2>
+
+            <button
+              onClick={fetchFacebookPagePosts}
+              disabled={loadingPosts}
+              className="bg-blue-600 px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 transition"
+            >
+              {loadingPosts ? "Fetching..." : "Fetch Posts"}
+            </button>
+          </div>
+
+          {postError && (
+            <p className="text-red-500 text-sm mb-4">{postError}</p>
+          )}
+
+          {!loadingPosts && pagePosts.length === 0 && (
+            <p className="text-gray-500 text-sm">
+              No Facebook posts fetched yet.
+            </p>
+          )}
+
+          <div className="space-y-4 mt-4">
+            {pagePosts.map((post) => (
+              <div
+                key={post.facebookPostId}
+                className="bg-[#161922] border border-gray-800 p-4 rounded-lg"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-400">
+                    {post.author?.name}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {formatDate(post.createdAt)}
+                  </p>
+                </div>
+
+                <p className="text-sm mb-3 whitespace-pre-wrap">
+                  {post.content?.text || "No text content"}
+                </p>
+
+                <div className="flex gap-4 text-xs text-gray-400 mb-3">
+                  <span>👍 {post.metrics?.likes}</span>
+                  <span>💬 {post.metrics?.comments}</span>
+                  <span>🔁 {post.metrics?.shares}</span>
+                </div>
+
+                <a
+                  href={post.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 text-xs hover:underline"
+                >
+                  View on Facebook →
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+
 
       </div>
     </div>

@@ -1365,7 +1365,7 @@ export default function KeywordsPageClient() {
         </div>
 
         {/* Configuration Panel (Add Keywords/Social Profiles) */}
-        {showConfig && selectedBrand && selectedBrand !== 'all' && (
+        {showConfig && (editingBrandName || (selectedBrand && selectedBrand !== 'all')) && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setShowConfig(false)}>
             <div className="bg-gray-900 border border-gray-800 text-white rounded-lg max-w-6xl w-[95vw] mx-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">

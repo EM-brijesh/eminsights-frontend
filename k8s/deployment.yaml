@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eminsights-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eminsights-frontend
+  template:
+    metadata:
+      labels:
+        app: eminsights-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: brijeshkori/emlisting_frontend:6
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://api.eminsights.in"

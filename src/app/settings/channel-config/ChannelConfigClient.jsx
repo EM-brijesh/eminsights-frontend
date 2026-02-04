@@ -24,12 +24,9 @@ export default function ChannelConfigClient() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-    /* -------------------- FACEBOOK PAGE POSTS -------------------- */
-
-    const [pagePosts, setPagePosts] = useState([]);
-    const [loadingPosts, setLoadingPosts] = useState(false);
-    const [postError, setPostError] = useState("");
-  
+  const [pagePosts, setPagePosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postError, setPostError] = useState("");
 
   /* -------------------- LOGIN -------------------- */
 
@@ -89,37 +86,37 @@ export default function ChannelConfigClient() {
       setLoadingPages(false);
     }
   };
-    /* -------------------- FETCH FACEBOOK PAGE POSTS -------------------- */
 
-    const fetchFacebookPagePosts = async () => {
-      try {
-        setLoadingPosts(true);
-        setPostError("");
-  
-        const res = await fetch(`${BACKEND}/meta/page-posts`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            limit: 10,
-            brand: { brandName: "Default Brand" }
-          })
-        });
-  
-        const data = await res.json();
-  
-        if (!res.ok) {
-          throw new Error(data.error || "Failed to fetch page posts");
-        }
-  
-        setPagePosts(data.posts || []);
-      } catch (err) {
-        setPostError(err.message);
-        setPagePosts([]);
-      } finally {
-        setLoadingPosts(false);
+  /* -------------------- FETCH FACEBOOK PAGE POSTS -------------------- */
+
+  const fetchFacebookPagePosts = async () => {
+    try {
+      setLoadingPosts(true);
+      setPostError("");
+
+      const res = await fetch(`${BACKEND}/meta/page-posts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          limit: 10,
+          brand: { brandName: "Default Brand" }
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch page posts");
       }
-    };
-  
+
+      setPagePosts(data.posts || []);
+    } catch (err) {
+      setPostError(err.message);
+      setPagePosts([]);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
 
   /* -------------------- CONNECT INSTAGRAM -------------------- */
 
@@ -144,7 +141,8 @@ export default function ChannelConfigClient() {
         throw new Error(data.error || "Failed to connect Instagram");
       }
 
-      alert("Instagram account connected successfully ✅");
+      setSuccessMessage(`✅ ${data.data?.instagram?.username ? `@${data.data.instagram.username}` : 'Instagram account'} connected successfully!`);
+      setTimeout(() => setSuccessMessage(""), 5000);
 
       await fetchConnectedAccounts();
     } catch (err) {
@@ -159,18 +157,23 @@ export default function ChannelConfigClient() {
   const formatDate = (date) =>
     new Date(date).toLocaleDateString();
 
+  const formatNumber = (num) => {
+    if (!num) return "0";
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+  };
+
   const connectedPageIds = new Set(
     connectedAccounts.map((a) => a.pageId)
   );
 
   /* -------------------- EFFECTS -------------------- */
 
-  // Always load DB data
   useEffect(() => {
     fetchConnectedAccounts();
   }, []);
 
-  // Load Meta pages only when token exists
   useEffect(() => {
     if (metaToken) {
       fetchPages(metaToken);
@@ -193,15 +196,22 @@ export default function ChannelConfigClient() {
             className="bg-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2"
           >
             <FaFacebook size={18} />
-            {loadingLogin ? "Redirecting..." : "Facebook Login"}
+            {loadingLogin ? "Redirecting..." : "Connect Facebook & Instagram"}
           </button>
         </div>
+
+        {/* SUCCESS MESSAGE */}
+        {successMessage && (
+          <div className="bg-green-900/30 border border-green-600 text-green-400 p-4 rounded-lg mb-6">
+            {successMessage}
+          </div>
+        )}
 
         {/* CONNECTED ACCOUNTS (ALWAYS SHOWN) */}
         <div className="bg-[#101218] p-6 rounded-xl border border-gray-800 mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <FaInstagram className="text-pink-500" />
-            Connected Instagram Accounts ({connectedAccounts.length})
+            Connected Accounts ({connectedAccounts.length})
           </h2>
 
           {loadingConnected && (
@@ -209,38 +219,119 @@ export default function ChannelConfigClient() {
           )}
 
           {!loadingConnected && connectedAccounts.length === 0 && (
-            <p className="text-gray-500 text-sm">
-              No Instagram accounts connected yet.
-            </p>
+            <div className="text-center py-8">
+              <FaInstagram className="text-gray-600 text-5xl mx-auto mb-4" />
+              <p className="text-gray-500 text-sm mb-2">
+                No accounts connected yet.
+              </p>
+              <p className="text-gray-600 text-xs">
+                Click "Connect Facebook & Instagram" above to get started
+              </p>
+            </div>
           )}
 
           <div className="grid md:grid-cols-2 gap-6">
             {connectedAccounts.map((acc) => (
               <div
-                key={acc._id}
-                className="bg-[#161922] border border-gray-800 p-5 rounded-xl"
+                key={acc._id || acc.id}
+                className="bg-[#161922] border border-gray-800 p-6 rounded-xl hover:border-gray-700 transition"
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <FaFacebook className="text-blue-500" />
-                  <FaInstagram className="text-pink-500" />
-                  <h3 className="font-semibold">{acc.pageName}</h3>
+                {/* FACEBOOK PAGE SECTION */}
+                <div className="mb-6 pb-6 border-b border-gray-800">
+                  <div className="flex items-center gap-2 mb-3">
+                    <FaFacebook className="text-blue-500 text-xl" />
+                    <h3 className="font-semibold text-lg">Facebook Page</h3>
+                  </div>
+                  
+                  <p className="font-medium text-white mb-1">
+                    {acc.pageName}
+                  </p>
+                  
+                  <p className="text-xs text-gray-500">
+                    ID: {acc.pageId}
+                  </p>
+                  
+                  <span className="inline-block mt-2 px-3 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded-full">
+                    ✓ Connected
+                  </span>
                 </div>
 
-                <p className="text-xs text-gray-400">
-                  Page ID: {acc.pageId}
-                </p>
+                {/* INSTAGRAM PROFESSIONAL ACCOUNT SECTION */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <FaInstagram className="text-pink-500 text-xl" />
+                    <h3 className="font-semibold text-lg">Instagram Professional Account</h3>
+                  </div>
 
-                <p className="text-green-500 text-sm mt-2">
-                  ✅ Instagram Connected
-                </p>
+                  {acc.instagram ? (
+                    <div className="flex items-start gap-4">
+                      {/* Profile Picture */}
+                      {acc.instagram.profile_picture ? (
+                        <img
+                          src={acc.instagram.profile_picture}
+                          alt={acc.instagram.username}
+                          className="w-16 h-16 rounded-full border-2 border-pink-500"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                          <FaInstagram className="text-white text-2xl" />
+                        </div>
+                      )}
 
-                <p className="text-gray-400 text-xs">
-                  IG Business ID: {acc.instagramBusinessId}
-                </p>
+                      {/* Instagram Details */}
+                      <div className="flex-1">
+                        <p className="font-semibold text-white text-lg mb-1">
+                          @{acc.instagram.username}
+                        </p>
+                        
+                        {acc.instagram.name && (
+                          <p className="text-gray-400 text-sm mb-2">
+                            {acc.instagram.name}
+                          </p>
+                        )}
 
-                <p className="text-gray-500 text-xs">
-                  Connected on: {formatDate(acc.connectedAt)}
-                </p>
+                        <div className="flex gap-4 text-sm text-gray-400">
+                          {acc.instagram.followers_count !== undefined && (
+                            <span className="font-medium">
+                              {formatNumber(acc.instagram.followers_count)} followers
+                            </span>
+                          )}
+                          {acc.instagram.media_count !== undefined && (
+                            <span>
+                              {formatNumber(acc.instagram.media_count)} posts
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="inline-block mt-3 px-3 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded-full">
+                          ✓ Connected
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-4">
+                      <p className="text-yellow-400 text-sm font-medium mb-2">
+                        ⚠️ No Instagram Professional account connected
+                      </p>
+                      <p className="text-gray-400 text-xs mb-3">
+                        This Facebook Page doesn't have an Instagram Professional (Business or Creator) account linked.
+                      </p>
+                      <a
+                        href="https://www.facebook.com/help/instagram/399237934150902"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 text-xs hover:underline"
+                      >
+                        Learn how to connect Instagram to your Page →
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Additional Info */}
+                  <p className="text-gray-600 text-xs mt-4">
+                    Connected on: {formatDate(acc.connectedAt)}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -248,46 +339,69 @@ export default function ChannelConfigClient() {
 
         {/* META PAGES (OAUTH FLOW) */}
         {metaToken && (
-          <div className="bg-[#101218] p-6 rounded-xl border border-gray-800">
+          <div className="bg-[#101218] p-6 rounded-xl border border-gray-800 mb-8">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <FaFacebook className="text-blue-500" />
-              Facebook Pages ({pages.length})
+              Available Facebook Pages ({pages.length})
             </h2>
 
             {loadingPages && (
               <p className="text-gray-400">Loading pages...</p>
             )}
-            {error && <p className="text-red-500">{error}</p>}
+            {error && (
+              <div className="bg-red-900/30 border border-red-600 text-red-400 p-4 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
 
             <div className="grid md:grid-cols-2 gap-6 mt-6">
-              {pages.map((page) => (
-                <div
-                  key={page.id}
-                  className="bg-[#161922] border border-gray-800 p-5 rounded-xl"
-                >
-                  <h3 className="font-semibold mb-2">{page.name}</h3>
-
-                  {connectedPageIds.has(page.id) && (
-                    <p className="text-green-500 text-sm mb-2">
-                      ✅ Already connected
-                    </p>
-                  )}
-
-                  <button
-                    onClick={() => connectInstagram(page)}
-                    className="bg-pink-600 px-4 py-2 rounded-md hover:bg-pink-700 transition text-sm font-semibold"
+              {pages.map((page) => {
+                const isConnected = connectedPageIds.has(page.id);
+                
+                return (
+                  <div
+                    key={page.id}
+                    className="bg-[#161922] border border-gray-800 p-5 rounded-xl"
                   >
-                    {connectingPage === page.id
-                      ? "Connecting..."
-                      : "Connect Instagram"}
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="font-semibold mb-1">{page.name}</h3>
+                        <p className="text-xs text-gray-500">ID: {page.id}</p>
+                        {page.category && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            {page.category}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {isConnected ? (
+                      <div className="bg-green-900/20 border border-green-600/50 rounded-lg p-3 text-center">
+                        <p className="text-green-400 text-sm font-semibold">
+                          ✅ Already Connected
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => connectInstagram(page)}
+                        disabled={connectingPage === page.id}
+                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <FaInstagram />
+                        {connectingPage === page.id
+                          ? "Connecting..."
+                          : "Connect Instagram"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
-                {/* FACEBOOK PAGE POSTS */}
-                <div className="bg-[#101218] p-6 rounded-xl border border-gray-800 mt-10">
+
+        {/* FACEBOOK PAGE POSTS */}
+        <div className="bg-[#101218] p-6 rounded-xl border border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <FaFacebook className="text-blue-500" />
@@ -297,19 +411,21 @@ export default function ChannelConfigClient() {
             <button
               onClick={fetchFacebookPagePosts}
               disabled={loadingPosts}
-              className="bg-blue-600 px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 transition"
+              className="bg-blue-600 px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
             >
               {loadingPosts ? "Fetching..." : "Fetch Posts"}
             </button>
           </div>
 
           {postError && (
-            <p className="text-red-500 text-sm mb-4">{postError}</p>
+            <div className="bg-red-900/30 border border-red-600 text-red-400 p-4 rounded-lg mb-4">
+              {postError}
+            </div>
           )}
 
           {!loadingPosts && pagePosts.length === 0 && (
-            <p className="text-gray-500 text-sm">
-              No Facebook posts fetched yet.
+            <p className="text-gray-500 text-sm text-center py-8">
+              No Facebook posts fetched yet. Click "Fetch Posts" to load posts.
             </p>
           )}
 
@@ -317,10 +433,10 @@ export default function ChannelConfigClient() {
             {pagePosts.map((post) => (
               <div
                 key={post.facebookPostId}
-                className="bg-[#161922] border border-gray-800 p-4 rounded-lg"
+                className="bg-[#161922] border border-gray-800 p-4 rounded-lg hover:border-gray-700 transition"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm font-medium text-gray-300">
                     {post.author?.name}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -328,21 +444,21 @@ export default function ChannelConfigClient() {
                   </p>
                 </div>
 
-                <p className="text-sm mb-3 whitespace-pre-wrap">
+                <p className="text-sm mb-3 whitespace-pre-wrap text-gray-200">
                   {post.content?.text || "No text content"}
                 </p>
 
                 <div className="flex gap-4 text-xs text-gray-400 mb-3">
-                  <span>👍 {post.metrics?.likes}</span>
-                  <span>💬 {post.metrics?.comments}</span>
-                  <span>🔁 {post.metrics?.shares}</span>
+                  <span>👍 {post.metrics?.likes || 0}</span>
+                  <span>💬 {post.metrics?.comments || 0}</span>
+                  <span>🔁 {post.metrics?.shares || 0}</span>
                 </div>
 
                 <a
                   href={post.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 text-xs hover:underline"
+                  className="text-blue-400 text-xs hover:underline inline-flex items-center gap-1"
                 >
                   View on Facebook →
                 </a>
@@ -350,7 +466,6 @@ export default function ChannelConfigClient() {
             ))}
           </div>
         </div>
-
 
       </div>
     </div>

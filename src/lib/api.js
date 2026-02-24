@@ -229,6 +229,11 @@ export const api = {
       apiRequest("/api/data/refreshbrand", { params }),
   },
 
+  facebook: {
+    posts: (params) =>
+      apiRequest("/api/facebook/posts", { params }),
+  },
+
   channels: {
     list: (brandName) =>
       apiRequest(`/api/channels/list?brandName=${encodeURIComponent(brandName)}`),

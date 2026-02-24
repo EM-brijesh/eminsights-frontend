@@ -5,6 +5,31 @@ import { useSearchParams } from "next/navigation";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL;
+const FB_BACKEND =
+  process.env.NEXT_PUBLIC_FB_API_URL || "http://localhost:5050";
+
+function ErrorBanner({ message }) {
+  if (!message) return null;
+
+  return (
+    <div className="bg-red-900/30 border border-red-600 text-red-400 p-4 rounded-lg mb-4">
+      {message}
+    </div>
+  );
+}
+
+async function parseJsonOrNull(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return null;
+  }
+  try {
+    return await response.json();
+  } catch (err) {
+    console.error("Failed to parse JSON response:", err);
+    return null;
+  }
+}
 
 export default function ChannelConfigClient() {
   const searchParams = useSearchParams();
@@ -27,6 +52,13 @@ export default function ChannelConfigClient() {
   const [pagePosts, setPagePosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postError, setPostError] = useState("");
+
+  const [pageIdInput, setPageIdInput] = useState("");
+  const [pageNameInput, setPageNameInput] = useState("");
+  const [savingPage, setSavingPage] = useState(false);
+  const [storedPages, setStoredPages] = useState([]);
+  const [loadingStoredPages, setLoadingStoredPages] = useState(false);
+  const [storedPagesError, setStoredPagesError] = useState("");
 
   /* -------------------- LOGIN -------------------- */
 
@@ -118,6 +150,88 @@ export default function ChannelConfigClient() {
     }
   };
 
+  /* -------------------- MANUAL FACEBOOK PAGES -------------------- */
+
+  const fetchStoredPages = async () => {
+    try {
+      setLoadingStoredPages(true);
+      setStoredPagesError("");
+
+      const res = await fetch(`${FB_BACKEND}/fb/listpages`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await parseJsonOrNull(res);
+
+      if (!res.ok) {
+        const message =
+          (data && (data.error || data.message)) ||
+          `Failed to fetch stored pages (status ${res.status})`;
+        throw new Error(message);
+      }
+
+      const pagesData = Array.isArray(data)
+        ? data
+        : Array.isArray(data.pages)
+        ? data.pages
+        : [];
+
+      setStoredPages(pagesData || []);
+    } catch (err) {
+      console.error("Stored pages error:", err.message);
+      setStoredPagesError(err.message || "Failed to fetch stored pages");
+      setStoredPages([]);
+    } finally {
+      setLoadingStoredPages(false);
+    }
+  };
+
+  const handleInsertPage = async () => {
+    const trimmedPageId = pageIdInput.trim();
+    const trimmedPageName = pageNameInput.trim();
+
+    if (!trimmedPageId || !trimmedPageName) {
+      setStoredPagesError("Page ID and Page Name are required.");
+      return;
+    }
+
+    try {
+      setSavingPage(true);
+      setStoredPagesError("");
+
+      const res = await fetch(`${FB_BACKEND}/fb/add-pages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pageId: trimmedPageId,
+          pageName: trimmedPageName,
+        }),
+      });
+      const data = await parseJsonOrNull(res);
+
+      if (!res.ok) {
+        const message =
+          (data && (data.error || data.message)) ||
+          `Failed to add page (status ${res.status})`;
+        throw new Error(message);
+      }
+
+      setPageIdInput("");
+      setPageNameInput("");
+
+      setSuccessMessage("✅ Facebook page added successfully.");
+      setTimeout(() => setSuccessMessage(""), 5000);
+
+      await fetchStoredPages();
+    } catch (err) {
+      console.error("Add page error:", err.message);
+      setStoredPagesError(err.message || "Failed to add page");
+    } finally {
+      setSavingPage(false);
+    }
+  };
+
   /* -------------------- CONNECT INSTAGRAM -------------------- */
 
   const connectInstagram = async (page) => {
@@ -172,6 +286,7 @@ export default function ChannelConfigClient() {
 
   useEffect(() => {
     fetchConnectedAccounts();
+    fetchStoredPages();
   }, []);
 
   useEffect(() => {
@@ -348,11 +463,7 @@ export default function ChannelConfigClient() {
             {loadingPages && (
               <p className="text-gray-400">Loading pages...</p>
             )}
-            {error && (
-              <div className="bg-red-900/30 border border-red-600 text-red-400 p-4 rounded-lg mb-4">
-                {error}
-              </div>
-            )}
+            <ErrorBanner message={error} />
 
             <div className="grid md:grid-cols-2 gap-6 mt-6">
               {pages.map((page) => {
@@ -400,6 +511,119 @@ export default function ChannelConfigClient() {
           </div>
         )}
 
+        {/* FACEBOOK PAGES (MANUAL) */}
+        <div className="bg-[#101218] p-6 rounded-xl border border-gray-800 mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <FaFacebook className="text-blue-500" />
+            Facebook Pages (Manual)
+          </h2>
+
+          <p className="text-sm text-gray-400 mb-4">
+            Manually register Facebook pages using their Page ID and name. This calls
+            <code className="mx-1 bg-black/40 px-1 py-0.5 rounded text-xs">/fb/add-pages</code>
+            and lists all stored pages from
+            <code className="mx-1 bg-black/40 px-1 py-0.5 rounded text-xs">/fb/listpages</code>.
+          </p>
+
+          <div className="grid md:grid-cols-[2fr,2fr,1fr] gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">
+                Page ID
+              </label>
+              <input
+                value={pageIdInput}
+                onChange={(e) => setPageIdInput(e.target.value)}
+                placeholder="119317973454"
+                className="w-full bg-[#161922] border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">
+                Page Name
+              </label>
+              <input
+                value={pageNameInput}
+                onChange={(e) => setPageNameInput(e.target.value)}
+                placeholder="Dainik Jaagran"
+                className="w-full bg-[#161922] border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleInsertPage}
+                disabled={savingPage}
+                className="w-full bg-blue-600 px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {savingPage ? "Inserting..." : "Insert Page"}
+              </button>
+            </div>
+          </div>
+
+          <ErrorBanner message={storedPagesError} />
+
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">
+                Stored Pages ({storedPages.length})
+              </h3>
+              {loadingStoredPages && (
+                <p className="text-xs text-gray-400">Refreshing...</p>
+              )}
+            </div>
+
+            {!loadingStoredPages && storedPages.length === 0 && (
+              <p className="text-gray-500 text-sm">
+                No pages added yet. Use the form above to insert your first page.
+              </p>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {storedPages.map((page) => {
+                const id = page.pageId || page.id;
+                const name = page.pageName || page.name || "Untitled Page";
+                const profilePicture = page.profilePicture || (id ? `https://graph.facebook.com/${id}/picture?type=square&width=200&height=200` : null);
+
+                return (
+                  <div
+                    key={id || name}
+                    className="bg-[#161922] border border-gray-800 p-4 rounded-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="relative w-12 h-12 flex-shrink-0">
+                        {profilePicture ? (
+                          <img
+                            src={profilePicture}
+                            alt={name}
+                            className="w-12 h-12 rounded-full border-2 border-blue-500 object-cover"
+                            onError={(e) => {
+                              // Hide image and show fallback icon
+                              e.target.style.display = 'none';
+                              const fallback = e.target.parentElement.querySelector('.fb-fallback-icon');
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="fb-fallback-icon w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center border-2 border-blue-500 absolute inset-0"
+                          style={{ display: profilePicture ? 'none' : 'flex' }}
+                        >
+                          <FaFacebook className="text-white text-xl" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white mb-1 truncate">{name}</p>
+                        {id && (
+                          <p className="text-xs text-gray-500 mb-1">ID: {id}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {/* FACEBOOK PAGE POSTS */}
         <div className="bg-[#101218] p-6 rounded-xl border border-gray-800">
           <div className="flex items-center justify-between mb-4">
@@ -417,11 +641,7 @@ export default function ChannelConfigClient() {
             </button>
           </div>
 
-          {postError && (
-            <div className="bg-red-900/30 border border-red-600 text-red-400 p-4 rounded-lg mb-4">
-              {postError}
-            </div>
-          )}
+          <ErrorBanner message={postError} />
 
           {!loadingPosts && pagePosts.length === 0 && (
             <p className="text-gray-500 text-sm text-center py-8">

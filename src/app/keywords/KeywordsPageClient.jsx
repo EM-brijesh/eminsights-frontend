@@ -579,6 +579,7 @@ export default function KeywordsPageClient() {
         if (k === 'reddit' || k === 'quora') return 'reddit';
         if (k === 'google') return 'google';
         if (k === 'instagram') return 'instagram';
+        if (k === 'facebook') return 'facebook';
         return 'twitter';
       });
 
@@ -694,10 +695,10 @@ export default function KeywordsPageClient() {
       setStatus('done');
 
       const summary = response.summary || {};
-      const totalPosts = (summary.youtube || 0) + (summary.twitter || 0) + (summary.reddit || 0) + (summary.google || 0) + (summary.instagram || 0);
+      const totalPosts = (summary.youtube || 0) + (summary.twitter || 0) + (summary.reddit || 0) + (summary.google || 0) + (summary.instagram || 0)+(summary.facebook || 0);
 
       showMessage(
-        `✅ Search completed!\nFound ${totalPosts} posts:\n• YouTube: ${summary.youtube || 0}\n• Twitter: ${summary.twitter || 0}\n• Reddit: ${summary.reddit || 0}\n• Google: ${summary.google || 0} \n Instagram: ${summary.instagram || 0}`,
+        `✅ Search completed!\nFound ${totalPosts} posts:\n• YouTube: ${summary.youtube || 0}\n• Twitter: ${summary.twitter || 0}\n• Reddit: ${summary.reddit || 0}\n• Google: ${summary.google || 0} \n Instagram: ${summary.instagram || 0} \n Facebook: ${summary.facebook || 0}`,
         'success'
       );
 
@@ -1138,6 +1139,8 @@ export default function KeywordsPageClient() {
                           <Image key={ch} src="/google-logo.svg" alt="Google" width={16} height={16} />
                         ) : ch === 'instagram' ? (
                           <Image key={ch} src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />
+                        ) : ch === 'facebook' ? (
+                          <Image key={ch} src="/facebook-logo.svg" alt="Facebook" width={16} height={16} />
                         ) : null
                       )}
                       {selectedFilterChannels.length > 4 && <span className="text-[10px]">+{selectedFilterChannels.length - 4}</span>}
@@ -1158,6 +1161,7 @@ export default function KeywordsPageClient() {
                       { key: 'instagram', label: 'Instagram', src: '/instagram-logo.svg', wh: [16, 16] },
                      // { key: 'quora', label: 'Quora', src: '/quora-logo.svg', wh: [16, 16] },
                       { key: 'google', label: 'Google', src: '/google-logo.svg', wh: [16, 16] },
+                      { key: 'facebook', label: 'Facebook', src: '/facebook-logo.svg', wh: [16, 16] },
                     ].map((p) => (
                       <label key={p.key} className="flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-800 cursor-pointer">
                         <input
@@ -1291,6 +1295,7 @@ export default function KeywordsPageClient() {
                             {plat === 'reddit' && <Image src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />}
                             {plat === 'instagram' && <Image src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />}
                             {plat === 'google' && <Image src="/google-logo.svg" alt="Google" width={16} height={16} />}
+                            {plat === 'facebook' && <Image src="/facebook-logo.svg" alt="Facebook" width={16} height={16} />}
                           </span>
                         ))}
                       </div>
@@ -1422,6 +1427,7 @@ export default function KeywordsPageClient() {
                           { key: 'youtube', title: 'YouTube', desc: 'Video post only', logo: '/youtube-logo.svg', size: 18 },
                           { key: 'reddit', title: 'Reddit', desc: 'Communities & comments', logo: '/reddit-logo.svg', size: 18 },
                           { key: 'google', title: 'Google', desc: 'Web Search', logo: '/google-logo.svg', size: 16 },
+                          { key: 'facebook', title: 'Facebook', desc: 'Posts', logo: '/facebook-logo.svg', size: 16 },
                           // { key: 'quora', title: 'Quora', desc: 'Question, Answers, Comment', logo: '/quora-logo.svg', size: 16 },
                         ].map((ch) => {
                           const active = configPlatforms.includes(ch.key);

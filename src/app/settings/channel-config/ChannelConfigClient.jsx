@@ -5,8 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL;
-const FB_BACKEND =
-  process.env.NEXT_PUBLIC_FB_API_URL || "http://localhost:5050";
+// const FB_BACKEND = process.env.NEXT_PUBLIC_FB_API_URL ;
 
 function ErrorBanner({ message }) {
   if (!message) return null;
@@ -156,28 +155,26 @@ export default function ChannelConfigClient() {
     try {
       setLoadingStoredPages(true);
       setStoredPagesError("");
-
-      const res = await fetch(`${FB_BACKEND}/fb/listpages`, {
+  
+      const res = await fetch(`${BACKEND}/fb/listpages`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
-
+  
       const data = await parseJsonOrNull(res);
-
+      console.log("RAW API DATA:", data);
+  
       if (!res.ok) {
         const message =
           (data && (data.error || data.message)) ||
           `Failed to fetch stored pages (status ${res.status})`;
         throw new Error(message);
       }
-
-      const pagesData = Array.isArray(data)
-        ? data
-        : Array.isArray(data.pages)
-        ? data.pages
-        : [];
-
-      setStoredPages(pagesData || []);
+  
+      const pagesData = Array.isArray(data?.data) ? data.data : [];
+  
+      setStoredPages(pagesData);
+      console.log("Fetched stored pages:", pagesData);
     } catch (err) {
       console.error("Stored pages error:", err.message);
       setStoredPagesError(err.message || "Failed to fetch stored pages");
@@ -200,7 +197,7 @@ export default function ChannelConfigClient() {
       setSavingPage(true);
       setStoredPagesError("");
 
-      const res = await fetch(`${FB_BACKEND}/fb/add-pages`, {
+      const res = await fetch(`${BACKEND}/fb/add-pages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

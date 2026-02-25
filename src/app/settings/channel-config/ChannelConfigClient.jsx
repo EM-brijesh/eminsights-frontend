@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL;
-// const FB_BACKEND = process.env.NEXT_PUBLIC_FB_API_URL ;
+const FB_BACKEND = process.env.NEXT_PUBLIC_FB_API_URL || BACKEND;
 
 function ErrorBanner({ message }) {
   if (!message) return null;
@@ -58,6 +58,7 @@ export default function ChannelConfigClient() {
   const [storedPages, setStoredPages] = useState([]);
   const [loadingStoredPages, setLoadingStoredPages] = useState(false);
   const [storedPagesError, setStoredPagesError] = useState("");
+  const [togglingPageId, setTogglingPageId] = useState(null);
 
   /* -------------------- LOGIN -------------------- */
 
@@ -156,7 +157,7 @@ export default function ChannelConfigClient() {
       setLoadingStoredPages(true);
       setStoredPagesError("");
   
-      const res = await fetch(`${BACKEND}/fb/listpages`, {
+      const res = await fetch(`${FB_BACKEND}/fb/listpages`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -171,10 +172,15 @@ export default function ChannelConfigClient() {
         throw new Error(message);
       }
   
-      const pagesData = Array.isArray(data?.data) ? data.data : [];
+      const pagesArray =
+        Array.isArray(data?.pages) && data.pages.length > 0
+          ? data.pages
+          : Array.isArray(data?.data)
+          ? data.data
+          : [];
   
-      setStoredPages(pagesData);
-      console.log("Fetched stored pages:", pagesData);
+      setStoredPages(pagesArray);
+      console.log("Fetched stored pages:", pagesArray);
     } catch (err) {
       console.error("Stored pages error:", err.message);
       setStoredPagesError(err.message || "Failed to fetch stored pages");
@@ -197,7 +203,7 @@ export default function ChannelConfigClient() {
       setSavingPage(true);
       setStoredPagesError("");
 
-      const res = await fetch(`${BACKEND}/fb/add-pages`, {
+      const res = await fetch(`${FB_BACKEND}/fb/add-pages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -226,6 +232,53 @@ export default function ChannelConfigClient() {
       setStoredPagesError(err.message || "Failed to add page");
     } finally {
       setSavingPage(false);
+    }
+  };
+
+  const handleToggleStoredPage = async (page) => {
+    const documentId = page._id || page.id || page.pageId;
+
+    if (!documentId) {
+      setStoredPagesError("Unable to toggle page: missing identifier.");
+      return;
+    }
+
+    try {
+      setTogglingPageId(documentId);
+      setStoredPagesError("");
+
+      const res = await fetch(`${FB_BACKEND}/fb/${documentId}/toggle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await parseJsonOrNull(res);
+
+      if (!res.ok) {
+        const message =
+          (data && (data.error || data.message)) ||
+          `Failed to toggle page (status ${res.status})`;
+        throw new Error(message);
+      }
+
+      const updatedPage = data?.data;
+
+      if (updatedPage && (updatedPage._id || updatedPage.id || updatedPage.pageId)) {
+        const updatedId = updatedPage._id || updatedPage.id || updatedPage.pageId;
+
+        setStoredPages((prev) =>
+          prev.map((p) =>
+            (p._id || p.id || p.pageId) === updatedId ? { ...p, ...updatedPage } : p
+          )
+        );
+      } else {
+        await fetchStoredPages();
+      }
+    } catch (err) {
+      console.error("Toggle page error:", err.message);
+      setStoredPagesError(err.message || "Failed to toggle page");
+    } finally {
+      setTogglingPageId(null);
     }
   };
 
@@ -577,8 +630,15 @@ export default function ChannelConfigClient() {
             <div className="grid md:grid-cols-2 gap-4">
               {storedPages.map((page) => {
                 const id = page.pageId || page.id;
+                const documentId = page._id || page.id || page.pageId;
                 const name = page.pageName || page.name || "Untitled Page";
-                const profilePicture = page.profilePicture || (id ? `https://graph.facebook.com/${id}/picture?type=square&width=200&height=200` : null);
+                const profilePicture =
+                  page.profilePicture ||
+                  (id
+                    ? `https://graph.facebook.com/${id}/picture?type=square&width=200&height=200`
+                    : null);
+                const isActive =
+                  typeof page.isActive === "boolean" ? page.isActive : true;
 
                 return (
                   <div
@@ -611,6 +671,28 @@ export default function ChannelConfigClient() {
                         <p className="font-medium text-white mb-1 truncate">{name}</p>
                         {id && (
                           <p className="text-xs text-gray-500 mb-1">ID: {id}</p>
+                        )}
+                        {documentId && (
+                          <button
+                            onClick={() => handleToggleStoredPage(page)}
+                            disabled={togglingPageId === documentId}
+                            className={`mt-1 inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                              isActive
+                                ? "bg-green-900/30 border-green-500 text-green-300"
+                                : "bg-gray-800 border-gray-600 text-gray-300"
+                            }`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full mr-2 ${
+                                isActive ? "bg-green-400" : "bg-gray-400"
+                              }`}
+                            />
+                            {togglingPageId === documentId
+                              ? "Updating..."
+                              : isActive
+                              ? "Selected"
+                              : "Not Selected"}
+                          </button>
                         )}
                       </div>
                     </div>

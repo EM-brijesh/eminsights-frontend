@@ -317,6 +317,11 @@ export const PLATFORM_META = {
     logo: '/google-logo.svg',
     className: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/60',
   },
+  facebook: {
+    label: 'Facebook',
+    logo: '/facebook-logo.svg',
+    className: 'bg-blue-500/10 text-blue-200 border-blue-400/60',
+  },
 };
 
 function PlatformBadge({ platform }) {

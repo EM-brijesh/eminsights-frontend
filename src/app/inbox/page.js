@@ -944,12 +944,28 @@ function MentionCard({ post, onDelete }) {
   const brandName = post?.brand?.brandName || 'Unknown Brand';
   const author = post?.author?.name || post?.author?.id || 'Anonymous';
   const platform = post?.platform || 'google';
-  const sentiment = post?.analysis?.sentiment || 'neutral';
+  const initialSentiment =
+    (post?.analysis?.sentiment || post?.sentiment || 'neutral')?.toLowerCase();
+  const [localSentiment, setLocalSentiment] = useState(initialSentiment);
+  const [isSavingSentiment, setIsSavingSentiment] = useState(false);
+  const [sentimentError, setSentimentError] = useState('');
+  const [isSentimentDialogOpen, setIsSentimentDialogOpen] = useState(false);
+  const [pendingSentiment, setPendingSentiment] = useState(initialSentiment);
+
+  useEffect(() => {
+    const nextSentiment =
+      (post?.analysis?.sentiment || post?.sentiment || 'neutral')?.toLowerCase();
+    setLocalSentiment(nextSentiment);
+  }, [post?._id, post?.analysis?.sentiment, post?.sentiment]);
+
+  const sentimentLabel =
+    localSentiment.charAt(0).toUpperCase() + localSentiment.slice(1);
+
   const keywordValue = getPostKeyword(post);
   const underlineColor =
-    sentiment === 'negative'
+    localSentiment === 'negative'
       ? 'border-red-500/60 text-red-300'
-      : sentiment === 'positive'
+      : localSentiment === 'positive'
         ? 'border-emerald-500/60 text-emerald-300'
         : 'border-yellow-500/60 text-yellow-300';
   const createdAt = post?.createdAt || post?.fetchedAt;
@@ -970,6 +986,67 @@ function MentionCard({ post, onDelete }) {
   const [emailSuccess, setEmailSuccess] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  const updateSentiment = async (newSentiment) => {
+    const allowed = ['positive', 'neutral', 'negative'];
+
+    if (!newSentiment || newSentiment === localSentiment) return;
+    if (!allowed.includes(newSentiment)) return;
+
+    const postId = post?._id || post?.id;
+    if (!postId) {
+      setSentimentError('Cannot update sentiment for this post');
+      return;
+    }
+
+    const previousSentiment = localSentiment;
+    setSentimentError('');
+    setLocalSentiment(newSentiment);
+    setIsSavingSentiment(true);
+
+    try {
+      await api.sentiment.manualUpdate(postId, newSentiment);
+
+      // Keep the in-memory post object in sync so filters and other views see the new value
+      if (post) {
+        // eslint-disable-next-line no-param-reassign
+        post.sentiment = newSentiment;
+        // eslint-disable-next-line no-param-reassign
+        post.analysis = {
+          ...(post.analysis || {}),
+          sentiment: newSentiment,
+        };
+      }
+    } catch (err) {
+      setLocalSentiment(previousSentiment);
+      setSentimentError(err?.message || 'Failed to update sentiment');
+    } finally {
+      setIsSavingSentiment(false);
+    }
+  };
+
+  const handleOpenSentimentDialog = () => {
+    if (isSavingSentiment) return;
+    setSentimentError('');
+    setPendingSentiment(localSentiment);
+    setIsSentimentDialogOpen(true);
+  };
+
+  const handleConfirmSentiment = async () => {
+    if (!pendingSentiment || pendingSentiment === localSentiment) {
+      setIsSentimentDialogOpen(false);
+      return;
+    }
+
+    await updateSentiment(pendingSentiment);
+    setIsSentimentDialogOpen(false);
+  };
+
+  const handleCancelSentimentDialog = () => {
+    if (isSavingSentiment) return;
+    setIsSentimentDialogOpen(false);
+    setPendingSentiment(localSentiment);
+  };
 
   const handleSendEmail = async (attachments = [], onClearAttachments) => {
     if (sendingEmail) return;
@@ -1078,9 +1155,22 @@ function MentionCard({ post, onDelete }) {
           <PlatformBadge platform={platform} />
         </div>
         <div className="flex items-center gap-3">
-          <span className={clsx('rounded-full border px-3 py-1 text-xs font-medium', underlineColor)}>
-            {sentiment.charAt(0).toUpperCase() + sentiment.slice(1)}
-          </span>
+          <button
+            type="button"
+            onClick={handleOpenSentimentDialog}
+            disabled={isSavingSentiment}
+            className={clsx(
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-black',
+              underlineColor,
+              isSavingSentiment && 'cursor-wait opacity-60',
+            )}
+            title="Click to change sentiment"
+          >
+            <span>{sentimentLabel}</span>
+          </button>
+          {isSavingSentiment && (
+            <span className="text-[10px] text-gray-400">Saving…</span>
+          )}
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white">
             <Users className="h-4 w-4 text-indigo-300" />
             {brandName}
@@ -1171,14 +1261,22 @@ function MentionCard({ post, onDelete }) {
             {deleting ? 'Deleting…' : 'Delete'}
           </button>
         </div>
-        {deleteError && (
-          <div className="mt-3 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-            {deleteError}
+        {(deleteError || sentimentError) && (
+          <div className="mt-3 space-y-1 text-xs">
+            {deleteError && (
+              <div className="rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-red-200">
+                {deleteError}
+              </div>
+            )}
+            {sentimentError && (
+              <div className="rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-red-200">
+                {sentimentError}
+              </div>
+            )}
           </div>
         )}
       </footer>
       <EmailModal
-      
         open={isEmailOpen}
         onClose={() => {
           if (!sendingEmail) {
@@ -1203,6 +1301,61 @@ function MentionCard({ post, onDelete }) {
         success={emailSuccess}
         post={post}
       />
+
+      {isSentimentDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-950/95 p-5 shadow-2xl">
+            <h3 className="mb-3 text-sm font-semibold text-white">Update sentiment</h3>
+            <p className="mb-4 text-xs text-gray-400">
+              Choose how you want to classify this mention. This will override the automatically
+              detected sentiment.
+            </p>
+            <div className="mb-4 flex flex-col gap-2">
+              {['positive', 'neutral', 'negative'].map((option) => {
+                const isActive = pendingSentiment === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setPendingSentiment(option)}
+                    className={clsx(
+                      'flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium capitalize transition',
+                      isActive
+                        ? 'border-emerald-400/70 bg-emerald-500/15 text-emerald-100'
+                        : 'border-white/10 bg-white/5 text-gray-200 hover:border-white/40 hover:bg-white/10',
+                    )}
+                  >
+                    <span>{option}</span>
+                    {isActive && (
+                      <span className="text-[10px] uppercase tracking-wide text-emerald-300">
+                        Selected
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 text-xs">
+              <button
+                type="button"
+                onClick={handleCancelSentimentDialog}
+                disabled={isSavingSentiment}
+                className="rounded-full border border-white/10 px-3 py-1 text-gray-300 hover:border-white/30 hover:bg-white/5 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSentiment}
+                disabled={isSavingSentiment || !pendingSentiment}
+                className="rounded-full border border-emerald-400/60 bg-emerald-500/20 px-3 py-1 font-medium text-emerald-100 hover:border-emerald-300 hover:bg-emerald-500/30 disabled:opacity-60"
+              >
+                {isSavingSentiment ? 'Saving…' : 'Save sentiment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

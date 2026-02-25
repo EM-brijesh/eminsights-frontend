@@ -45,6 +45,36 @@ const CHART_TOOLTIP_STYLE = {
   padding: '12px',
   boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
 };
+const downloadCsv = (baseName, headers, rows) => {
+  if (!Array.isArray(headers) || !Array.isArray(rows) || headers.length === 0) {
+    return;
+  }
+
+  const csvContent = [headers, ...rows]
+    .map((row) =>
+      row
+        .map((value) => {
+          const stringValue =
+            value === null || value === undefined ? '' : value.toString();
+          const escaped = stringValue.replace(/"/g, '""');
+          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+        })
+        .join(','),
+    )
+    .join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const datePart = new Date().toISOString().split('T')[0];
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${baseName}-${datePart}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 const ANALYTICS_POST_LIMIT = 2000;
 const ANALYTICS_SENTIMENT_CHUNK_SIZE = 10;
 const buildSentimentRequestPayload = (post) => ({
@@ -592,8 +622,26 @@ function AnalyticsPageContent() {
           : sortedPosts.slice(0, ANALYTICS_POST_LIMIT);
       setPosts(limitedPosts);
       const needsSentiment = limitedPosts.filter((post) => {
+        const isManual =
+          post?.sentimentIsManual === true ||
+          (typeof post?.sentimentSource === 'string' &&
+            post.sentimentSource.toLowerCase() === 'manual');
+
+        if (isManual) {
+          return false;
+        }
+
         const hasScore = typeof post.sentimentScore === 'number';
-        return !post.sentiment || post.sentiment === 'pending' || !hasScore;
+        const sentimentValue = post.sentiment;
+
+        // Only analyze when sentiment is missing or explicitly pending.
+        // Posts with an existing non-pending sentiment (including legacy ones)
+        // are trusted as-is, even if they lack a score.
+        if (!sentimentValue || sentimentValue === 'pending') {
+          return true;
+        }
+
+        return false;
       });
       if (needsSentiment.length === 0) {
         setSentimentWarning('');
@@ -939,6 +987,43 @@ function AnalyticsPageContent() {
     }
     return filtered;
   }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups]);
+  const handleExportAnalytics = useCallback(() => {
+    if (!filteredPosts.length) return;
+
+    const headers = [
+      'Brand',
+      'Platform',
+      'Keyword',
+      'Sentiment',
+      'Sentiment Score',
+      'Created At',
+      'Text',
+    ];
+
+    const rows = filteredPosts.map((post) => {
+      const brandName =
+        post?.brand?.brandName || post?.brandName || post?.brand?.aiFriendlyName || '';
+      const platform = post?.platform || '';
+      const keyword = post?.keyword || '';
+      const sentiment = (post?.sentiment || '').toString();
+      const sentimentScore =
+        typeof post?.sentimentScore === 'number' ? post.sentimentScore : '';
+      const createdAt = post?.createdAt ? new Date(post.createdAt).toISOString() : '';
+      const text = (
+        post?.content?.text ||
+        post?.content?.description ||
+        post?.text ||
+        post?.summary ||
+        ''
+      )
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      return [brandName, platform, keyword, sentiment, sentimentScore, createdAt, text];
+    });
+
+    downloadCsv('analytics', headers, rows);
+  }, [filteredPosts]);
 
   const clientStats = useMemo(() => {
     return {
@@ -1060,20 +1145,12 @@ function AnalyticsPageContent() {
   
   // Export function for top keywords
   const handleExportTopKeywords = useCallback(() => {
-    const csvContent = [
-      ['Top Keywords', 'Mentions Count'],
-      ...topKeywordsData.map(({ keyword, count }) => [keyword, count])
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `top-keywords-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (!topKeywordsData.length) return;
+
+    const headers = ['Top Keyword', 'Mentions Count'];
+    const rows = topKeywordsData.map(({ keyword, count }) => [keyword, count]);
+
+    downloadCsv('top-keywords', headers, rows);
   }, [topKeywordsData]);
   const clientTimelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
     if (post.createdAt) {
@@ -1189,6 +1266,83 @@ function AnalyticsPageContent() {
         total: sentiments.positive + sentiments.neutral + sentiments.negative,
       }));
   }, [summaryUsable, summaryData, filteredPosts]);
+  const handleExportSentimentDistribution = useCallback(() => {
+    if (!sentimentChartData.length) return;
+
+    const headers = ['Sentiment', 'Posts', 'Percentage'];
+    const rows = sentimentChartData.map((item) => [
+      item.name,
+      item.value,
+      item.percentage,
+    ]);
+
+    downloadCsv('sentiment-distribution', headers, rows);
+  }, [sentimentChartData]);
+  const handleExportTimeline = useCallback(() => {
+    if (!timelineChartData.length) return;
+
+    const headers = [
+      'Date',
+      'Positive',
+      'Neutral',
+      'Negative',
+      'Total',
+      '7-Day MA (positive share)',
+      '14-Day MA (positive share)',
+    ];
+
+    const rows = timelineChartData.map((item) => [
+      item.date,
+      item.positive,
+      item.neutral,
+      item.negative,
+      item.total,
+      item.ma7,
+      item.ma14,
+    ]);
+
+    downloadCsv('sentiment-timeline', headers, rows);
+  }, [timelineChartData]);
+  const handleExportPlatformDistribution = useCallback(() => {
+    if (!platformChartData.length) return;
+
+    const headers = ['Platform', 'Posts', 'Percentage'];
+    const rows = platformChartData.map((item) => [
+      item.name,
+      item.value,
+      item.percentage,
+    ]);
+
+    downloadCsv('platform-distribution', headers, rows);
+  }, [platformChartData]);
+  const handleExportKeywordHeatmap = useCallback(() => {
+    if (!keywordSentimentHeatmapData.length) return;
+
+    const headers = ['Keyword', 'Positive', 'Neutral', 'Negative', 'Total'];
+    const rows = keywordSentimentHeatmapData.map((item) => [
+      item.keyword,
+      item.positive,
+      item.neutral,
+      item.negative,
+      item.total,
+    ]);
+
+    downloadCsv('keyword-sentiment-heatmap', headers, rows);
+  }, [keywordSentimentHeatmapData]);
+  const handleExportSentimentByPlatform = useCallback(() => {
+    if (!sentimentByPlatformData.length) return;
+
+    const headers = ['Platform', 'Positive', 'Neutral', 'Negative', 'Total'];
+    const rows = sentimentByPlatformData.map((item) => [
+      item.platform,
+      item.positive,
+      item.neutral,
+      item.negative,
+      item.total,
+    ]);
+
+    downloadCsv('sentiment-by-platform', headers, rows);
+  }, [sentimentByPlatformData]);
   const getSentimentIcon = (sentiment) => {
     switch (sentiment) {
       case 'positive': return <Smile className="w-4 h-4 text-green-500" />;
@@ -1230,14 +1384,29 @@ function AnalyticsPageContent() {
             <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
             <p className="text-gray-400">Brand performance with sentiment analysis</p>
           </div>
-          <Button
-            onClick={handleRefresh}
-            disabled={loadingPosts || analyzingSentiment}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loadingPosts || analyzingSentiment ? 'animate-spin' : ''}`} />
-            {analyzingSentiment ? 'Analyzing...' : 'Refresh'}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleExportAnalytics}
+              disabled={loadingPosts || analyzingSentiment || filteredPosts.length === 0}
+              variant="outline"
+              className="border-white/20 bg-white/5 hover:bg-white/10"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export to Excel
+            </Button>
+            <Button
+              onClick={handleRefresh}
+              disabled={loadingPosts || analyzingSentiment}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${
+                  loadingPosts || analyzingSentiment ? 'animate-spin' : ''
+                }`}
+              />
+              {analyzingSentiment ? 'Analyzing...' : 'Refresh'}
+            </Button>
+          </div>
         </div>
         {sentimentWarning && (
           <div className="mb-6 rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-100">
@@ -1460,8 +1629,18 @@ function AnalyticsPageContent() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Sentiment Distribution - Phase 1.3: Added center text */}
           <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle>Sentiment Distribution</CardTitle>
+              <Button
+                onClick={handleExportSentimentDistribution}
+                disabled={sentimentChartData.length === 0}
+                size="sm"
+                variant="outline"
+                className="border-white/20 bg-white/5 hover:bg-white/10"
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Export
+              </Button>
             </CardHeader>
             <CardContent>
               {sentimentChartData.length > 0 ? (
@@ -1535,8 +1714,18 @@ function AnalyticsPageContent() {
           </Card>
           {/* Platform Distribution */}
           <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle>Platform Distribution</CardTitle>
+              <Button
+                onClick={handleExportPlatformDistribution}
+                disabled={platformChartData.length === 0}
+                size="sm"
+                variant="outline"
+                className="border-white/20 bg-white/5 hover:bg-white/10"
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Export
+              </Button>
             </CardHeader>
             <CardContent>
               {platformChartData.length > 0 ? (
@@ -1587,8 +1776,18 @@ function AnalyticsPageContent() {
         </div>
         {/* Sentiment Timeline - Phase 1.2: Improved X-axis readability */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle>Sentiment Timeline (Last 14 Days)</CardTitle>
+            <Button
+              onClick={handleExportTimeline}
+              disabled={timelineChartData.length === 0}
+              size="sm"
+              variant="outline"
+              className="border-white/20 bg-white/5 hover:bg-white/10"
+            >
+              <Download className="w-3 h-3 mr-1" />
+              Export
+            </Button>
           </CardHeader>
           <CardContent>
             {timelineChartData.length > 0 ? (
@@ -1688,8 +1887,18 @@ function AnalyticsPageContent() {
         </Card>
         {/* Sentiment by Platform */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle>Sentiment Distribution by Platform</CardTitle>
+            <Button
+              onClick={handleExportSentimentByPlatform}
+              disabled={sentimentByPlatformData.length === 0}
+              size="sm"
+              variant="outline"
+              className="border-white/20 bg-white/5 hover:bg-white/10"
+            >
+              <Download className="w-3 h-3 mr-1" />
+              Export
+            </Button>
           </CardHeader>
           <CardContent>
                           <div className="flex gap-4 mb-4 text-xs text-gray-400">
@@ -1747,8 +1956,18 @@ function AnalyticsPageContent() {
         </Card>
         {/* Keyword Sentiment Heatmap */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle>Keyword Sentiment Heatmap (Top 10 Keywords)</CardTitle>
+            <Button
+              onClick={handleExportKeywordHeatmap}
+              disabled={keywordSentimentHeatmapData.length === 0}
+              size="sm"
+              variant="outline"
+              className="border-white/20 bg-white/5 hover:bg-white/10"
+            >
+              <Download className="w-3 h-3 mr-1" />
+              Export
+            </Button>
           </CardHeader>
           <CardContent>
             {keywordSentimentHeatmapData.length > 0 ? (

@@ -285,6 +285,24 @@ export const api = {
       apiRequest("/api/sentiment/summary", {
         params,
       }),
+    manualUpdate: (postId, sentiment) => {
+      const allowed = ["positive", "neutral", "negative"];
+      const normalizedSentiment =
+        typeof sentiment === "string" ? sentiment.toLowerCase() : "";
+
+      if (!postId) {
+        throw new Error("Post ID is required to update sentiment");
+      }
+
+      if (!allowed.includes(normalizedSentiment)) {
+        throw new Error("Invalid sentiment value");
+      }
+
+      return apiRequest("/api/sentiment/manual", {
+        method: "PATCH",
+        body: JSON.stringify({ postId, sentiment: normalizedSentiment }),
+      });
+    },
   },
 };
 

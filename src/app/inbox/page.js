@@ -62,7 +62,7 @@ const PLATFORM_OPTIONS = [
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v'];
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
-const DEFAULT_DURATION = '1';
+const DEFAULT_DURATION = 'all-time';
 const DEFAULT_POSTS_LIMIT = 100;
 const EXTENDED_POSTS_LIMIT = 1000;
 const MAX_RANGE_POSTS_LIMIT = 3000;
@@ -86,9 +86,9 @@ const parseDateOnly = (value) => {
 };
 
 const createDefaultDateRange = () => {
-  const today = new Date();
-  const todayStr = formatDateInput(today);
-  return { start: todayStr, end: todayStr };
+  const end = new Date();
+  const start = new Date(2000, 0, 1);
+  return { start: formatDateInput(start), end: formatDateInput(end) };
 };
 
 const formatDisplayDate = (value) => {
@@ -127,8 +127,8 @@ const buildRangeFromDuration = (days) => {
 
 const isDefaultDateRange = (range) => {
   if (!range) return false;
-  const today = formatDateInput(new Date());
-  return range.start === today && range.end === today;
+  const defaults = createDefaultDateRange();
+  return range.start === defaults.start && range.end === defaults.end;
 };
 
 const createDefaultTimeRange = () => ({
@@ -1567,7 +1567,7 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
     setDraftRange(range || createDefaultDateRange());
   }, [range]);
 
-  // Default to today's date when picker opens for the first time
+  // Default to all-time range when picker opens for the first time
   useEffect(() => {
     if (open && !range) {
       const todayRange = createDefaultDateRange();

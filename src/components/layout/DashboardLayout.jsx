@@ -259,7 +259,7 @@ export default function DashboardLayout({ children }) {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col lg:ml-20">
+      <div className="flex-1 flex flex-col lg:ml-20 print:ml-0 print:w-full">
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-black border-b border-gray-800 sticky top-0 z-30">
           <button onClick={() => setSidebarOpen(true)} className="text-gray-300 hover:text-white">
             <Menu className="w-6 h-6" />
@@ -267,8 +267,8 @@ export default function DashboardLayout({ children }) {
           <span className="text-xs text-gray-500 truncate max-w-[150px]">{currentUser?.email}</span>
         </header>
         
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-4 lg:p-8 overflow-y-auto print:p-2 print:overflow-visible">
+          <div className="max-w-7xl mx-auto print:max-w-full print:mx-0">
             {children}
           </div>
         </main>

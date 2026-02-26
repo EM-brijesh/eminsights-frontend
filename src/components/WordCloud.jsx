@@ -52,7 +52,6 @@ export default function WordCloud({ keywordFrequency, colorScheme = 'multiple' }
         ...word,
         fontSize,
         color,
-        rotation: Math.random() > 0.5 ? 0 : -90, // Random rotation
       };
     });
   }, [keywordFrequency, colorScheme]);
@@ -66,33 +65,26 @@ export default function WordCloud({ keywordFrequency, colorScheme = 'multiple' }
   }
 
   return (
-    <div className="w-full min-h-[400px] bg-gray-800 rounded-lg p-4 relative">
-      {/* Tooltip */}
+    <div className="w-full min-h-[300px] bg-gray-800 rounded-lg p-4 relative overflow-hidden">
       {hoveredWord && (
         <div className="absolute top-2 right-2 bg-gray-900 text-white px-3 py-2 rounded text-sm shadow-lg z-20 border border-gray-700">
           <strong>{hoveredWord.text}</strong>: {hoveredWord.value}
         </div>
       )}
-      
-      {/* Word Cloud - Flexible Grid Layout */}
-      <div className="flex flex-wrap justify-center items-center gap-2 p-4">
+
+      <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 p-4">
         {words.map((word, index) => (
           <span
             key={`${word.text}-${index}`}
             style={{
               fontSize: `${word.fontSize}px`,
               color: word.color,
-              transform: `rotate(${word.rotation}deg)`,
-              display: 'inline-block',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer',
-              fontWeight: 'bold',
+              fontWeight: word.fontSize > 40 ? 800 : 600,
               fontFamily: 'Inter, system-ui, sans-serif',
-              padding: '4px 8px',
-              lineHeight: 1.2,
+              lineHeight: 1.3,
               userSelect: 'none',
             }}
-            className="hover:scale-110 hover:opacity-80"
+            className="inline-block cursor-pointer transition-all duration-200 hover:scale-110 hover:opacity-80 px-1"
             onMouseEnter={() => setHoveredWord(word)}
             onMouseLeave={() => setHoveredWord(null)}
             title={`${word.text}: ${word.value}`}
@@ -101,10 +93,9 @@ export default function WordCloud({ keywordFrequency, colorScheme = 'multiple' }
           </span>
         ))}
       </div>
-      
-      {/* Legend */}
-      <div className="text-xs text-gray-500 text-center mt-4">
-        Hover over words to see frequency • Size indicates relative frequency
+
+      <div className="text-xs text-gray-500 text-center mt-2">
+        Hover over words to see frequency · Size indicates relative frequency
       </div>
     </div>
   );

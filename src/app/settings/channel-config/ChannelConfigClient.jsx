@@ -24,10 +24,15 @@ async function parseJsonOrNull(response) {
   }
   try {
     return await response.json();
-  } catch (err) {
-    console.error("Failed to parse JSON response:", err);
+  } catch {
     return null;
   }
+}
+
+function getErrorMessage(err) {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  return String(err ?? "Unknown error");
 }
 
 export default function ChannelConfigClient() {
@@ -85,7 +90,7 @@ export default function ChannelConfigClient() {
 
       setConnectedAccounts(data.accounts || []);
     } catch (err) {
-      console.error("Connected accounts error:", err.message);
+      console.error("Connected accounts error:", getErrorMessage(err));
     } finally {
       setLoadingConnected(false);
     }
@@ -112,7 +117,7 @@ export default function ChannelConfigClient() {
 
       setPages(data.pages || []);
     } catch (err) {
-      setError(err.message);
+      setError(getErrorMessage(err));
       setPages([]);
     } finally {
       setLoadingPages(false);
@@ -143,7 +148,7 @@ export default function ChannelConfigClient() {
 
       setPagePosts(data.posts || []);
     } catch (err) {
-      setPostError(err.message);
+      setPostError(getErrorMessage(err));
       setPagePosts([]);
     } finally {
       setLoadingPosts(false);
@@ -182,8 +187,9 @@ export default function ChannelConfigClient() {
       setStoredPages(pagesArray);
       console.log("Fetched stored pages:", pagesArray);
     } catch (err) {
-      console.error("Stored pages error:", err.message);
-      setStoredPagesError(err.message || "Failed to fetch stored pages");
+      const msg = getErrorMessage(err);
+      console.error("Stored pages error:", msg);
+      setStoredPagesError(msg || "Failed to fetch stored pages");
       setStoredPages([]);
     } finally {
       setLoadingStoredPages(false);
@@ -228,8 +234,9 @@ export default function ChannelConfigClient() {
 
       await fetchStoredPages();
     } catch (err) {
-      console.error("Add page error:", err.message);
-      setStoredPagesError(err.message || "Failed to add page");
+      const msg = getErrorMessage(err);
+      console.error("Add page error:", msg);
+      setStoredPagesError(msg || "Failed to add page");
     } finally {
       setSavingPage(false);
     }
@@ -275,8 +282,9 @@ export default function ChannelConfigClient() {
         await fetchStoredPages();
       }
     } catch (err) {
-      console.error("Toggle page error:", err.message);
-      setStoredPagesError(err.message || "Failed to toggle page");
+      const msg = getErrorMessage(err);
+      console.error("Toggle page error:", msg);
+      setStoredPagesError(msg || "Failed to toggle page");
     } finally {
       setTogglingPageId(null);
     }
@@ -310,7 +318,7 @@ export default function ChannelConfigClient() {
 
       await fetchConnectedAccounts();
     } catch (err) {
-      alert(err.message);
+      alert(getErrorMessage(err));
     } finally {
       setConnectingPage(null);
     }

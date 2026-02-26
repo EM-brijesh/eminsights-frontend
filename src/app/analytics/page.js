@@ -17,8 +17,13 @@ import {
   Users,
   MoreVertical,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
+  Settings,
+  Maximize2,
 } from 'lucide-react';
+import WordCloud from '@/components/WordCloud';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
@@ -321,6 +326,11 @@ function AnalyticsPageContent() {
   const [wordCloudColorMenuOpen, setWordCloudColorMenuOpen] = useState(false);
   const [wordCloudMenuOpen, setWordCloudMenuOpen] = useState(false);
   const [topKeywordsMenuOpen, setTopKeywordsMenuOpen] = useState(false);
+  const sentimentChartRef = useRef(null);
+  const platformChartRef = useRef(null);
+  const timelineChartRef = useRef(null);
+  const sentimentByPlatformChartRef = useRef(null);
+  const keywordHeatmapRef = useRef(null);
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
 
   // Read URL parameters and initialize filters so refresh preserves current selection
@@ -1343,6 +1353,75 @@ function AnalyticsPageContent() {
 
     downloadCsv('sentiment-by-platform', headers, rows);
   }, [sentimentByPlatformData]);
+  const handleDownloadAnalyticsPdf = useCallback(async () => {
+    try {
+      const [{ jsPDF }, html2canvasModule] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas-pro'),
+      ]);
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+
+      const printHideEls = Array.from(document.querySelectorAll('.print-hide'));
+      printHideEls.forEach((el) => { el.style.display = 'none'; });
+
+      try {
+        const container = document.querySelector('.max-w-7xl');
+        if (!container) throw new Error('Analytics container not found');
+
+        const canvas = await html2canvas(container, {
+          scale: 1.5,
+          useCORS: true,
+          backgroundColor: '#000000',
+          scrollX: 0,
+          scrollY: 0,
+          width: container.offsetWidth,
+          height: container.scrollHeight,
+          windowWidth: container.offsetWidth,
+          windowHeight: container.scrollHeight,
+          ignoreElements: (el) => el.classList.contains('dotted-background'),
+        });
+
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth    = doc.internal.pageSize.getWidth();
+        const pageHeight   = doc.internal.pageSize.getHeight();
+        const margin       = 8;
+        const imgWidth     = pageWidth - margin * 2;
+        const mmPerPx      = imgWidth / canvas.width;
+        const pageCanvasPx = (pageHeight - margin * 2) / mmPerPx;
+
+        let srcY = 0;
+        let firstPage = true;
+
+        while (srcY < canvas.height) {
+          if (!firstPage) doc.addPage();
+
+          const sliceH = Math.min(pageCanvasPx, canvas.height - srcY);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width  = canvas.width;
+          sliceCanvas.height = Math.ceil(sliceH);
+
+          sliceCanvas.getContext('2d').drawImage(
+            canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH,
+          );
+
+          doc.addImage(
+            sliceCanvas.toDataURL('image/png'),
+            'PNG', margin, margin, imgWidth, sliceH * mmPerPx,
+          );
+
+          srcY      += pageCanvasPx;
+          firstPage  = false;
+        }
+
+        const datePart = new Date().toISOString().split('T')[0];
+        doc.save(`analytics-report-${datePart}.pdf`);
+      } finally {
+        printHideEls.forEach((el) => { el.style.display = ''; });
+      }
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+    }
+  }, []);
   const getSentimentIcon = (sentiment) => {
     switch (sentiment) {
       case 'positive': return <Smile className="w-4 h-4 text-green-500" />;
@@ -1375,16 +1454,29 @@ function AnalyticsPageContent() {
     );
   }
   return (
-    <div className="min-h-screen bg-black text-white p-6 relative">
+    <div className="min-h-screen bg-black text-white p-6 relative" style={{ backgroundColor: '#000000' }}>
       <DottedBackground />
       <div className="max-w-7xl mx-auto relative z-10">
+        {/* Print hint – visible only in print, reminds user to enable Background Graphics */}
+        <div className="hidden print:block mb-4 text-xs text-gray-400">
+          Analytics Report &nbsp;·&nbsp; Generated: {new Date().toLocaleString()}
+        </div>
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
             <p className="text-gray-400">Brand performance with sentiment analysis</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 print-hide">
+            <Button
+              onClick={handleDownloadAnalyticsPdf}
+              disabled={loadingPosts || analyzingSentiment || stats.total === 0}
+              variant="outline"
+              className="border-white/20 bg-white/5 hover:bg-white/10"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
             <Button
               onClick={handleExportAnalytics}
               disabled={loadingPosts || analyzingSentiment || filteredPosts.length === 0}
@@ -1414,7 +1506,7 @@ function AnalyticsPageContent() {
           </div>
         )}
         {/* Filters */}
-        <Card className="bg-black border-white/10 mb-6">
+        <Card className="bg-black border-white/10 mb-6 print-hide">
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
@@ -1636,15 +1728,16 @@ function AnalyticsPageContent() {
                 disabled={sentimentChartData.length === 0}
                 size="sm"
                 variant="outline"
-                className="border-white/20 bg-white/5 hover:bg-white/10"
+                className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
               >
                 <Download className="w-3 h-3 mr-1" />
                 Export
               </Button>
             </CardHeader>
             <CardContent>
-              {sentimentChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+              <div ref={sentimentChartRef}>
+                {sentimentChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <defs>
                       <linearGradient id="gradientPositive" x1="0" y1="0" x2="0" y2="1">
@@ -1704,12 +1797,13 @@ function AnalyticsPageContent() {
                     </text>
                   </PieChart>
                 </ResponsiveContainer>
-              ) : (
-                <EmptyState
-                  message="No sentiment data available"
-                  helpText="Try adjusting your filters or refresh the data to see sentiment distribution."
-                />
-              )}
+                ) : (
+                  <EmptyState
+                    message="No sentiment data available"
+                    helpText="Try adjusting your filters or refresh the data to see sentiment distribution."
+                  />
+                )}
+              </div>
             </CardContent>
           </Card>
           {/* Platform Distribution */}
@@ -1721,15 +1815,16 @@ function AnalyticsPageContent() {
                 disabled={platformChartData.length === 0}
                 size="sm"
                 variant="outline"
-                className="border-white/20 bg-white/5 hover:bg-white/10"
+                className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
               >
                 <Download className="w-3 h-3 mr-1" />
                 Export
               </Button>
             </CardHeader>
             <CardContent>
-              {platformChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+              <div ref={platformChartRef}>
+                {platformChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={platformChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                     <defs>
                       <linearGradient id="gradientBar" x1="0" y1="0" x2="0" y2="1">
@@ -1765,17 +1860,18 @@ function AnalyticsPageContent() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
-                <EmptyState
-                  message="No platform data available"
-                  helpText="Posts from different platforms will appear here once data is loaded."
-                />
-              )}
+                ) : (
+                  <EmptyState
+                    message="No platform data available"
+                    helpText="Posts from different platforms will appear here once data is loaded."
+                  />
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
         {/* Sentiment Timeline - Phase 1.2: Improved X-axis readability */}
-        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
+        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6 print-page-break print-avoid-break">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle>Sentiment Timeline (Last 14 Days)</CardTitle>
             <Button
@@ -1783,15 +1879,16 @@ function AnalyticsPageContent() {
               disabled={timelineChartData.length === 0}
               size="sm"
               variant="outline"
-              className="border-white/20 bg-white/5 hover:bg-white/10"
+              className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
             >
               <Download className="w-3 h-3 mr-1" />
               Export
             </Button>
           </CardHeader>
           <CardContent>
-            {timelineChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+            <div ref={timelineChartRef}>
+              {timelineChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={timelineChartData}>
                   <defs>
                     <linearGradient id="colorPositive" x1="0" y1="0" x2="0" y2="1">
@@ -1877,16 +1974,17 @@ function AnalyticsPageContent() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            ) : (
-              <EmptyState
-                message="No timeline data available"
-                helpText="Sentiment trends over time will appear here as data accumulates."
-              />
-            )}
+              ) : (
+                <EmptyState
+                  message="No timeline data available"
+                  helpText="Sentiment trends over time will appear here as data accumulates."
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
         {/* Sentiment by Platform */}
-        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
+        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6 print-page-break print-avoid-break">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle>Sentiment Distribution by Platform</CardTitle>
             <Button
@@ -1894,14 +1992,15 @@ function AnalyticsPageContent() {
               disabled={sentimentByPlatformData.length === 0}
               size="sm"
               variant="outline"
-              className="border-white/20 bg-white/5 hover:bg-white/10"
+              className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
             >
               <Download className="w-3 h-3 mr-1" />
               Export
             </Button>
           </CardHeader>
           <CardContent>
-                          <div className="flex gap-4 mb-4 text-xs text-gray-400">
+            <div ref={sentimentByPlatformChartRef}>
+              <div className="flex gap-4 mb-4 text-xs text-gray-400">
                   <span className="flex items-center gap-1">
                     <span className="h-2.5 w-2.5 rounded bg-emerald-500" />
                     Positive
@@ -1914,10 +2013,10 @@ function AnalyticsPageContent() {
                     <span className="h-2.5 w-2.5 rounded bg-red-500" />
                     Negative
                   </span>
-                </div>
+              </div>
 
-            {sentimentByPlatformData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              {sentimentByPlatformData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={sentimentByPlatformData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <defs>
                     <linearGradient id="gradientPos" x1="0" y1="0" x2="0" y2="1">
@@ -1946,16 +2045,17 @@ function AnalyticsPageContent() {
                   <Bar dataKey="negative" stackId="a" fill="url(#gradientNeg)" opacity={0.95} radius={[8, 8, 0, 0]} activeBar={false} />
                 </BarChart>
               </ResponsiveContainer>
-            ) : (
-              <EmptyState
-                message="No platform sentiment data"
-                helpText="Sentiment breakdown by platform will be displayed here."
-              />
-            )}
+              ) : (
+                <EmptyState
+                  message="No platform sentiment data"
+                  helpText="Sentiment breakdown by platform will be displayed here."
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
         {/* Keyword Sentiment Heatmap */}
-        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6">
+        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6 print-page-break print-avoid-break">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle>Keyword Sentiment Heatmap (Top 10 Keywords)</CardTitle>
             <Button
@@ -1963,15 +2063,16 @@ function AnalyticsPageContent() {
               disabled={keywordSentimentHeatmapData.length === 0}
               size="sm"
               variant="outline"
-              className="border-white/20 bg-white/5 hover:bg-white/10"
+              className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
             >
               <Download className="w-3 h-3 mr-1" />
               Export
             </Button>
           </CardHeader>
           <CardContent>
-            {keywordSentimentHeatmapData.length > 0 ? (
-              <div className="overflow-x-auto">
+            <div ref={keywordHeatmapRef}>
+              {keywordSentimentHeatmapData.length > 0 ? (
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-700">
@@ -2031,16 +2132,239 @@ function AnalyticsPageContent() {
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <EmptyState
-                message="No keyword data available"
-                helpText="Keyword sentiment breakdown will appear here once you have tracked keywords."
-              />
-            )}
+              ) : (
+                <EmptyState
+                  message="No keyword data available"
+                  helpText="Keyword sentiment breakdown will appear here once you have tracked keywords."
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
         {/* Word Cloud and Top Keywords */}
-       
+        <div className="space-y-6 mb-6">
+          {/* Word Cloud Card */}
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 relative">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle>Word Cloud</CardTitle>
+              <div className="flex items-center gap-2 print-hide">
+                {/* Color Scheme Selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => setWordCloudColorMenuOpen((v) => !v)}
+                    className="flex items-center gap-1.5 rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 transition"
+                  >
+                    <span
+                      className="h-3 w-3 rounded-sm"
+                      style={{
+                        background: wordCloudColorScheme === 'multiple'
+                          ? 'linear-gradient(135deg, #10B981, #3B82F6, #EC4899)'
+                          : '#3B82F6',
+                      }}
+                    />
+                    {wordCloudColorScheme === 'multiple' ? 'Multiple Colour' : 'Single Colour'}
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                  {wordCloudColorMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[160px] rounded-md border border-gray-700 bg-gray-900 py-1 shadow-lg">
+                      {['multiple', 'single'].map((scheme) => (
+                        <button
+                          key={scheme}
+                          onClick={() => {
+                            setWordCloudColorScheme(scheme);
+                            setWordCloudColorMenuOpen(false);
+                          }}
+                          className={clsx(
+                            'flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-gray-800 transition',
+                            wordCloudColorScheme === scheme ? 'text-white' : 'text-gray-400',
+                          )}
+                        >
+                          <span
+                            className="h-3 w-3 rounded-sm"
+                            style={{
+                              background: scheme === 'multiple'
+                                ? 'linear-gradient(135deg, #10B981, #3B82F6, #EC4899)'
+                                : '#3B82F6',
+                            }}
+                          />
+                          {scheme === 'multiple' ? 'Multiple Colour' : 'Single Colour'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Menu */}
+                <div className="relative">
+                  <button
+                    onClick={() => setWordCloudMenuOpen((v) => !v)}
+                    className="rounded-md border border-white/20 bg-white/5 p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {wordCloudMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[140px] rounded-md border border-gray-700 bg-gray-900 py-1 shadow-lg">
+                      <button
+                        onClick={() => {
+                          handleExportTopKeywords();
+                          setWordCloudMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition"
+                      >
+                        <Download className="h-3 w-3" />
+                        Export CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {topKeywordsData.length > 0 ? (
+                <WordCloud keywordFrequency={keywordFrequency} colorScheme={wordCloudColorScheme} />
+              ) : (
+                <EmptyState
+                  message="No keyword data for word cloud"
+                  helpText="Keywords from your posts will be visualized here."
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Top Keywords Card */}
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle>Top Keywords</CardTitle>
+              <div className="flex items-center gap-2 print-hide">
+                <Button
+                  onClick={handleExportTopKeywords}
+                  disabled={topKeywordsData.length === 0}
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 bg-white/5 hover:bg-white/10"
+                >
+                  <Download className="w-3 h-3 mr-1" />
+                  Export
+                </Button>
+                <div className="relative">
+                  <button
+                    onClick={() => setTopKeywordsMenuOpen((v) => !v)}
+                    className="rounded-md border border-white/20 bg-white/5 p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {topKeywordsMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[140px] rounded-md border border-gray-700 bg-gray-900 py-1 shadow-lg">
+                      <button
+                        onClick={() => {
+                          handleExportTopKeywords();
+                          setTopKeywordsMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition"
+                      >
+                        <Download className="h-3 w-3" />
+                        Export CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {topKeywordsData.length > 0 ? (
+                <div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-700">
+                          <th className="text-left p-3 text-gray-400 font-semibold text-sm">Top Keywords</th>
+                          <th className="text-right p-3 text-gray-400 font-semibold text-sm">Mentions Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedTopKeywords.map((item, index) => (
+                          <tr
+                            key={item.keyword}
+                            className="border-b border-gray-800/50 hover:bg-gray-800/40 transition"
+                          >
+                            <td className="p-3 text-sm text-gray-200">{item.keyword}</td>
+                            <td className="p-3 text-sm text-right text-gray-300 font-medium">{item.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Pagination */}
+                  <div className="flex items-center justify-between px-3 pt-4 pb-1 text-xs text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <span>Rows per page</span>
+                      <select
+                        value={topKeywordsRowsPerPage}
+                        onChange={(e) => {
+                          setTopKeywordsRowsPerPage(Number(e.target.value));
+                          setTopKeywordsPage(1);
+                        }}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300"
+                      >
+                        {[5, 10, 20, 50].map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span>
+                        {(topKeywordsPage - 1) * topKeywordsRowsPerPage + 1}-
+                        {Math.min(topKeywordsPage * topKeywordsRowsPerPage, topKeywordsData.length)} of {topKeywordsData.length}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setTopKeywordsPage((p) => Math.max(1, p - 1))}
+                          disabled={topKeywordsPage === 1}
+                          className="rounded p-1 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        {Array.from({ length: totalTopKeywordsPages }, (_, i) => i + 1)
+                          .filter((p) => Math.abs(p - topKeywordsPage) <= 1 || p === 1 || p === totalTopKeywordsPages)
+                          .map((p, idx, arr) => {
+                            const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                            return (
+                              <span key={p} className="flex items-center">
+                                {showEllipsis && <span className="px-1 text-gray-600">…</span>}
+                                <button
+                                  onClick={() => setTopKeywordsPage(p)}
+                                  className={clsx(
+                                    'min-w-[24px] rounded px-1.5 py-0.5 text-xs transition',
+                                    topKeywordsPage === p
+                                      ? 'bg-blue-600 text-white'
+                                      : 'hover:bg-gray-700 text-gray-400',
+                                  )}
+                                >
+                                  {p}
+                                </button>
+                              </span>
+                            );
+                          })}
+                        <button
+                          onClick={() => setTopKeywordsPage((p) => Math.min(totalTopKeywordsPages, p + 1))}
+                          disabled={topKeywordsPage === totalTopKeywordsPages}
+                          className="rounded p-1 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  message="No keyword data available"
+                  helpText="Top keywords and their mention counts will appear here."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Recent Posts */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
           <CardHeader>

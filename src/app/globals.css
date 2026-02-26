@@ -277,3 +277,154 @@
 .animate-glow {
   animation: glow 2s ease-in-out infinite;
 }
+
+@media print {
+  /* ── Page setup ── */
+  @page {
+    margin: 8mm;
+    size: A4 portrait;
+  }
+
+  /* ── Force exact color/background reproduction ── */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    /* Stop animations so charts render in final state */
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+  }
+
+  /* ── Full-bleed dark body ── */
+  html,
+  body {
+    background: #000000 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* ── Hide: sidebar, mobile header, dotted bg, all print-hide ── */
+  aside,
+  header,
+  nav,
+  [data-sidebar],
+  .print-hide,
+  .dotted-background,
+  .dotted-background::before {
+    display: none !important;
+  }
+
+  /* ── Remove sidebar left-margin from the content wrapper ── */
+  .lg\:ml-20 {
+    margin-left: 0 !important;
+  }
+
+  /* ── Content fills full print width ── */
+  .max-w-7xl {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 4px !important;
+    margin: 0 !important;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* ── Keep multi-column layouts intact ── */
+  .lg\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .md\:grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  /* ── THE KEY FIX: Recharts ResponsiveContainer collapses to 0x0 during
+     print because its ResizeObserver never fires. Give it an explicit size. ── */
+  .recharts-responsive-container {
+    width: 100% !important;
+    min-width: 200px !important;
+    height: 280px !important;
+    min-height: 280px !important;
+  }
+
+  .recharts-wrapper {
+    width: 100% !important;
+    height: 280px !important;
+    overflow: visible !important;
+  }
+
+  .recharts-surface {
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  svg {
+    overflow: visible !important;
+  }
+
+  /* ── Prevent cards from splitting across pages ── */
+  .print-page-break {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ── Force explicit dark backgrounds on chart cards (gradient may not print) ── */
+  .from-gray-900,
+  [class*="from-gray-900"] {
+    background-color: #111827 !important;
+  }
+
+  /* ── Stat card backgrounds ── */
+  [class*="from-blue-9"] {
+    background-color: #1e3a5f !important;
+  }
+  [class*="from-emerald-5"] {
+    background-color: #064e3b !important;
+  }
+  [class*="from-yellow-5"],
+  [class*="from-amber-5"] {
+    background-color: #78350f !important;
+  }
+  [class*="from-red-5"] {
+    background-color: #7f1d1d !important;
+  }
+
+  /* ── Outer analytics page wrapper ── */
+  .min-h-screen.bg-black {
+    background-color: #000000 !important;
+  }
+
+  /* ── Prevent horizontal overflow ── */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  /* ── Tighten spacing so content fits on fewer pages ── */
+  .gap-6 {
+    gap: 8px !important;
+  }
+
+  .mb-6 {
+    margin-bottom: 8px !important;
+  }
+
+  .p-6 {
+    padding: 8px !important;
+  }
+}

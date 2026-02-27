@@ -37,10 +37,61 @@ import {
 } from 'recharts';
 // Chart colors
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const LANGUAGE_COLORS = [
+  '#6366f1', '#a855f7', '#ec4899', '#f472b6', '#06b6d4',
+  '#f97316', '#14b8a6', '#8b5cf6', '#3b82f6', '#10b981',
+  '#f59e0b', '#ef4444', '#64748b', '#84cc16', '#e879f9',
+  '#22d3ee', '#facc15', '#fb923c', '#a78bfa', '#2dd4bf',
+];
 const SENTIMENT_COLORS = {
   positive: '#10b981',
   neutral: '#f59e0b',
   negative: '#ef4444'
+};
+
+const _intlLanguageNames =
+  typeof Intl !== 'undefined'
+    ? new Intl.DisplayNames(['en'], { type: 'language' })
+    : null;
+
+const LANGUAGE_NAME_FALLBACK = {
+  en: 'English', hi: 'Hindi', bn: 'Bengali', ta: 'Tamil', te: 'Telugu',
+  mr: 'Marathi', gu: 'Gujarati', kn: 'Kannada', ml: 'Malayalam', pa: 'Punjabi',
+  or: 'Odia', as: 'Assamese', ur: 'Urdu', ne: 'Nepali', sa: 'Sanskrit',
+  sd: 'Sindhi', ks: 'Kashmiri', bh: 'Bhojpuri', mai: 'Maithili', doi: 'Dogri',
+  kok: 'Konkani', mni: 'Manipuri', sat: 'Santali', brx: 'Bodo',
+  raj: 'Rajasthani', mag: 'Magahi', awa: 'Awadhi', tcy: 'Tulu',
+  hne: 'Chhattisgarhi', gom: 'Goan Konkani', si: 'Sinhala',
+  fr: 'French', de: 'German', es: 'Spanish', pt: 'Portuguese', it: 'Italian',
+  ru: 'Russian', ja: 'Japanese', ko: 'Korean', zh: 'Chinese', ar: 'Arabic',
+  tr: 'Turkish', pl: 'Polish', nl: 'Dutch', sv: 'Swedish', da: 'Danish',
+  no: 'Norwegian', fi: 'Finnish', th: 'Thai', vi: 'Vietnamese', id: 'Indonesian',
+  ms: 'Malay', cs: 'Czech', el: 'Greek', he: 'Hebrew', hu: 'Hungarian',
+  ro: 'Romanian', uk: 'Ukrainian', ca: 'Catalan', hr: 'Croatian', bg: 'Bulgarian',
+  sk: 'Slovak', lt: 'Lithuanian', lv: 'Latvian', et: 'Estonian', fa: 'Persian',
+  ps: 'Pashto', af: 'Afrikaans', sw: 'Swahili', my: 'Burmese', lo: 'Lao',
+  am: 'Amharic', so: 'Somali', ha: 'Hausa', yo: 'Yoruba', ig: 'Igbo',
+  zu: 'Zulu', xh: 'Xhosa', jv: 'Javanese', su: 'Sundanese', tl: 'Filipino',
+  ka: 'Georgian', hy: 'Armenian', az: 'Azerbaijani', uz: 'Uzbek',
+  kk: 'Kazakh', mn: 'Mongolian', bo: 'Tibetan', sr: 'Serbian', sq: 'Albanian',
+  nb: 'Norwegian Bokmål', nn: 'Norwegian Nynorsk', ht: 'Haitian Creole',
+  mg: 'Malagasy', sc: 'Sardinian', qu: 'Quechua', km: 'Khmer',
+  ceb: 'Cebuano', pam: 'Kapampangan', war: 'Waray', bcl: 'Bikol',
+  ilo: 'Ilocano', min: 'Minangkabau', mad: 'Madurese', ban: 'Balinese',
+  bug: 'Buginese', vec: 'Venetian', snk: 'Soninke', rmn: 'Romani',
+  lus: 'Mizo', mwr: 'Marwari',
+};
+
+const languageDisplayName = (code) => {
+  if (!code || code === 'undefined' || code === 'und') return 'Undefined';
+  if (LANGUAGE_NAME_FALLBACK[code]) return LANGUAGE_NAME_FALLBACK[code];
+  try {
+    const name = _intlLanguageNames?.of(code);
+    if (name && name !== code) return name;
+  } catch {
+    // Intl couldn't resolve it
+  }
+  return code;
 };
 // Tooltip styling constant (Phase 1.1)
 const CHART_TOOLTIP_STYLE = {
@@ -322,6 +373,8 @@ function AnalyticsPageContent() {
   const [sentimentWarning, setSentimentWarning] = useState('');
   const [topKeywordsPage, setTopKeywordsPage] = useState(1);
   const [topKeywordsRowsPerPage, setTopKeywordsRowsPerPage] = useState(10);
+  const [languagePage, setLanguagePage] = useState(1);
+  const [languageRowsPerPage, setLanguageRowsPerPage] = useState(10);
   const [wordCloudColorScheme, setWordCloudColorScheme] = useState('multiple');
   const [wordCloudColorMenuOpen, setWordCloudColorMenuOpen] = useState(false);
   const [wordCloudMenuOpen, setWordCloudMenuOpen] = useState(false);
@@ -1162,6 +1215,57 @@ function AnalyticsPageContent() {
 
     downloadCsv('top-keywords', headers, rows);
   }, [topKeywordsData]);
+
+  const languageTableData = useMemo(() => {
+    if (summaryUsable && Array.isArray(summaryData?.languages) && summaryData.languages.length > 0) {
+      const total = summaryData.languages.reduce((s, l) => s + (l.count || 0), 0);
+      return summaryData.languages.map((entry) => ({
+        code: entry.language || 'undefined',
+        name: languageDisplayName(entry.language),
+        count: entry.count || 0,
+        percent: total > 0 ? ((entry.count / total) * 100).toFixed(2) : '0.00',
+      }));
+    }
+    const langMap = {};
+    filteredPosts.forEach((post) => {
+      const code = post.language || 'undefined';
+      langMap[code] = (langMap[code] || 0) + 1;
+    });
+    const total = filteredPosts.length;
+    return Object.entries(langMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([code, count]) => ({
+        code,
+        name: languageDisplayName(code),
+        count,
+        percent: total > 0 ? ((count / total) * 100).toFixed(2) : '0.00',
+      }));
+  }, [summaryUsable, summaryData, filteredPosts]);
+
+  const languageChartData = useMemo(() => {
+    return languageTableData.slice(0, 6).map((item) => ({
+      name: item.name,
+      value: item.count,
+      percentage: item.percent,
+    }));
+  }, [languageTableData]);
+
+  const paginatedLanguageData = useMemo(() => {
+    const start = (languagePage - 1) * languageRowsPerPage;
+    return languageTableData.slice(start, start + languageRowsPerPage);
+  }, [languageTableData, languagePage, languageRowsPerPage]);
+
+  const totalLanguagePages = useMemo(() => {
+    return Math.ceil(languageTableData.length / languageRowsPerPage);
+  }, [languageTableData.length, languageRowsPerPage]);
+
+  const handleExportLanguages = useCallback(() => {
+    if (!languageTableData.length) return;
+    const headers = ['Language', 'Mention Count', 'Mention Count Percent'];
+    const rows = languageTableData.map((item) => [item.name, item.count, `${item.percent}%`]);
+    downloadCsv('top-languages', headers, rows);
+  }, [languageTableData]);
+
   const clientTimelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
     if (post.createdAt) {
       const date = new Date(post.createdAt).toLocaleDateString();
@@ -2359,6 +2463,195 @@ function AnalyticsPageContent() {
                 <EmptyState
                   message="No keyword data available"
                   helpText="Top keywords and their mention counts will appear here."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Top Languages */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Language Pie Chart */}
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle>Top Languages</CardTitle>
+              <Button
+                onClick={handleExportLanguages}
+                disabled={languageTableData.length === 0}
+                size="sm"
+                variant="outline"
+                className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Export
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {languageChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <PieChart>
+                    <defs>
+                      {languageChartData.map((_, idx) => (
+                        <linearGradient key={`langGrad${idx}`} id={`langGrad${idx}`} x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor={LANGUAGE_COLORS[idx % LANGUAGE_COLORS.length]} stopOpacity={1} />
+                          <stop offset="100%" stopColor={LANGUAGE_COLORS[idx % LANGUAGE_COLORS.length]} stopOpacity={0.6} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <Pie
+                      data={languageChartData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={130}
+                      innerRadius={0}
+                      dataKey="value"
+                      label={({ name, value, percentage }) => `${name}\n${value.toLocaleString()} | ${percentage}%`}
+                      labelLine={true}
+                      animationBegin={0}
+                      animationDuration={800}
+                      paddingAngle={1}
+                    >
+                      {languageChartData.map((_, idx) => (
+                        <Cell
+                          key={`lang-cell-${idx}`}
+                          fill={`url(#langGrad${idx})`}
+                          stroke="#1f2937"
+                          strokeWidth={2}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ ...CHART_TOOLTIP_STYLE, color: '#ffffff' }}
+                      formatter={(value, name) => [`${value.toLocaleString()} mentions`, name]}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      iconType="circle"
+                      wrapperStyle={{ paddingTop: '16px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState
+                  message="No language data available"
+                  helpText="Language detection data will appear here once posts are analyzed."
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Language Table */}
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle>
+                Top Languages{' '}
+                <span className="text-sm font-normal text-gray-400">
+                  (Showing Top {languageTableData.length})
+                </span>
+              </CardTitle>
+              <Button
+                onClick={handleExportLanguages}
+                disabled={languageTableData.length === 0}
+                size="sm"
+                variant="outline"
+                className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Export
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {languageTableData.length > 0 ? (
+                <div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-700">
+                          <th className="text-left p-3 text-gray-400 font-semibold text-sm">Language</th>
+                          <th className="text-center p-3 text-gray-400 font-semibold text-sm">Mention Count</th>
+                          <th className="text-center p-3 text-gray-400 font-semibold text-sm">Mention Count Percent</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedLanguageData.map((item) => (
+                          <tr
+                            key={item.code}
+                            className="border-b border-gray-800/50 hover:bg-gray-800/40 transition"
+                          >
+                            <td className="p-3 text-sm text-gray-200 font-medium">{item.name}</td>
+                            <td className="p-3 text-sm text-center text-gray-300">{item.count.toLocaleString()}</td>
+                            <td className="p-3 text-sm text-center text-gray-300">{item.percent}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Pagination */}
+                  <div className="flex items-center justify-between px-3 pt-4 pb-1 text-xs text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <span>Rows per page</span>
+                      <select
+                        value={languageRowsPerPage}
+                        onChange={(e) => {
+                          setLanguageRowsPerPage(Number(e.target.value));
+                          setLanguagePage(1);
+                        }}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300"
+                      >
+                        {[5, 10, 20, 50].map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span>
+                        {(languagePage - 1) * languageRowsPerPage + 1}-
+                        {Math.min(languagePage * languageRowsPerPage, languageTableData.length)} of {languageTableData.length}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setLanguagePage((p) => Math.max(1, p - 1))}
+                          disabled={languagePage === 1}
+                          className="rounded p-1 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        {Array.from({ length: totalLanguagePages }, (_, i) => i + 1)
+                          .filter((p) => Math.abs(p - languagePage) <= 1 || p === 1 || p === totalLanguagePages)
+                          .map((p, idx, arr) => {
+                            const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                            return (
+                              <span key={p} className="flex items-center">
+                                {showEllipsis && <span className="px-1 text-gray-600">...</span>}
+                                <button
+                                  onClick={() => setLanguagePage(p)}
+                                  className={clsx(
+                                    'min-w-[24px] rounded px-1.5 py-0.5 text-xs transition',
+                                    languagePage === p
+                                      ? 'bg-blue-600 text-white'
+                                      : 'hover:bg-gray-700 text-gray-400',
+                                  )}
+                                >
+                                  {p}
+                                </button>
+                              </span>
+                            );
+                          })}
+                        <button
+                          onClick={() => setLanguagePage((p) => Math.min(totalLanguagePages, p + 1))}
+                          disabled={languagePage === totalLanguagePages}
+                          className="rounded p-1 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  message="No language data available"
+                  helpText="Language breakdown will appear here once posts are analyzed."
                 />
               )}
             </CardContent>

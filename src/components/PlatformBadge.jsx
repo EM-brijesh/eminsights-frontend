@@ -28,6 +28,11 @@ const PLATFORM_META = {
     logo: '/instagram-logo.svg',
     className: 'bg-pink-500/20 text-pink-100 border-pink-400/60',
   },
+  facebook: {
+    label: 'Facebook',
+    logo: '/facebook-logo.svg',
+    className: 'bg-blue-600/20 text-blue-100 border-blue-500/60',
+  },
 };
 
 const PlatformBadge = ({ platform, size = 'md' }) => {

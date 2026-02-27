@@ -49,6 +49,37 @@ const SENTIMENT_COLORS = {
   negative: '#ef4444'
 };
 
+const RADIAN = Math.PI / 180;
+
+const renderPlatformLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  if (
+    typeof cx !== 'number' ||
+    typeof cy !== 'number' ||
+    typeof innerRadius !== 'number' ||
+    typeof outerRadius !== 'number' ||
+    typeof percent !== 'number'
+  ) {
+    return null;
+  }
+
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#e5e7eb"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs"
+    >
+      {(percent * 100).toFixed(1)}%
+    </text>
+  );
+};
+
 const _intlLanguageNames =
   typeof Intl !== 'undefined'
     ? new Intl.DisplayNames(['en'], { type: 'language' })
@@ -1651,6 +1682,7 @@ function AnalyticsPageContent() {
                 >
                   <option value="all">All Platforms</option>
                   <option value="twitter">Twitter</option>
+                  <option value="facebook">Facebook</option>
                   <option value="youtube">YouTube</option>
                   <option value="reddit">Reddit</option>
                   <option value="google">Google</option>
@@ -1929,40 +1961,41 @@ function AnalyticsPageContent() {
               <div ref={platformChartRef}>
                 {platformChartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={platformChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="gradientBar" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#2563eb" stopOpacity={0.8} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                    <XAxis
-                      dataKey="name"
-                      stroke="#cd1766ff"
-                      tick={{ fill: '#9ca3af' }}
-                      axisLine={{ stroke: '#4b5563' }}
-                    />
-                    <YAxis
-                      stroke="#cd1496ff"
-                      tick={{ fill: '#9ca3af' }}
-                      axisLine={{ stroke: '#4b5563' }}
-                    />
+                  <PieChart>
+                    <Pie
+                      data={platformChartData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={renderPlatformLabel}
+                      outerRadius={105}
+                      innerRadius={55}
+                      dataKey="value"
+                      animationBegin={0}
+                      animationDuration={800}
+                      paddingAngle={2}
+                    >
+                      {platformChartData.map((entry, index) => (
+                        <Cell
+                          key={`platform-cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                          stroke="#1f2937"
+                          strokeWidth={2}
+                        />
+                      ))}
+                    </Pie>
                     <Tooltip
-                      contentStyle={CHART_TOOLTIP_STYLE}
-                      cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
-                      formatter={(value, name) => [value, 'Posts']}
+                      contentStyle={{ ...CHART_TOOLTIP_STYLE, color: '#ffffff' }}
+                      formatter={(value) => [value.toLocaleString(), 'Posts']}
                       labelFormatter={(label) => `Platform: ${label}`}
                     />
-                    <Bar
-                      dataKey="value"
-                      fill="url(#gradientBar)"
-                      radius={[8, 8, 0, 0]}
-                      animationDuration={800}
-                      animationBegin={0}
-                      activeBar={false}
+                    <Legend
+                      verticalAlign="bottom"
+                      iconType="circle"
+                      wrapperStyle={{ paddingTop: '16px' }}
+                      formatter={(value) => value}
                     />
-                  </BarChart>
+                  </PieChart>
                 </ResponsiveContainer>
                 ) : (
                   <EmptyState
@@ -2103,25 +2136,16 @@ function AnalyticsPageContent() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div ref={sentimentByPlatformChartRef}>
-              <div className="flex gap-4 mb-4 text-xs text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 rounded bg-emerald-500" />
-                    Positive
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 rounded bg-amber-500" />
-                    Neutral
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 rounded bg-red-500" />
-                    Negative
-                  </span>
-              </div>
-
+            <div ref={sentimentByPlatformChartRef} className="min-h-[340px]">
               {sentimentByPlatformData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sentimentByPlatformData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <ResponsiveContainer width="100%" height={340}>
+                <BarChart
+                  data={sentimentByPlatformData}
+                  margin={{ top: 24, right: 24, left: 24, bottom: 60 }}
+                  layout="vertical"
+                  barCategoryGap="12%"
+                  barGap={4}
+                >
                   <defs>
                     <linearGradient id="gradientPos" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
@@ -2136,17 +2160,17 @@ function AnalyticsPageContent() {
                       <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="2 6" stroke="#374151"  vertical={false} horizontal={true} opacity={0.25} />
-                  <XAxis dataKey="platform" stroke="#9ca3af" tick={{ fill: '#9ca3af' }} axisLine={{ stroke: '#4b5563' }} />
-                  <YAxis stroke="#9ca3af" domain={['dataMin', 'dataMax+50']} tick={{ fill: '#9ca3af',fontsize:12 }} axisLine={{ stroke: '#4b5563' }} />
+                  <CartesianGrid strokeDasharray="2 6" stroke="#374151" horizontal={false} vertical={true} opacity={0.25} />
+                  <XAxis type="number" stroke="#9ca3af" tick={{ fill: '#9ca3af', fontSize: 12 }} axisLine={{ stroke: '#4b5563' }} />
+                  <YAxis type="category" dataKey="platform" stroke="#9ca3af" tick={{ fill: '#9ca3af', fontSize: 12 }} axisLine={{ stroke: '#4b5563' }} width={90} tickLine={false} />
                   <Tooltip
                     content={<SentimentByPlatformTooltip />}
                     cursor={{ fill: 'rgba(15, 23, 42, 0.6)' }}
                   />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" opacity={0.9} radius={[0, 0, 0, 0]} activeBar={false} />
-                  <Bar dataKey="neutral" stackId="a" fill="url(#gradientNeu)" opacity={0.85} radius={[0, 0, 0, 0]} activeBar={false} />
-                  <Bar dataKey="negative" stackId="a" fill="url(#gradientNeg)" opacity={0.95} radius={[8, 8, 0, 0]} activeBar={false} />
+                  <Legend verticalAlign="top" align="center" wrapperStyle={{ paddingBottom: 16 }} iconType="circle" iconSize={8} />
+                  <Bar dataKey="positive" stackId="a" fill="url(#gradientPos)" radius={[0, 0, 0, 0]} activeBar={false} />
+                  <Bar dataKey="neutral" stackId="a" fill="url(#gradientNeu)" radius={[0, 0, 0, 0]} activeBar={false} />
+                  <Bar dataKey="negative" stackId="a" fill="url(#gradientNeg)" radius={[0, 4, 4, 0]} activeBar={false} />
                 </BarChart>
               </ResponsiveContainer>
               ) : (

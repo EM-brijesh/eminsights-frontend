@@ -1995,7 +1995,9 @@ function AnalyticsPageContent() {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ ...CHART_TOOLTIP_STYLE, color: '#ffffff' }}
+                      contentStyle={{ ...CHART_TOOLTIP_STYLE, color: '#ffffff', backgroundColor: '#111827' }}
+                      itemStyle={{ color: '#ffffff' }}
+                      labelStyle={{ color: '#ffffff' }}
                       formatter={(value) => [value.toLocaleString(), 'Posts']}
                       labelFormatter={(label) => `Platform: ${label}`}
                     />
@@ -2555,7 +2557,9 @@ function AnalyticsPageContent() {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ ...CHART_TOOLTIP_STYLE, color: '#ffffff' }}
+                      contentStyle={{ ...CHART_TOOLTIP_STYLE, color: '#ffffff', backgroundColor: '#111827' }}
+                      itemStyle={{ color: '#ffffff' }}
+                      labelStyle={{ color: '#ffffff' }}
                       formatter={(value, name) => [`${value.toLocaleString()} mentions`, name]}
                     />
                     <Legend

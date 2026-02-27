@@ -80,6 +80,55 @@ const renderPlatformLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, perce
   );
 };
 
+const renderLanguageLabel = ({
+  cx,
+  cy,
+  midAngle,
+  outerRadius,
+  name,
+  value,
+  percentage,
+  percent,
+}) => {
+  if (
+    typeof cx !== 'number' ||
+    typeof cy !== 'number' ||
+    typeof outerRadius !== 'number' ||
+    typeof value !== 'number'
+  ) {
+    return null;
+  }
+
+  const radius = outerRadius * 0.7;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  const pctValue =
+    typeof percentage === 'number'
+      ? percentage
+      : typeof percent === 'number'
+        ? percent * 100
+        : null;
+
+  const labelText =
+    pctValue !== null
+      ? `${name} ${value.toLocaleString()} | ${pctValue.toFixed(2)}%`
+      : `${name} ${value.toLocaleString()}`;
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#e5e7eb"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs"
+    >
+      {labelText}
+    </text>
+  );
+};
+
 const _intlLanguageNames =
   typeof Intl !== 'undefined'
     ? new Intl.DisplayNames(['en'], { type: 'language' })
@@ -2541,8 +2590,8 @@ function AnalyticsPageContent() {
                       outerRadius={130}
                       innerRadius={0}
                       dataKey="value"
-                      label={({ name, value, percentage }) => `${name}\n${value.toLocaleString()} | ${percentage}%`}
-                      labelLine={true}
+                      label={renderLanguageLabel}
+                      labelLine={false}
                       animationBegin={0}
                       animationDuration={800}
                       paddingAngle={1}

@@ -1503,16 +1503,26 @@ function AnalyticsPageContent() {
         const container = document.querySelector('.max-w-7xl');
         if (!container) throw new Error('Analytics container not found');
 
+        const baseScale = 1.5;
+        const maxCanvasDimension = 32760; // just under browser canvas dimension limit
+        const containerHeight = container.scrollHeight || container.offsetHeight || 0;
+        const captureHeight =
+          containerHeight > 0 ? Math.min(containerHeight, maxCanvasDimension) : containerHeight;
+        const safeScale =
+          captureHeight > 0
+            ? Math.min(baseScale, maxCanvasDimension / captureHeight)
+            : baseScale;
+
         const canvas = await html2canvas(container, {
-          scale: 1.5,
+          scale: safeScale,
           useCORS: true,
           backgroundColor: '#000000',
           scrollX: 0,
           scrollY: 0,
           width: container.offsetWidth,
-          height: container.scrollHeight,
+          height: captureHeight,
           windowWidth: container.offsetWidth,
-          windowHeight: container.scrollHeight,
+          windowHeight: captureHeight,
           ignoreElements: (el) => el.classList.contains('dotted-background'),
         });
 
@@ -2683,32 +2693,34 @@ function AnalyticsPageContent() {
         </div>
 
         {/* Recent Posts */}
-        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle>Recent Posts with Sentiment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingPosts || analyzingSentiment ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-                <p className="ml-3 text-gray-400">
-                  {analyzingSentiment ? 'Analyzing sentiment...' : 'Loading posts...'}
-                </p>
-              </div>
-            ) : filteredPosts.length > 0 ? (
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {filteredPosts.slice(0, 10).map((post) => (
-                  <AnalyticsMentionCard key={post._id || post.id} post={post} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                message="No posts found"
-                helpText="Try running a search from the Keywords page or adjusting your filters."
-              />
-            )}
-          </CardContent>
-        </Card>
+        <section id="analytics-recent-posts-section" className="print-hide">
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle>Recent Posts with Sentiment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingPosts || analyzingSentiment ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                  <p className="ml-3 text-gray-400">
+                    {analyzingSentiment ? 'Analyzing sentiment...' : 'Loading posts...'}
+                  </p>
+                </div>
+              ) : filteredPosts.length > 0 ? (
+                <div className="space-y-4">
+                  {filteredPosts.map((post) => (
+                    <AnalyticsMentionCard key={post._id || post.id} post={post} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  message="No posts found"
+                  helpText="Try running a search from the Keywords page or adjusting your filters."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </section>
       </div>
     </div>
   );

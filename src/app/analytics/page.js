@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import {
   RefreshCw,
   TrendingUp,
+  TrendingDown,
   MessageSquare,
   BarChart3,
   Smile,
@@ -20,8 +21,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Settings,
-  Maximize2,
 } from 'lucide-react';
 import WordCloud from '@/components/WordCloud';
 import { Button } from '@/components/ui/button';
@@ -33,7 +32,7 @@ import {
   PieChart, Pie, Cell,
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Area, AreaChart
+  Area, AreaChart, ComposedChart
 } from 'recharts';
 // Chart colors
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -47,6 +46,73 @@ const SENTIMENT_COLORS = {
   positive: '#10b981',
   neutral: '#f59e0b',
   negative: '#ef4444'
+};
+
+const DURATION_PRESETS = [
+  { label: 'Today', value: '1' },
+  { label: 'Last 7 Days', value: '7' },
+  { label: 'Last 14 Days', value: '14' },
+  { label: 'Last 30 Days', value: '30' },
+  { label: 'Last 60 Days', value: '60' },
+  { label: 'All Time', value: 'all-time' },
+];
+
+const formatYmdLocal = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const parseYmdLocalMidnight = (ymd) => {
+  if (!ymd || typeof ymd !== 'string') return null;
+  const [yStr, mStr, dStr] = ymd.split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const d = Number(dStr);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  const dt = new Date(y, m - 1, d);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+};
+
+const getLocalDayBounds = (startYmd, endYmd) => {
+  const start = parseYmdLocalMidnight(startYmd);
+  const end = parseYmdLocalMidnight(endYmd);
+  if (!start || !end) return null;
+  const startDt = new Date(start);
+  const endDt = new Date(end);
+  startDt.setHours(0, 0, 0, 0);
+  endDt.setHours(23, 59, 59, 999);
+  return {
+    startMs: startDt.getTime(),
+    endMs: endDt.getTime(),
+    startIso: startDt.toISOString(),
+    endIso: endDt.toISOString(),
+  };
+};
+
+const isDurationValueValid = (value) => {
+  if (!value) return false;
+  if (value === 'all-time') return true;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0;
+};
+
+const buildRangeFromDuration = (days) => {
+  if (days === 'all-time' || days >= 3650) {
+    return { start: '2000-01-01', end: formatYmdLocal(new Date()) };
+  }
+  const durationNum = Number(days);
+  if (Number.isNaN(durationNum) || durationNum <= 0) {
+    return { start: '2000-01-01', end: formatYmdLocal(new Date()) };
+  }
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - durationNum + 1);
+  return {
+    start: formatYmdLocal(start),
+    end: formatYmdLocal(end),
+  };
 };
 
 const RADIAN = Math.PI / 180;
@@ -181,6 +247,13 @@ const CHART_TOOLTIP_STYLE = {
   padding: '12px',
   boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
 };
+const formatCompactNumber = (n) => {
+  if (typeof n !== 'number' || Number.isNaN(n)) return '0';
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}m`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString();
+};
+
 const downloadCsv = (baseName, headers, rows) => {
   if (!Array.isArray(headers) || !Array.isArray(rows) || headers.length === 0) {
     return;
@@ -459,6 +532,9 @@ function AnalyticsPageContent() {
   const [wordCloudColorMenuOpen, setWordCloudColorMenuOpen] = useState(false);
   const [wordCloudMenuOpen, setWordCloudMenuOpen] = useState(false);
   const [topKeywordsMenuOpen, setTopKeywordsMenuOpen] = useState(false);
+  const [mentionsCountMenuOpen, setMentionsCountMenuOpen] = useState(false);
+  const [incomingOutgoingMenuOpen, setIncomingOutgoingMenuOpen] = useState(false);
+  const [duration, setDuration] = useState('all-time');
   const sentimentChartRef = useRef(null);
   const platformChartRef = useRef(null);
   const timelineChartRef = useRef(null);
@@ -477,6 +553,7 @@ function AnalyticsPageContent() {
       ? decodeURIComponent(searchParams.get('keywordGroup'))
       : null;
     const keyword = searchParams.get('keyword');
+    const durationParam = searchParams.get('duration');
 
     urlFiltersRef.current = { brand, platform, keywordGroup, keyword };
 
@@ -491,6 +568,9 @@ function AnalyticsPageContent() {
     }
     if (keyword && keyword !== 'all') {
       setSelectedKeyword(keyword);
+    }
+    if (durationParam && isDurationValueValid(durationParam)) {
+      setDuration(durationParam);
     }
   }, [searchParams]);
   // Handle sentiment card click - navigate to inbox with filters
@@ -848,7 +928,7 @@ function AnalyticsPageContent() {
       setLoadingPosts(false);
     }
   };
-  const fetchSentimentSummary = useCallback(async ({ brandName, platform, keyword }) => {
+  const fetchSentimentSummary = useCallback(async ({ brandName, platform, keyword, startDate, endDate }) => {
     if (!brandName) return;
     setLoadingSummary(true);
     try {
@@ -859,6 +939,8 @@ function AnalyticsPageContent() {
       if (keyword && keyword !== 'all') {
         params.keyword = keyword;
       }
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
       const data = await api.sentiment.summary(params);
       setSummaryData(data);
       setSummaryError(null);
@@ -875,6 +957,8 @@ function AnalyticsPageContent() {
       await fetchPostsAndAnalyze(selectedBrand);
     }
   };
+  const dateRange = useMemo(() => buildRangeFromDuration(duration), [duration]);
+
   useEffect(() => {
     if (!selectedBrand || selectedBrand === 'all') {
       setSummaryData(null);
@@ -883,12 +967,16 @@ function AnalyticsPageContent() {
       return;
     }
     const effectiveKeyword = selectedGroup === 'all' ? selectedKeyword : 'all';
+    const { start, end } = dateRange;
+    const bounds = duration !== 'all-time' ? getLocalDayBounds(start, end) : null;
     fetchSentimentSummary({
       brandName: selectedBrand,
       platform: selectedPlatform,
       keyword: effectiveKeyword,
+      startDate: bounds?.startIso,
+      endDate: bounds?.endIso,
     });
-  }, [selectedBrand, selectedPlatform, selectedKeyword, selectedGroup, fetchSentimentSummary]);
+  }, [selectedBrand, selectedPlatform, selectedKeyword, selectedGroup, duration, dateRange, fetchSentimentSummary]);
   const availableKeywords = useMemo(() => {
     // Helper to merge AND / OR keywords into a unique list (exclude NOT keywords)
     const collectKeywordsFromGroup = (group) => {
@@ -1031,6 +1119,15 @@ function AnalyticsPageContent() {
   }, [brands, keywordGroups, availableKeywords, selectedBrand, selectedGroup]);
   const filteredPosts = React.useMemo(() => {
     let filtered = [...analyzedPosts];
+    if (duration !== 'all-time' && dateRange.start && dateRange.end) {
+      const bounds = getLocalDayBounds(dateRange.start, dateRange.end);
+      const startMs = bounds?.startMs ?? 0;
+      const endMs = bounds?.endMs ?? Number.MAX_SAFE_INTEGER;
+      filtered = filtered.filter((p) => {
+        const t = p?.createdAt ? new Date(p.createdAt).getTime() : 0;
+        return t >= startMs && t <= endMs;
+      });
+    }
     if (selectedPlatform !== 'all') {
       filtered = filtered.filter(p => p.platform === selectedPlatform);
     }
@@ -1129,7 +1226,7 @@ function AnalyticsPageContent() {
       });
     }
     return filtered;
-  }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups]);
+  }, [analyzedPosts, selectedPlatform, selectedKeyword, selectedGroup, keywordGroups, duration, dateRange]);
   const handleExportAnalytics = useCallback(() => {
     if (!filteredPosts.length) return;
 
@@ -1172,11 +1269,14 @@ function AnalyticsPageContent() {
     return {
       total: filteredPosts.length,
       byPlatform: filteredPosts.reduce((acc, post) => {
-        acc[post.platform] = (acc[post.platform] || 0) + 1;
+        const key = post.platform || 'unknown';
+        acc[key] = (acc[key] || 0) + 1;
         return acc;
       }, {}),
       byKeyword: filteredPosts.reduce((acc, post) => {
-        acc[post.keyword] = (acc[post.keyword] || 0) + 1;
+        const key = post.keyword || post.content?.keyword || post.content?.tag || post.analysis?.keyword || post.tag || post.topic;
+        if (!key) return acc;
+        acc[key] = (acc[key] || 0) + 1;
         return acc;
       }, {}),
       bySentiment: filteredPosts.reduce((acc, post) => {
@@ -1241,32 +1341,87 @@ function AnalyticsPageContent() {
       analyzed: stats.total - pendingCount,
     };
   }, [summaryUsable, summaryStats, stats]);
-  const platformChartData = useMemo(() => Object.entries(stats.byPlatform).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value,
-    percentage: ((value / stats.total) * 100).toFixed(1)
-  })), [stats.byPlatform, stats.total]);
-  const sentimentChartData = useMemo(() => Object.entries(stats.bySentiment)
-    .filter(([name]) => name !== 'pending') // Exclude pending from pie chart
-    .map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      value,
-      percentage: ((value / stats.total) * 100).toFixed(1)
-    })), [stats.bySentiment, stats.total]);
+  const platformChartData = useMemo(() => {
+    const total = stats.total || 0;
+    return Object.entries(stats.byPlatform)
+      .filter(([, value]) => value > 0)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        percentage: total > 0 ? ((value / total) * 100).toFixed(1) : '0.0',
+      }));
+  }, [stats.byPlatform, stats.total]);
+  const sentimentChartData = useMemo(() => {
+    const analyzedTotal = (stats.bySentiment?.positive || 0) + (stats.bySentiment?.neutral || 0) + (stats.bySentiment?.negative || 0);
+    return Object.entries(stats.bySentiment)
+      .filter(([name]) => name !== 'pending')
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        percentage: analyzedTotal > 0 ? ((value / analyzedTotal) * 100).toFixed(1) : '0.0',
+      }));
+  }, [stats.bySentiment]);
   const keywordChartData = useMemo(() => Object.entries(stats.byKeyword)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([name, value]) => ({ name, posts: value })), [stats.byKeyword]);
   
-  // Keyword frequency for word cloud
+  // Keyword frequency for word cloud and top keywords (expands groups to constituent keywords)
   const keywordFrequency = useMemo(() => {
+    const getKeywordsFromGroup = (group) => {
+      if (!group) return [];
+      const set = new Set();
+      (group.keywords || []).forEach((k) => k && set.add(String(k).trim()));
+      (group.includeKeywords || []).forEach((k) => k && set.add(String(k).trim()));
+      return Array.from(set).filter(Boolean);
+    };
+
+    const resolveKeywordsForPost = (post) => {
+      const raw = (
+        post?.keyword ||
+        post?.content?.keyword ||
+        post?.analysis?.keyword ||
+        post?.tag ||
+        post?.topic ||
+        ''
+      ).toString().trim();
+      if (!raw || raw.toLowerCase() === 'unknown') return [];
+
+      let groupName = raw;
+      let brandName = post?.brand?.brandName || post?.brandName || null;
+      if (raw.includes('::')) {
+        const parts = raw.split('::');
+        brandName = parts[0]?.trim() || brandName;
+        groupName = parts[1]?.trim() || raw;
+      }
+
+      const group = keywordGroups.find((g) => {
+        const gName = (g.groupName || g.name || '').toString().trim();
+        if (gName !== groupName) return false;
+        if (brandName && g.brandName) return g.brandName === brandName;
+        return true;
+      });
+
+      if (group) {
+        return getKeywordsFromGroup(group);
+      }
+      return [raw];
+    };
+
     const frequency = {};
     filteredPosts.forEach((post) => {
-      const keyword = post.keyword || 'unknown';
-      frequency[keyword] = (frequency[keyword] || 0) + 1;
+      const keywords = resolveKeywordsForPost(post);
+      if (keywords.length === 0) {
+        frequency['unknown'] = (frequency['unknown'] || 0) + 1;
+        return;
+      }
+      keywords.forEach((kw) => {
+        const k = String(kw).trim();
+        if (k) frequency[k] = (frequency[k] || 0) + 1;
+      });
     });
     return frequency;
-  }, [filteredPosts]);
+  }, [filteredPosts, keywordGroups]);
   
   // Top keywords data for table (sorted by frequency)
   const topKeywordsData = useMemo(() => {
@@ -1348,7 +1503,7 @@ function AnalyticsPageContent() {
 
   const clientTimelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
     if (post.createdAt) {
-      const date = new Date(post.createdAt).toLocaleDateString();
+      const date = formatYmdLocal(new Date(post.createdAt));
       if (!acc[date]) {
         acc[date] = { date, positive: 0, neutral: 0, negative: 0, total: 0 };
       }
@@ -1363,39 +1518,195 @@ function AnalyticsPageContent() {
       ? summaryData.timeline
       : Object.values(clientTimelineData);
 
-    // Filter out invalid dates and restrict to the last 14 calendar days (including today)
-    const now = new Date();
-    const fourteenDaysAgo = new Date(now);
-    fourteenDaysAgo.setDate(now.getDate() - 13); // inclusive 14‑day window
+    const { start, end } = dateRange;
+    if (!start || !end) return rawTimeline.filter((item) => item && item.date);
 
-    return rawTimeline.filter((item) => {
+    const bounds = getLocalDayBounds(start, end);
+    if (!bounds) {
+      return rawTimeline.filter((item) => item && item.date);
+    }
+
+    const { startMs, endMs } = bounds;
+
+    let filtered = rawTimeline.filter((item) => {
       if (!item || !item.date) return false;
-      const d = new Date(item.date);
-      if (Number.isNaN(d.getTime())) return false;
-      return d >= fourteenDaysAgo && d <= now;
+      const d = parseYmdLocalMidnight(item.date);
+      if (!d) return false;
+      const t = d.getTime();
+      return t >= startMs && t <= endMs;
     });
-  }, [summaryUsable, summaryData, clientTimelineData]);
+
+    const rangeDays = (endMs - startMs) / (24 * 60 * 60 * 1000);
+    if (rangeDays > 90) {
+      const sorted = [...filtered].sort((a, b) => new Date(a.date) - new Date(b.date));
+      filtered = sorted.slice(-90);
+    }
+    return filtered;
+  }, [summaryUsable, summaryData, clientTimelineData, dateRange]);
   const timelineChartData = useMemo(() => {
-    const sorted = [...combinedTimeline]
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(-14);
+    const sorted = [...combinedTimeline].sort((a, b) => new Date(a.date) - new Date(b.date));
     const withMovingAverages = sorted.map((item, index) => {
+      const positive = Number(item?.positive ?? 0) || 0;
+      const neutral = Number(item?.neutral ?? 0) || 0;
+      const negative = Number(item?.negative ?? 0) || 0;
+      // Always derive total from analyzed counts so the line sits exactly on top
+      // of the stacked areas. Backend total includes pending (unanalyzed) posts.
+      const total = positive + neutral + negative;
+
       const window7 = sorted.slice(Math.max(0, index - 6), index + 1);
       const window14 = sorted.slice(Math.max(0, index - 13), index + 1);
       const avg7 = window7.length > 0
-        ? window7.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window7.length
+        ? window7.reduce((sum, d) => {
+          const dPositive = Number(d?.positive ?? 0) || 0;
+          const dNeutral = Number(d?.neutral ?? 0) || 0;
+          const dNegative = Number(d?.negative ?? 0) || 0;
+          const dTotal = Number(d?.total ?? (dPositive + dNeutral + dNegative)) || 0;
+          return sum + (dTotal > 0 ? dPositive / dTotal : 0);
+        }, 0) / window7.length
         : 0;
       const avg14 = window14.length > 0
-        ? window14.reduce((sum, d) => sum + (d.positive / d.total || 0), 0) / window14.length
+        ? window14.reduce((sum, d) => {
+          const dPositive = Number(d?.positive ?? 0) || 0;
+          const dNeutral = Number(d?.neutral ?? 0) || 0;
+          const dNegative = Number(d?.negative ?? 0) || 0;
+          const dTotal = Number(d?.total ?? (dPositive + dNeutral + dNegative)) || 0;
+          return sum + (dTotal > 0 ? dPositive / dTotal : 0);
+        }, 0) / window14.length
         : 0;
       return {
         ...item,
+        positive,
+        neutral,
+        negative,
+        total,
         ma7: avg7,
         ma14: avg14
       };
     });
     return withMovingAverages;
   }, [combinedTimeline]);
+
+  const mentionCountMetrics = useMemo(() => {
+    // Use normalized timeline data (total = positive+neutral+negative, no pending)
+    // so this matches exactly what the chart shows.
+    const normalizedTimeline = [...timelineChartData].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const timelineSum = normalizedTimeline.reduce((s, d) => s + (d.total || 0), 0);
+    // Fall back to filteredPosts count when no timeline data is available
+    const total = timelineSum > 0 ? timelineSum : filteredPosts.length;
+    const daysWithData = Math.max(1, normalizedTimeline.length);
+    const avgPerDay = total / daysWithData;
+
+    let percentChangeMentions = null;
+    let percentChangeAvg = null;
+    // Split timeline in half: second half vs first half
+    if (normalizedTimeline.length >= 2) {
+      const mid = Math.floor(normalizedTimeline.length / 2);
+      const current = normalizedTimeline.slice(mid).reduce((s, d) => s + (d.total || 0), 0);
+      const previous = normalizedTimeline.slice(0, mid).reduce((s, d) => s + (d.total || 0), 0);
+      if (previous > 0) {
+        percentChangeMentions = ((current - previous) / previous) * 100;
+        percentChangeAvg = percentChangeMentions;
+      }
+    }
+
+    const dateSpanFallback = (() => {
+      const dates = filteredPosts
+        .map((p) => p?.createdAt && formatYmdLocal(new Date(p.createdAt)))
+        .filter(Boolean);
+      const unique = new Set(dates);
+      return Math.max(1, unique.size);
+    })();
+    const avgPerDayFallback = filteredPosts.length / dateSpanFallback;
+
+    return {
+      total,
+      avgPerDay: normalizedTimeline.length > 0 ? avgPerDay : avgPerDayFallback,
+      percentChangeMentions,
+      percentChangeAvg,
+      incomingTotal: total,
+      outgoingTotal: 0,
+    };
+  }, [timelineChartData, filteredPosts]);
+
+  const sentimentPercentChange = useMemo(() => {
+    // Use normalized timeline (same source as chart) and split in half so the
+    // comparison window always matches the selected duration rather than a
+    // hardcoded last-7/14 days from "now".
+    const sortedTimeline = [...timelineChartData].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const result = { positive: null, neutral: null, negative: null };
+    if (sortedTimeline.length >= 2) {
+      const mid = Math.floor(sortedTimeline.length / 2);
+      const current = sortedTimeline.slice(mid);
+      const previous = sortedTimeline.slice(0, mid);
+      const sum = (arr, key) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0);
+      ['positive', 'neutral', 'negative'].forEach((key) => {
+        const curr = sum(current, key);
+        const prev = sum(previous, key);
+        if (prev > 0) result[key] = ((curr - prev) / prev) * 100;
+      });
+    }
+    return result;
+  }, [timelineChartData]);
+
+  const uniqueUsersMetrics = useMemo(() => {
+    const getAuthorId = (post) =>
+      (post?.author?.id || post?.author?.name || post?.user?.id || post?.user?.username || '').toString().trim() || null;
+    const allIds = new Set();
+    filteredPosts.forEach((p) => {
+      const id = getAuthorId(p);
+      if (id) allIds.add(id);
+    });
+    const total = allIds.size;
+
+    let percentChange = null;
+    const sortedByDate = [...filteredPosts]
+      .filter((p) => p?.createdAt)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    if (sortedByDate.length > 0) {
+      // Split the visible date range in half; compare first half vs second half.
+      // Falls back to absolute 7/14-day windows when only a few posts exist.
+      const bounds = duration !== 'all-time'
+        ? getLocalDayBounds(dateRange.start, dateRange.end)
+        : null;
+
+      const current7Ids = new Set();
+      const previous7Ids = new Set();
+
+      if (bounds) {
+        const midMs = (bounds.startMs + bounds.endMs) / 2;
+        sortedByDate.forEach((p) => {
+          const t = new Date(p.createdAt).getTime();
+          const id = getAuthorId(p);
+          if (!id) return;
+          if (t > midMs && t <= bounds.endMs) current7Ids.add(id);
+          else if (t >= bounds.startMs && t <= midMs) previous7Ids.add(id);
+        });
+      } else {
+        // All Time fallback: last 7 days vs prior 7 days from today
+        const now = new Date();
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        const fourteenDaysAgo = new Date(now);
+        fourteenDaysAgo.setDate(now.getDate() - 14);
+        fourteenDaysAgo.setHours(0, 0, 0, 0);
+        sortedByDate.forEach((p) => {
+          const d = new Date(p.createdAt);
+          const id = getAuthorId(p);
+          if (!id) return;
+          if (d >= sevenDaysAgo && d <= now) current7Ids.add(id);
+          else if (d >= fourteenDaysAgo && d < sevenDaysAgo) previous7Ids.add(id);
+        });
+      }
+
+      if (previous7Ids.size > 0) {
+        percentChange = ((current7Ids.size - previous7Ids.size) / previous7Ids.size) * 100;
+      }
+    }
+    return { total, percentChange };
+  }, [filteredPosts, duration, dateRange]);
+
   const sentimentByPlatformData = useMemo(() => {
     if (summaryUsable && Array.isArray(summaryData?.platforms) && summaryData.platforms.length > 0) {
       return summaryData.platforms.map((entry) => {
@@ -1537,6 +1848,21 @@ function AnalyticsPageContent() {
 
     downloadCsv('sentiment-by-platform', headers, rows);
   }, [sentimentByPlatformData]);
+
+  const handleExportMentionsCount = useCallback(() => {
+    const { total, avgPerDay, percentChangeMentions, incomingTotal, outgoingTotal } = mentionCountMetrics;
+    const formatPctValue = (v) => (v != null ? `${v.toFixed(2)}%` : '-');
+    const headers = ['Metric', 'Value', 'Change (%)'];
+    const rows = [
+      ['Mentions Count', total.toLocaleString(), formatPctValue(percentChangeMentions)],
+      ['Average Mentions/Day', Math.round(avgPerDay).toLocaleString(), formatPctValue(mentionCountMetrics.percentChangeAvg)],
+      ['Incoming Mentions Count', incomingTotal.toLocaleString(), formatPctValue(percentChangeMentions)],
+      ['Outgoing Mentions Count', outgoingTotal.toLocaleString(), '-'],
+      ['Unique Users', uniqueUsersMetrics.total.toLocaleString(), formatPctValue(uniqueUsersMetrics.percentChange)],
+    ];
+    downloadCsv('mentions-count', headers, rows);
+  }, [mentionCountMetrics, uniqueUsersMetrics]);
+
   const handleDownloadAnalyticsPdf = useCallback(async () => {
     try {
       const [{ jsPDF }, html2canvasModule] = await Promise.all([
@@ -1702,7 +2028,7 @@ function AnalyticsPageContent() {
         {/* Filters */}
         <Card className="bg-black border-white/10 mb-6 print-hide">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Brand</label>
                 <select
@@ -1809,6 +2135,27 @@ function AnalyticsPageContent() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Duration</label>
+                <select
+                  value={duration}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setDuration(value);
+                    updateURL({ duration: value });
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
+                >
+                  {duration !== 'all-time' && !DURATION_PRESETS.some((p) => p.value === duration) && (
+                    <option value={duration}>{`Last ${duration} Days`}</option>
+                  )}
+                  {DURATION_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1871,9 +2218,20 @@ function AnalyticsPageContent() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold">{stats.bySentiment.positive}</p>
-              <p className="text-sm text-gray-400 mt-1">
-                {stats.total > 0 ? ((stats.bySentiment.positive / stats.total) * 100).toFixed(1) : 0}%
+              <p className="text-4xl font-bold">{formatCompactNumber(stats.bySentiment.positive)}</p>
+              <p className="text-sm text-gray-400 mt-1 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                {stats.total > 0 ? ((stats.bySentiment.positive / stats.total) * 100).toFixed(2) : 0} %
+              </p>
+              <p className={clsx('flex items-center gap-1 mt-1 text-sm', sentimentPercentChange.positive == null ? 'text-gray-500' : sentimentPercentChange.positive >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                {sentimentPercentChange.positive != null ? (
+                  <>
+                    {sentimentPercentChange.positive >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {sentimentPercentChange.positive >= 0 ? '+' : ''}{sentimentPercentChange.positive.toFixed(2)}%
+                  </>
+                ) : (
+                  '—'
+                )}
               </p>
             </CardContent>
           </Card>
@@ -1888,9 +2246,20 @@ function AnalyticsPageContent() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold">{stats.bySentiment.neutral}</p>
-              <p className="text-sm text-gray-400 mt-1">
-                {stats.total > 0 ? ((stats.bySentiment.neutral / stats.total) * 100).toFixed(1) : 0}%
+              <p className="text-4xl font-bold">{formatCompactNumber(stats.bySentiment.neutral)}</p>
+              <p className="text-sm text-gray-400 mt-1 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                {stats.total > 0 ? ((stats.bySentiment.neutral / stats.total) * 100).toFixed(2) : 0} %
+              </p>
+              <p className={clsx('flex items-center gap-1 mt-1 text-sm', sentimentPercentChange.neutral == null ? 'text-gray-500' : sentimentPercentChange.neutral >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                {sentimentPercentChange.neutral != null ? (
+                  <>
+                    {sentimentPercentChange.neutral >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {sentimentPercentChange.neutral >= 0 ? '+' : ''}{sentimentPercentChange.neutral.toFixed(2)}%
+                  </>
+                ) : (
+                  '—'
+                )}
               </p>
             </CardContent>
           </Card>
@@ -1905,13 +2274,183 @@ function AnalyticsPageContent() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold">{stats.bySentiment.negative}</p>
-              <p className="text-sm text-gray-400 mt-1">
-                {stats.total > 0 ? ((stats.bySentiment.negative / stats.total) * 100).toFixed(1) : 0}%
+              <p className="text-4xl font-bold">{formatCompactNumber(stats.bySentiment.negative)}</p>
+              <p className="text-sm text-gray-400 mt-1 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                {stats.total > 0 ? ((stats.bySentiment.negative / stats.total) * 100).toFixed(2) : 0} %
+              </p>
+              <p className={clsx('flex items-center gap-1 mt-1 text-sm', sentimentPercentChange.negative == null ? 'text-gray-500' : sentimentPercentChange.negative >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                {sentimentPercentChange.negative != null ? (
+                  <>
+                    {sentimentPercentChange.negative >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {sentimentPercentChange.negative >= 0 ? '+' : ''}{sentimentPercentChange.negative.toFixed(2)}%
+                  </>
+                ) : (
+                  '—'
+                )}
               </p>
             </CardContent>
           </Card>
         </div>
+
+        {/* Mentions Count, Incoming/Outgoing, Unique User */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* Panel 1: Mentions Count */}
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle>Mentions Count</CardTitle>
+              <div className="flex items-center gap-2 print-hide">
+                <Button
+                  onClick={handleExportMentionsCount}
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 bg-white/5 hover:bg-white/10"
+                >
+                  <Download className="w-3 h-3 mr-1" />
+                  Export
+                </Button>
+                <div className="relative">
+                  <button
+                    onClick={() => setMentionsCountMenuOpen((v) => !v)}
+                    className="rounded-md border border-white/20 bg-white/5 p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {mentionsCountMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[140px] rounded-md border border-gray-700 bg-gray-900 py-1 shadow-lg">
+                      <button
+                        onClick={() => {
+                          handleExportMentionsCount();
+                          setMentionsCountMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition"
+                      >
+                        <Download className="h-3 w-3" />
+                        Export CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Mentions Count</p>
+                  <p className="text-3xl font-bold text-white">{formatCompactNumber(mentionCountMetrics.total)}</p>
+                  {mentionCountMetrics.percentChangeMentions != null && (
+                    <p className="flex items-center gap-1 mt-1 text-sm text-emerald-400">
+                      <TrendingUp className="h-4 w-4" />
+                      {mentionCountMetrics.percentChangeMentions.toFixed(2)}%
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Average Mentions/Day</p>
+                  <p className="text-3xl font-bold text-white">{formatCompactNumber(Math.round(mentionCountMetrics.avgPerDay))}</p>
+                  {mentionCountMetrics.percentChangeAvg != null && (
+                    <p className="flex items-center gap-1 mt-1 text-sm text-emerald-400">
+                      <TrendingUp className="h-4 w-4" />
+                      {mentionCountMetrics.percentChangeAvg.toFixed(2)}%
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Panel 2: Incoming and Outgoing Mentions */}
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle>Incoming and Outgoing Mentions</CardTitle>
+              <div className="flex items-center gap-2 print-hide">
+                <Button
+                  onClick={handleExportMentionsCount}
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 bg-white/5 hover:bg-white/10"
+                >
+                  <Download className="w-3 h-3 mr-1" />
+                  Export
+                </Button>
+                <div className="relative">
+                  <button
+                    onClick={() => setIncomingOutgoingMenuOpen((v) => !v)}
+                    className="rounded-md border border-white/20 bg-white/5 p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {incomingOutgoingMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[140px] rounded-md border border-gray-700 bg-gray-900 py-1 shadow-lg">
+                      <button
+                        onClick={() => {
+                          handleExportMentionsCount();
+                          setIncomingOutgoingMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition"
+                      >
+                        <Download className="h-3 w-3" />
+                        Export CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Incoming Mentions Count</p>
+                  <p className="text-3xl font-bold text-white">{formatCompactNumber(mentionCountMetrics.incomingTotal)}</p>
+                  {mentionCountMetrics.percentChangeMentions != null && (
+                    <p className="flex items-center gap-1 mt-1 text-sm text-emerald-400">
+                      <TrendingUp className="h-4 w-4" />
+                      {mentionCountMetrics.percentChangeMentions.toFixed(2)}%
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Outgoing Mentions Count</p>
+                  <p className="text-3xl font-bold text-white">{formatCompactNumber(mentionCountMetrics.outgoingTotal)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Panel 3: Unique User */}
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div>
+                <CardTitle>Unique User</CardTitle>
+                <p className="text-xs text-gray-500 mt-0.5">Includes user activity only</p>
+              </div>
+              <div className="flex items-center gap-2 print-hide">
+                <Button
+                  onClick={handleExportMentionsCount}
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 bg-white/5 hover:bg-white/10"
+                >
+                  <Download className="w-3 h-3 mr-1" />
+                  Export
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Unique User</p>
+                <p className="text-3xl font-bold text-white">{formatCompactNumber(uniqueUsersMetrics.total)}</p>
+                {uniqueUsersMetrics.percentChange != null && (
+                  <p className={clsx('flex items-center gap-1 mt-1 text-sm', uniqueUsersMetrics.percentChange >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                    {uniqueUsersMetrics.percentChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {uniqueUsersMetrics.percentChange >= 0 ? '+' : ''}{uniqueUsersMetrics.percentChange.toFixed(2)}%
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Sentiment Distribution - Phase 1.3: Added center text */}
@@ -2068,10 +2607,19 @@ function AnalyticsPageContent() {
             </CardContent>
           </Card>
         </div>
-        {/* Sentiment Timeline - Phase 1.2: Improved X-axis readability */}
+        {/* Sentiment Timeline */}
         <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-6 print-page-break print-avoid-break">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <CardTitle>Sentiment Timeline (Last 14 Days)</CardTitle>
+            <CardTitle>
+              Sentiment Timeline
+              {duration !== 'all-time' ? (
+                <span className="text-gray-400 font-normal ml-2">
+                  ({DURATION_PRESETS.find((p) => p.value === duration)?.label ?? `${duration} days`})
+                </span>
+              ) : (
+                <span className="text-gray-400 font-normal ml-2">(All Time)</span>
+              )}
+            </CardTitle>
             <Button
               onClick={handleExportTimeline}
               disabled={timelineChartData.length === 0}
@@ -2087,91 +2635,83 @@ function AnalyticsPageContent() {
             <div ref={timelineChartRef}>
               {timelineChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={timelineChartData}>
-                  <defs>
-                    <linearGradient id="colorPositive" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.65} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorNeutral" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.65} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorNegative" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.65} />
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="2 6" stroke="#374151" opacity={0.25}  />
-                  {/* Phase 1.2: Improved angle and font size */}
-                  <XAxis
-                    dataKey="date"
-                    stroke="#9ca3af"
-                    tick={{ fill: '#9ca3af', fontSize: 12 }}
-                    interval="preserveStartEnd"
-                    tickformatter={(date) =>
-                      new Date(date).toLocaleDateString('en-In',{
-                      day:2-digit,
-                      month:'short',
-                      
-                    })}
-                    
-                  />
-                  <YAxis stroke="#9ca3af" />
-                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                  <Legend verticalAlign="bottom align=center" icontype="circle" wrapperStyle={{ paddingTop: '16px' }}/>
-                  <Area
-                    type="monotone"
-                    dataKey="positive"
-                    
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorPositive)"
-                    animationDuration={800}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="neutral"
-                    
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorNeutral)"
-                    animationDuration={800}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="negative"
-                    
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorNegative)"
-                    animationDuration={800}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="ma7"
-                    stroke="#60a5fa"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={false}
-                    name="7-Day MA"
-                    legendType="line"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="ma14"
-                    stroke="#a78bfa"
-                    strokeWidth={2}
-                    strokeDasharray="3 3"
-                    dot={false}
-                    name="14-Day MA"
-                    legendType="line"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+                  <LineChart
+                    data={timelineChartData}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="2 6" stroke="#374151" opacity={0.25} />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#9ca3af"
+                      tick={{ fill: '#9ca3af', fontSize: 12 }}
+                      interval="preserveStartEnd"
+                      tickFormatter={(dateStr) => {
+                        const d = parseYmdLocalMidnight(dateStr);
+                        if (!d) return dateStr;
+                        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+                      }}
+                    />
+                    <YAxis
+                      stroke="#9ca3af"
+                      tick={{ fill: '#9ca3af', fontSize: 12 }}
+                      domain={[0, (dataMax) => Math.ceil(dataMax * 1.1) || 10]}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                      labelFormatter={(dateStr) => {
+                        const d = parseYmdLocalMidnight(dateStr);
+                        return d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : dateStr;
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      align="center"
+                      iconType="line"
+                      wrapperStyle={{ paddingTop: '16px' }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="total"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls
+                      name="Total Posts"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="positive"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls
+                      name="Positive"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="neutral"
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls
+                      name="Neutral"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="negative"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls
+                      name="Negative"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               ) : (
                 <EmptyState
                   message="No timeline data available"

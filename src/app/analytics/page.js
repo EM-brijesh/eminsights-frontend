@@ -21,6 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Calendar,
+  X,
 } from 'lucide-react';
 import WordCloud from '@/components/WordCloud';
 import { Button } from '@/components/ui/button';
@@ -114,6 +116,269 @@ const buildRangeFromDuration = (days) => {
     end: formatYmdLocal(end),
   };
 };
+
+// Aliases used by DateRangePicker (same implementation as the local date utils above)
+const formatDateInput = formatYmdLocal;
+const parseDateOnly = parseYmdLocalMidnight;
+
+const formatDisplayDate = (value) => {
+  const parsed = parseDateOnly(value);
+  if (!parsed) return 'Select dates';
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const createDefaultDateRange = () => ({
+  start: '2000-01-01',
+  end: formatYmdLocal(new Date()),
+});
+
+const createDefaultTimeRange = () => ({
+  from: { h: '12', m: '00', ampm: 'AM' },
+  to: { h: '11', m: '59', ampm: 'PM' },
+});
+
+const isDefaultTimeRange = (range) => {
+  if (!range) return false;
+  return (
+    range.from?.h === '12' &&
+    range.from?.m === '00' &&
+    range.from?.ampm === 'AM' &&
+    range.to?.h === '11' &&
+    range.to?.m === '59' &&
+    range.to?.ampm === 'PM'
+  );
+};
+
+function DateRangePicker({ range, onChange, durationValue, onDurationChange, timeRange, onTimeChange }) {
+  const [open, setOpen] = useState(false);
+  const [draftRange, setDraftRange] = useState(range || createDefaultDateRange());
+  const [viewDateStart, setViewDateStart] = useState(() => {
+    const now = new Date();
+    // Left calendar = previous month
+    return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  });
+  const [viewDateEnd, setViewDateEnd] = useState(() => {
+    const now = new Date();
+    // Right calendar = current month
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+
+  const applyPreset = (days) => {
+    const nextRange = normalizeRangeOrder(buildRangeFromDuration(days));
+    onDurationChange?.(String(days));
+    onChange(nextRange);
+    setDraftRange(nextRange);
+    setOpen(false);
+  };
+
+  const normalizeRangeOrder = (nextRange) => {
+    const s = parseDateOnly(nextRange?.start);
+    const e = parseDateOnly(nextRange?.end);
+    if (s && e && s > e) return { start: nextRange.end, end: nextRange.start };
+    return nextRange;
+  };
+
+  const startDate = parseDateOnly(draftRange?.start);
+  const endDate = parseDateOnly(draftRange?.end);
+
+  useEffect(() => { setDraftRange(range || createDefaultDateRange()); }, [range]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.analytics-duration-picker')) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const moveMonth = (calendarType, delta) => {
+    const setter = calendarType === 'start' ? setViewDateStart : setViewDateEnd;
+    setter((prev) => {
+      const next = new Date(prev);
+      next.setMonth(prev.getMonth() + delta);
+      return new Date(next.getFullYear(), next.getMonth(), 1);
+    });
+  };
+
+  const handleDayClick = (date) => {
+    const dateStr = formatDateInput(date);
+    onDurationChange?.('custom');
+    setDraftRange((prev) => {
+      // If a full range already exists, restart selection from the clicked date
+      const hasBoth = prev?.start && prev?.end && prev.start !== prev.end;
+      if (hasBoth) return { start: dateStr, end: dateStr };
+
+      if (prev?.start) {
+        if (prev.start === dateStr) return { start: dateStr, end: dateStr };
+        // Always keep chronological order: earlier date → start, later date → end
+        const earlier = prev.start < dateStr ? prev.start : dateStr;
+        const later   = prev.start < dateStr ? dateStr   : prev.start;
+        return { start: earlier, end: later };
+      }
+
+      return { start: dateStr, end: dateStr };
+    });
+  };
+
+  const applyDraft = () => {
+    const todayStr = formatDateInput(new Date());
+    const normalized = normalizeRangeOrder({
+      start: draftRange?.start,
+      // Cap end at today — future dates cannot be applied
+      end: draftRange?.end && draftRange.end > todayStr ? todayStr : draftRange?.end,
+    });
+    setDraftRange(normalized);
+    onChange(normalized);
+    onDurationChange?.('custom');
+    setOpen(false);
+  };
+
+  const handleReset = () => {
+    const defaults = createDefaultDateRange();
+    const now = new Date();
+    setDraftRange(defaults);
+    onChange(defaults);
+    onDurationChange?.('all-time');
+    onTimeChange?.(createDefaultTimeRange());
+    setViewDateStart(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    setViewDateEnd(new Date(now.getFullYear(), now.getMonth(), 1));
+  };
+
+  const renderMonth = (baseDate, calendarType) => {
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const cells = [];
+    for (let i = 0; i < firstDay; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+
+    return (
+      <div className="rounded-md border border-white/10 bg-black/40 p-2">
+        {/* Month header */}
+        <div className="mb-1.5 flex items-center justify-between">
+          <button type="button" onClick={() => moveMonth(calendarType, -1)}
+            className="rounded p-0.5 text-gray-400 transition hover:text-white">
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-[11px] font-semibold text-gray-100">
+            {new Date(year, month, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+          </span>
+          <button type="button" onClick={() => moveMonth(calendarType, 1)}
+            className="rounded p-0.5 text-gray-400 transition hover:text-white">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {/* Day-of-week headers */}
+        <div className="grid grid-cols-7 text-center text-[9px] text-gray-500 mb-0.5">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={i}>{d}</span>)}
+        </div>
+        {/* Day cells */}
+        <div className="grid grid-cols-7">
+          {cells.map((cell, idx) => {
+            if (!cell) return <span key={`e-${idx}`} />;
+            const cellStr = formatDateInput(cell);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const isFuture = cell > today;
+            // Clamp range display at today — future dates never appear highlighted
+            const rangeStart = startDate && endDate ? (startDate <= endDate ? startDate : endDate) : null;
+            const rangeEnd   = startDate && endDate ? (endDate >= startDate ? endDate   : startDate) : null;
+            const effectiveEnd = rangeEnd && rangeEnd > today ? today : rangeEnd;
+            const inRange = !isFuture && rangeStart && effectiveEnd &&
+              cell >= rangeStart && cell <= effectiveEnd;
+            // Only show selected highlight if the date is not in the future
+            const isSelected = !isFuture && (draftRange?.start === cellStr || draftRange?.end === cellStr);
+            return (
+              <button key={cellStr} onClick={() => !isFuture && handleDayClick(cell)}
+                title={isFuture ? 'Future dates cannot be selected' : cellStr}
+                disabled={isFuture}
+                className={clsx(
+                  'flex h-5 w-full items-center justify-center rounded text-[10px] transition',
+                  isFuture ? 'cursor-not-allowed opacity-25 text-gray-600'
+                    : isSelected ? 'bg-indigo-500 font-semibold text-white'
+                    : inRange ? 'bg-indigo-500/15 text-indigo-200'
+                    : 'text-gray-300 hover:bg-white/10'
+                )}>
+                {cell.getDate()}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const buttonLabel = `${formatDisplayDate(range?.start)} – ${formatDisplayDate(range?.end)}`;
+
+  return (
+    <div className="relative analytics-duration-picker">
+      <label className="block text-sm font-medium mb-2">Duration</label>
+      <button onClick={() => setOpen((p) => !p)}
+        className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white transition hover:border-gray-600 hover:bg-gray-700">
+        <span className="flex items-center gap-2 truncate min-w-0">
+          <Calendar className="h-4 w-4 flex-shrink-0 text-gray-400" />
+          <span className="truncate text-xs">{buttonLabel}</span>
+        </span>
+        <ChevronDown className={clsx('h-4 w-4 flex-shrink-0 text-gray-400 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-[200] mt-1 rounded-xl border border-white/10 bg-[#0a0a0a] p-2 shadow-2xl shadow-black/60"
+          style={{ width: 'min(560px, 95vw)' }}>
+          {/* From → To summary */}
+          <div className="mb-1.5 flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2.5 py-1 text-[10px]">
+            <span className="text-gray-500 uppercase tracking-wider">From</span>
+            <span className="font-medium text-white">{formatDisplayDate(draftRange?.start)}</span>
+            <span className="text-gray-600 mx-1">→</span>
+            <span className="text-gray-500 uppercase tracking-wider">To</span>
+            <span className="font-medium text-white">{formatDisplayDate(draftRange?.end)}</span>
+          </div>
+
+          {/* Calendars (left) + presets column (right) */}
+          <div className="flex gap-2">
+            {/* Two month calendars */}
+            <div className="grid flex-1 grid-cols-2 gap-1.5">
+              {renderMonth(viewDateStart, 'start')}
+              {renderMonth(viewDateEnd, 'end')}
+            </div>
+
+            {/* Preset pills — vertical column */}
+            <div className="flex w-[100px] flex-shrink-0 flex-col gap-1">
+              {DURATION_PRESETS.map((preset) => (
+                <button key={preset.value} onClick={() => applyPreset(preset.value)}
+                  className={clsx(
+                    'w-full rounded border px-2 py-1 text-left text-[10px] font-medium transition',
+                    durationValue === preset.value
+                      ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
+                      : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20 hover:text-gray-200'
+                  )}>
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions row */}
+          <div className="mt-1.5 flex items-center justify-end gap-1.5">
+            <button onClick={handleReset}
+              className="rounded border border-white/10 px-3 py-1 text-[10px] text-gray-400 transition hover:bg-white/10">
+              Reset
+            </button>
+            <button onClick={() => setOpen(false)}
+              className="rounded border border-white/10 px-3 py-1 text-[10px] text-gray-400 transition hover:bg-white/10">
+              Cancel
+            </button>
+            <button onClick={applyDraft}
+              className="rounded border border-indigo-500/40 bg-indigo-500/20 px-3 py-1 text-[10px] font-semibold text-indigo-100 transition hover:bg-indigo-500/30">
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const RADIAN = Math.PI / 180;
 
@@ -535,11 +800,14 @@ function AnalyticsPageContent() {
   const [mentionsCountMenuOpen, setMentionsCountMenuOpen] = useState(false);
   const [incomingOutgoingMenuOpen, setIncomingOutgoingMenuOpen] = useState(false);
   const [duration, setDuration] = useState('all-time');
+  const [dateRange, setDateRange] = useState(() => createDefaultDateRange());
+  const [timeRange, setTimeRange] = useState(() => createDefaultTimeRange());
   const sentimentChartRef = useRef(null);
   const platformChartRef = useRef(null);
   const timelineChartRef = useRef(null);
   const sentimentByPlatformChartRef = useRef(null);
   const keywordHeatmapRef = useRef(null);
+  const pendingPickerRangeRef = useRef(null);
   const storageKeyForBrand = (brand) => `keywordGroups:${brand}`;
 
   // Read URL parameters and initialize filters so refresh preserves current selection
@@ -554,6 +822,8 @@ function AnalyticsPageContent() {
       : null;
     const keyword = searchParams.get('keyword');
     const durationParam = searchParams.get('duration');
+    const startParam = searchParams.get('start');
+    const endParam = searchParams.get('end');
 
     urlFiltersRef.current = { brand, platform, keywordGroup, keyword };
 
@@ -569,8 +839,12 @@ function AnalyticsPageContent() {
     if (keyword && keyword !== 'all') {
       setSelectedKeyword(keyword);
     }
-    if (durationParam && isDurationValueValid(durationParam)) {
+    if (durationParam === 'custom' && startParam && endParam) {
+      setDuration('custom');
+      setDateRange({ start: startParam, end: endParam });
+    } else if (durationParam && isDurationValueValid(durationParam)) {
       setDuration(durationParam);
+      setDateRange(buildRangeFromDuration(durationParam));
     }
   }, [searchParams]);
   // Handle sentiment card click - navigate to inbox with filters
@@ -957,7 +1231,7 @@ function AnalyticsPageContent() {
       await fetchPostsAndAnalyze(selectedBrand);
     }
   };
-  const dateRange = useMemo(() => buildRangeFromDuration(duration), [duration]);
+  // dateRange is now a state (managed by DateRangePicker), not derived from duration
 
   useEffect(() => {
     if (!selectedBrand || selectedBrand === 'all') {
@@ -1976,7 +2250,7 @@ function AnalyticsPageContent() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
-            <p className="text-gray-400">Brand performance with sentiment analysis</p>
+            <p className="text-gray-400"></p>
           </div>
           <div className="flex items-center gap-3 print-hide">
             <Button
@@ -2126,27 +2400,26 @@ function AnalyticsPageContent() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Duration</label>
-                <select
-                  value={duration}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setDuration(value);
-                    updateURL({ duration: value });
-                  }}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md"
-                >
-                  {duration !== 'all-time' && !DURATION_PRESETS.some((p) => p.value === duration) && (
-                    <option value={duration}>{`Last ${duration} Days`}</option>
-                  )}
-                  {DURATION_PRESETS.map((preset) => (
-                    <option key={preset.value} value={preset.value}>
-                      {preset.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <DateRangePicker
+                range={dateRange}
+                onChange={(newRange) => {
+                  setDateRange(newRange);
+                  // Capture for URL sync when custom duration is confirmed right after
+                  pendingPickerRangeRef.current = newRange;
+                }}
+                durationValue={duration}
+                onDurationChange={(newDuration) => {
+                  setDuration(newDuration);
+                  if (newDuration === 'custom') {
+                    const r = pendingPickerRangeRef.current;
+                    if (r) updateURL({ duration: 'custom', start: r.start, end: r.end });
+                  } else {
+                    updateURL({ duration: newDuration === 'all-time' ? null : newDuration, start: null, end: null });
+                  }
+                }}
+                timeRange={timeRange}
+                onTimeChange={setTimeRange}
+              />
             </div>
           </CardContent>
         </Card>
@@ -2227,7 +2500,7 @@ function AnalyticsPageContent() {
             </CardContent>
           </Card>
           <Card 
-            className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 border-yellow-500/60 cursor-pointer transition-all hover:scale-105 hover:border-yellow-400/80 hover:shadow-lg hover:shadow-yellow-500/20"
+            className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 border-yellow-500/60 cursor-pointer transition-all hover:scale-105 hover:border-yellow-400/80 hover:shadow-lg hover:shadow-yellow-500/20 z-[-999]"
             onClick={() => handleSentimentClick('neutral')}
           >
             <CardHeader>
@@ -2255,7 +2528,7 @@ function AnalyticsPageContent() {
             </CardContent>
           </Card>
           <Card 
-            className="bg-gradient-to-br from-red-500/20 to-red-400/10 border-red-500/60 cursor-pointer transition-all hover:scale-105 hover:border-red-400/80 hover:shadow-lg hover:shadow-red-500/20"
+            className="bg-gradient-to-br from-red-500/20 to-red-400/10 border-red-500/60 cursor-pointer transition-all hover:scale-105 hover:border-red-400/80 hover:shadow-lg hover:shadow-red-500/20 z-[-999]"
             onClick={() => handleSentimentClick('negative')}
           >
             <CardHeader>

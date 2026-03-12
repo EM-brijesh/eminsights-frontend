@@ -1,3 +1,10 @@
+## 2026-02-26 (calendar picker)
+
+- **Date range picker**: Replaced the Duration `<select>` dropdown with the same two-month calendar picker used in the Inbox page. Users can now click any start/end date or pick a preset (Today, Last 7/14/30/60 Days, All Time, Custom). Includes time-of-day selectors for same-day granularity.
+- Added `DateRangePicker` component, `createDefaultDateRange`, `createDefaultTimeRange`, `isDefaultTimeRange`, `formatDisplayDate` helper functions to the analytics page.
+- `dateRange` promoted from a derived `useMemo` to a `useState` so the picker can own it directly.
+- URL sync: presets write `?duration=N`, custom selections write `?duration=custom&start=YYYY-MM-DD&end=YYYY-MM-DD`; refreshing the page restores the exact selection.
+
 ## 2026-02-26 (audit pass 2)
 
 - **Pending posts excluded from charts**: `clientTimelineData`, `sentimentByPlatformData`, and `keywordSentimentHeatmapData` now skip posts that have no resolved sentiment (pending/null) instead of bucketing them as "neutral", which was inflating the neutral counts in all three charts.

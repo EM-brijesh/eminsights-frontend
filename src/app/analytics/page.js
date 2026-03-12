@@ -1448,6 +1448,7 @@ function AnalyticsPageContent() {
   // Top keywords data for table (sorted by frequency)
   const topKeywordsData = useMemo(() => {
     return Object.entries(keywordFrequency)
+      .filter(([keyword]) => keyword && keyword.toLowerCase() !== 'unknown')
       .map(([keyword, count]) => ({ keyword, count }))
       .sort((a, b) => b.count - a.count);
   }, [keywordFrequency]);
@@ -1485,10 +1486,11 @@ function AnalyticsPageContent() {
     }
     const langMap = {};
     filteredPosts.forEach((post) => {
-      const code = post.language || 'undefined';
+      const code = post.language;
+      if (!code) return;
       langMap[code] = (langMap[code] || 0) + 1;
     });
-    const total = filteredPosts.length;
+    const total = Object.values(langMap).reduce((s, n) => s + n, 0);
     return Object.entries(langMap)
       .sort((a, b) => b[1] - a[1])
       .map(([code, count]) => ({
@@ -1524,14 +1526,17 @@ function AnalyticsPageContent() {
   }, [languageTableData]);
 
   const clientTimelineData = useMemo(() => filteredPosts.reduce((acc, post) => {
-    if (post.createdAt) {
-      const date = formatYmdLocal(new Date(post.createdAt));
-      if (!acc[date]) {
-        acc[date] = { date, positive: 0, neutral: 0, negative: 0, total: 0 };
-      }
-      acc[date][post.sentiment || 'neutral'] += 1;
-      acc[date].total += 1;
+    if (!post.createdAt) return acc;
+    const sentiment = post.sentiment;
+    // Only count posts that have a resolved sentiment so pending posts don't
+    // inflate the neutral bucket and distort the timeline lines.
+    if (!sentiment || !['positive', 'neutral', 'negative'].includes(sentiment)) return acc;
+    const date = formatYmdLocal(new Date(post.createdAt));
+    if (!acc[date]) {
+      acc[date] = { date, positive: 0, neutral: 0, negative: 0, total: 0 };
     }
+    acc[date][sentiment] += 1;
+    acc[date].total += 1;
     return acc;
   }, {}), [filteredPosts]);
   const combinedTimeline = useMemo(() => {
@@ -1566,46 +1571,16 @@ function AnalyticsPageContent() {
     return filtered;
   }, [summaryUsable, summaryData, clientTimelineData, dateRange]);
   const timelineChartData = useMemo(() => {
-    const sorted = [...combinedTimeline].sort((a, b) => new Date(a.date) - new Date(b.date));
-    const withMovingAverages = sorted.map((item, index) => {
-      const positive = Number(item?.positive ?? 0) || 0;
-      const neutral = Number(item?.neutral ?? 0) || 0;
-      const negative = Number(item?.negative ?? 0) || 0;
-      // Always derive total from analyzed counts so the line sits exactly on top
-      // of the stacked areas. Backend total includes pending (unanalyzed) posts.
-      const total = positive + neutral + negative;
-
-      const window7 = sorted.slice(Math.max(0, index - 6), index + 1);
-      const window14 = sorted.slice(Math.max(0, index - 13), index + 1);
-      const avg7 = window7.length > 0
-        ? window7.reduce((sum, d) => {
-          const dPositive = Number(d?.positive ?? 0) || 0;
-          const dNeutral = Number(d?.neutral ?? 0) || 0;
-          const dNegative = Number(d?.negative ?? 0) || 0;
-          const dTotal = Number(d?.total ?? (dPositive + dNeutral + dNegative)) || 0;
-          return sum + (dTotal > 0 ? dPositive / dTotal : 0);
-        }, 0) / window7.length
-        : 0;
-      const avg14 = window14.length > 0
-        ? window14.reduce((sum, d) => {
-          const dPositive = Number(d?.positive ?? 0) || 0;
-          const dNeutral = Number(d?.neutral ?? 0) || 0;
-          const dNegative = Number(d?.negative ?? 0) || 0;
-          const dTotal = Number(d?.total ?? (dPositive + dNeutral + dNegative)) || 0;
-          return sum + (dTotal > 0 ? dPositive / dTotal : 0);
-        }, 0) / window14.length
-        : 0;
-      return {
-        ...item,
-        positive,
-        neutral,
-        negative,
-        total,
-        ma7: avg7,
-        ma14: avg14
-      };
-    });
-    return withMovingAverages;
+    return [...combinedTimeline]
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map((item) => {
+        const positive = Number(item?.positive ?? 0) || 0;
+        const neutral = Number(item?.neutral ?? 0) || 0;
+        const negative = Number(item?.negative ?? 0) || 0;
+        // Derive total from analyzed counts only — backend total includes pending posts.
+        const total = positive + neutral + negative;
+        return { ...item, positive, neutral, negative, total };
+      });
   }, [combinedTimeline]);
 
   const mentionCountMetrics = useMemo(() => {
@@ -1744,11 +1719,13 @@ function AnalyticsPageContent() {
     }
     const platformSentiment = {};
     filteredPosts.forEach((post) => {
+      const sentiment = post.sentiment;
+      if (!sentiment || !['positive', 'neutral', 'negative'].includes(sentiment)) return;
       const platform = post.platform || 'unknown';
       if (!platformSentiment[platform]) {
         platformSentiment[platform] = { positive: 0, neutral: 0, negative: 0 };
       }
-      platformSentiment[platform][post.sentiment || 'neutral'] += 1;
+      platformSentiment[platform][sentiment] += 1;
     });
     return Object.entries(platformSentiment).map(([platform, sentiments]) => ({
       platform: platform.charAt(0).toUpperCase() + platform.slice(1),
@@ -1772,11 +1749,13 @@ function AnalyticsPageContent() {
     }
     const keywordSentiment = {};
     filteredPosts.forEach((post) => {
+      const sentiment = post.sentiment;
+      if (!sentiment || !['positive', 'neutral', 'negative'].includes(sentiment)) return;
       const keyword = post.keyword || 'unknown';
       if (!keywordSentiment[keyword]) {
         keywordSentiment[keyword] = { positive: 0, neutral: 0, negative: 0 };
       }
-      keywordSentiment[keyword][post.sentiment || 'neutral'] += 1;
+      keywordSentiment[keyword][sentiment] += 1;
     });
     return Object.entries(keywordSentiment)
       .sort((a, b) => {
@@ -1808,15 +1787,7 @@ function AnalyticsPageContent() {
   const handleExportTimeline = useCallback(() => {
     if (!timelineChartData.length) return;
 
-    const headers = [
-      'Date',
-      'Positive',
-      'Neutral',
-      'Negative',
-      'Total',
-      '7-Day MA (positive share)',
-      '14-Day MA (positive share)',
-    ];
+    const headers = ['Date', 'Positive', 'Neutral', 'Negative', 'Total'];
 
     const rows = timelineChartData.map((item) => [
       item.date,
@@ -1824,8 +1795,6 @@ function AnalyticsPageContent() {
       item.neutral,
       item.negative,
       item.total,
-      item.ma7,
-      item.ma14,
     ]);
 
     downloadCsv('sentiment-timeline', headers, rows);

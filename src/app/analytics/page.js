@@ -1286,6 +1286,28 @@ function AnalyticsPageContent() {
       }, { positive: 0, neutral: 0, negative: 0, pending: 0 })
     };
   }, [filteredPosts]);
+
+  const channelEngagementTableData = useMemo(() => {
+    const map = {};
+    filteredPosts.forEach((post) => {
+      const key = (post.platform || 'unknown').toLowerCase();
+      if (!map[key]) map[key] = { platform: key, total: 0, likes: 0, comments: 0, shares: 0, views: 0 };
+      map[key].total    += 1;
+      map[key].likes    += Number(post.metrics?.likes    ?? 0) || 0;
+      map[key].comments += Number(post.metrics?.comments ?? 0) || 0;
+      map[key].shares   += Number(post.metrics?.shares   ?? 0) || 0;
+      map[key].views    += Number(post.metrics?.views    ?? 0) || 0;
+    });
+    return Object.values(map)
+      .sort((a, b) => b.total - a.total)
+      .map((row) => ({
+        ...row,
+        avgEngagement: row.total > 0
+          ? Math.round((row.likes + row.comments + row.shares) / row.total)
+          : 0,
+      }));
+  }, [filteredPosts]);
+
   const summaryStats = useMemo(() => {
     if (!summaryData?.success) return null;
     const totals = summaryData.totals || {};
@@ -2958,6 +2980,142 @@ function AnalyticsPageContent() {
               )}
             </CardContent>
           </Card>
+
+          {/* Channel Wise Engagement — Bar Chart + Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Bar Chart */}
+            <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
+                <CardTitle>Channel Wise Engagement</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {channelEngagementTableData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={340}>
+                    <BarChart
+                      data={channelEngagementTableData.map((r) => ({
+                        ...r,
+                        platform: r.platform.charAt(0).toUpperCase() + r.platform.slice(1),
+                      }))}
+                      margin={{ top: 16, right: 56, left: 8, bottom: 70 }}
+                      barCategoryGap="25%"
+                      barGap={2}
+                    >
+                      <CartesianGrid strokeDasharray="2 6" stroke="#374151" opacity={0.25} vertical={false} />
+                      <XAxis
+                        dataKey="platform"
+                        stroke="#9ca3af"
+                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                        angle={-35}
+                        textAnchor="end"
+                        interval={0}
+                        height={65}
+                      />
+                      {/* Left axis — Video Views */}
+                      <YAxis
+                        yAxisId="views"
+                        orientation="left"
+                        stroke="#9ca3af"
+                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                        tickFormatter={(v) => formatCompactNumber(v)}
+                        width={48}
+                        label={{ value: 'Video Views', angle: -90, position: 'insideLeft', dx: -4, fill: '#6b7280', fontSize: 10 }}
+                      />
+                      {/* Right axis — Interactions (Likes / Shares / Comments) */}
+                      <YAxis
+                        yAxisId="interactions"
+                        orientation="right"
+                        stroke="#9ca3af"
+                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                        tickFormatter={(v) => formatCompactNumber(v)}
+                        width={48}
+                        label={{ value: 'Interactions', angle: 90, position: 'insideRight', dx: 14, fill: '#6b7280', fontSize: 10 }}
+                      />
+                      <Tooltip
+                        contentStyle={CHART_TOOLTIP_STYLE}
+                        formatter={(value, name) => [formatCompactNumber(Number(value)), name]}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        align="center"
+                        iconType="circle"
+                        wrapperStyle={{ paddingTop: '8px', fontSize: '12px' }}
+                      />
+                      <Bar yAxisId="views" dataKey="views" name="Video Views" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                      <Bar yAxisId="interactions" dataKey="likes" name="Post Likes" fill="#8b5cf6" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                      <Bar yAxisId="interactions" dataKey="shares" name="Post Shares" fill="#ec4899" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                      <Bar yAxisId="interactions" dataKey="comments" name="Post Comments" fill="#f9a8d4" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    message="No channel engagement data"
+                    helpText="Channel metrics will appear here once post data is loaded."
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Table */}
+            <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
+                <CardTitle>Channel Wise Engagement</CardTitle>
+                <Button
+                  onClick={() => {
+                    if (!channelEngagementTableData.length) return;
+                    const headers = ['Channel', 'Total Post', 'Likes', 'Comments', 'Shares', 'Video Views', 'Avg. Engagement'];
+                    const rows = channelEngagementTableData.map((r) => [
+                      r.platform, r.total, r.likes, r.comments, r.shares, r.views, r.avgEngagement,
+                    ]);
+                    downloadCsv('channel-wise-engagement', headers, rows);
+                  }}
+                  disabled={channelEngagementTableData.length === 0}
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
+                >
+                  <Download className="w-3 h-3 mr-1" />
+                  Export
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {channelEngagementTableData.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-700">
+                          {['Channel', 'Total Post', 'Likes', 'Comments', 'Shares', 'Video Views', 'Avg. Engagement'].map((h) => (
+                            <th key={h} className="py-3 px-3 text-xs font-semibold uppercase tracking-wide text-gray-400 whitespace-nowrap">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {channelEngagementTableData.map((row) => (
+                          <tr key={row.platform} className="border-b border-gray-800 hover:bg-white/5 transition-colors">
+                            <td className="py-3 px-3">
+                              <PlatformBadge platform={row.platform} />
+                            </td>
+                            <td className="py-3 px-3 text-white font-medium">{row.total.toLocaleString()}</td>
+                            <td className="py-3 px-3 text-gray-300">{formatCompactNumber(row.likes)}</td>
+                            <td className="py-3 px-3 text-gray-300">{formatCompactNumber(row.comments)}</td>
+                            <td className="py-3 px-3 text-gray-300">{formatCompactNumber(row.shares)}</td>
+                            <td className="py-3 px-3 text-gray-300">{formatCompactNumber(row.views)}</td>
+                            <td className="py-3 px-3 text-gray-300">{formatCompactNumber(row.avgEngagement)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyState
+                    message="No channel engagement data"
+                    helpText="Channel metrics will appear here once post data is loaded."
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Top Keywords Card */}
           <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">

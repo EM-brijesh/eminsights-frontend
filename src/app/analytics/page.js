@@ -798,6 +798,7 @@ function AnalyticsPageContent() {
   const [wordCloudMenuOpen, setWordCloudMenuOpen] = useState(false);
   const [topKeywordsMenuOpen, setTopKeywordsMenuOpen] = useState(false);
   const [mentionsCountMenuOpen, setMentionsCountMenuOpen] = useState(false);
+  const [isRecentPostsCollapsed, setIsRecentPostsCollapsed] = useState(true);
   const [incomingOutgoingMenuOpen, setIncomingOutgoingMenuOpen] = useState(false);
   const [duration, setDuration] = useState('all-time');
   const [dateRange, setDateRange] = useState(() => createDefaultDateRange());
@@ -2553,7 +2554,7 @@ function AnalyticsPageContent() {
                   '—'
                 )}
               </p>
-            </CardContent>
+            </CardContent>+
           </Card>
         </div>
 
@@ -3688,8 +3689,24 @@ function AnalyticsPageContent() {
         {/* Recent Posts */}
         <section id="analytics-recent-posts-section" className="print-hide">
           <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle>Recent Posts with Sentiment</CardTitle>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="border-white/20 bg-white/5 hover:bg-white/10 print-hide"
+                onClick={() => setIsRecentPostsCollapsed((v) => !v)}
+                aria-expanded={!isRecentPostsCollapsed}
+              >
+                <ChevronDown
+                  className={clsx(
+                    'h-4 w-4 flex-shrink-0 transition-transform',
+                    !isRecentPostsCollapsed && 'rotate-180',
+                  )}
+                />
+                {isRecentPostsCollapsed ? 'Show comments' : 'Hide comments'}
+              </Button>
             </CardHeader>
             <CardContent>
               {loadingPosts || analyzingSentiment ? (
@@ -3701,9 +3718,15 @@ function AnalyticsPageContent() {
                 </div>
               ) : filteredPosts.length > 0 ? (
                 <div className="space-y-4">
-                  {filteredPosts.map((post) => (
-                    <AnalyticsMentionCard key={post._id || post.id} post={post} />
-                  ))}
+                  {isRecentPostsCollapsed ? (
+                    <div className="py-6 text-center text-sm text-gray-400">
+                      Comments hidden.
+                    </div>
+                  ) : (
+                    filteredPosts.map((post) => (
+                      <AnalyticsMentionCard key={post._id || post.id} post={post} />
+                    ))
+                  )}
                 </div>
               ) : (
                 <EmptyState

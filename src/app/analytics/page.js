@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -152,6 +153,8 @@ const isDefaultTimeRange = (range) => {
 function DateRangePicker({ range, onChange, durationValue, onDurationChange, timeRange, onTimeChange }) {
   const [open, setOpen] = useState(false);
   const [draftRange, setDraftRange] = useState(range || createDefaultDateRange());
+  const triggerRef = useRef(null);
+  const [popoverPos, setPopoverPos] = useState(null);
   const [viewDateStart, setViewDateStart] = useState(() => {
     const now = new Date();
     // Left calendar = previous month
@@ -190,6 +193,33 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const desiredWidth = Math.min(560, Math.floor(window.innerWidth * 0.95));
+      const leftUnclamped = rect.right - desiredWidth;
+      const left = Math.max(8, Math.min(leftUnclamped, window.innerWidth - desiredWidth - 8));
+      const top = rect.bottom + 8;
+      setPopoverPos({
+        top,
+        left,
+        width: desiredWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    // Capture scrolls from ancestors; fixed-position popover still needs recompute.
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
   }, [open]);
 
   const moveMonth = (calendarType, delta) => {
@@ -312,10 +342,12 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
   const buttonLabel = `${formatDisplayDate(range?.start)} – ${formatDisplayDate(range?.end)}`;
 
   return (
-    <div className="relative analytics-duration-picker">
+    <div className="relative analytics-duration-picker" style={{ zIndex: 9999 }}>
       <label className="block text-sm font-medium mb-2">Duration</label>
-      <button onClick={() => setOpen((p) => !p)}
-        className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white transition hover:border-gray-600 hover:bg-gray-700">
+      <button
+        ref={triggerRef}
+        onClick={() => setOpen((p) => !p)}
+        className="relative z-[10000] inline-flex w-full items-center justify-between gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white transition hover:border-gray-600 hover:bg-gray-700">
         <span className="flex items-center gap-2 truncate min-w-0">
           <Calendar className="h-4 w-4 flex-shrink-0 text-gray-400" />
           <span className="truncate text-xs">{buttonLabel}</span>
@@ -323,59 +355,79 @@ function DateRangePicker({ range, onChange, durationValue, onDurationChange, tim
         <ChevronDown className={clsx('h-4 w-4 flex-shrink-0 text-gray-400 transition-transform', open && 'rotate-180')} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 z-[200] mt-1 rounded-xl border border-white/10 bg-[#0a0a0a] p-2 shadow-2xl shadow-black/60"
-          style={{ width: 'min(560px, 95vw)' }}>
-          {/* From → To summary */}
-          <div className="mb-1.5 flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2.5 py-1 text-[10px]">
-            <span className="text-gray-500 uppercase tracking-wider">From</span>
-            <span className="font-medium text-white">{formatDisplayDate(draftRange?.start)}</span>
-            <span className="text-gray-600 mx-1">→</span>
-            <span className="text-gray-500 uppercase tracking-wider">To</span>
-            <span className="font-medium text-white">{formatDisplayDate(draftRange?.end)}</span>
-          </div>
-
-          {/* Calendars (left) + presets column (right) */}
-          <div className="flex gap-2">
-            {/* Two month calendars */}
-            <div className="grid flex-1 grid-cols-2 gap-1.5">
-              {renderMonth(viewDateStart, 'start')}
-              {renderMonth(viewDateEnd, 'end')}
+      {open &&
+        popoverPos &&
+        createPortal(
+          <div
+            className="analytics-duration-picker rounded-xl border border-white/10 bg-gray-800 p-2 shadow-2xl shadow-black/60"
+            style={{
+              position: 'fixed',
+              top: popoverPos.top,
+              left: popoverPos.left,
+              width: popoverPos.width,
+              zIndex: 999999,
+            }}
+          >
+            {/* From → To summary */}
+            <div className="mb-1.5 flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2.5 py-1 text-[10px]">
+              <span className="text-gray-500 uppercase tracking-wider">From</span>
+              <span className="font-medium text-white">{formatDisplayDate(draftRange?.start)}</span>
+              <span className="text-gray-600 mx-1">→</span>
+              <span className="text-gray-500 uppercase tracking-wider">To</span>
+              <span className="font-medium text-white">{formatDisplayDate(draftRange?.end)}</span>
             </div>
 
-            {/* Preset pills — vertical column */}
-            <div className="flex w-[100px] flex-shrink-0 flex-col gap-1">
-              {DURATION_PRESETS.map((preset) => (
-                <button key={preset.value} onClick={() => applyPreset(preset.value)}
-                  className={clsx(
-                    'w-full rounded border px-2 py-1 text-left text-[10px] font-medium transition',
-                    durationValue === preset.value
-                      ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
-                      : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20 hover:text-gray-200'
-                  )}>
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
+            {/* Calendars (left) + presets column (right) */}
+            <div className="flex gap-2">
+              {/* Two month calendars */}
+              <div className="grid flex-1 grid-cols-2 gap-1.5">
+                {renderMonth(viewDateStart, 'start')}
+                {renderMonth(viewDateEnd, 'end')}
+              </div>
 
-          {/* Actions row */}
-          <div className="mt-1.5 flex items-center justify-end gap-1.5">
-            <button onClick={handleReset}
-              className="rounded border border-white/10 px-3 py-1 text-[10px] text-gray-400 transition hover:bg-white/10">
-              Reset
-            </button>
-            <button onClick={() => setOpen(false)}
-              className="rounded border border-white/10 px-3 py-1 text-[10px] text-gray-400 transition hover:bg-white/10">
-              Cancel
-            </button>
-            <button onClick={applyDraft}
-              className="rounded border border-indigo-500/40 bg-indigo-500/20 px-3 py-1 text-[10px] font-semibold text-indigo-100 transition hover:bg-indigo-500/30">
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
+              {/* Preset pills — vertical column */}
+              <div className="flex w-[100px] flex-shrink-0 flex-col gap-1">
+                {DURATION_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    onClick={() => applyPreset(preset.value)}
+                    className={clsx(
+                      'w-full rounded border px-2 py-1 text-left text-[10px] font-medium transition',
+                      durationValue === preset.value
+                        ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
+                        : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20 hover:text-gray-200',
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions row */}
+            <div className="mt-1.5 flex items-center justify-end gap-1.5">
+              <button
+                onClick={handleReset}
+                className="rounded border border-white/10 px-3 py-1 text-[10px] text-gray-400 transition hover:bg-white/10"
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded border border-white/10 px-3 py-1 text-[10px] text-gray-400 transition hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applyDraft}
+                className="rounded border border-indigo-500/40 bg-indigo-500/20 px-3 py-1 text-[10px] font-semibold text-indigo-100 transition hover:bg-indigo-500/30"
+              >
+                Apply
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -2501,7 +2553,7 @@ function AnalyticsPageContent() {
             </CardContent>
           </Card>
           <Card 
-            className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 border-yellow-500/60 cursor-pointer transition-all hover:scale-105 hover:border-yellow-400/80 hover:shadow-lg hover:shadow-yellow-500/20 z-[-999]"
+            className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 border-yellow-500/60 cursor-pointer transition-all hover:scale-105 hover:border-yellow-400/80 hover:shadow-lg hover:shadow-yellow-500/20 "
             onClick={() => handleSentimentClick('neutral')}
           >
             <CardHeader>
@@ -2529,7 +2581,7 @@ function AnalyticsPageContent() {
             </CardContent>
           </Card>
           <Card 
-            className="bg-gradient-to-br from-red-500/20 to-red-400/10 border-red-500/60 cursor-pointer transition-all hover:scale-105 hover:border-red-400/80 hover:shadow-lg hover:shadow-red-500/20 z-[-999]"
+            className="bg-gradient-to-br from-red-500/20 to-red-400/10 border-red-500/60 cursor-pointer transition-all hover:scale-105 hover:border-red-400/80 hover:shadow-lg hover:shadow-red-500/20 "
             onClick={() => handleSentimentClick('negative')}
           >
             <CardHeader>
@@ -2554,7 +2606,7 @@ function AnalyticsPageContent() {
                   '—'
                 )}
               </p>
-            </CardContent>+
+            </CardContent>
           </Card>
         </div>
 

@@ -84,7 +84,9 @@ const PLATFORM_KEY_TO_BACKEND = {
   google: 'google',
   instagram: 'instagram',
   facebook: 'facebook',
-  news: 'news',
+  // Backend currently validates keywordGroups.platforms against an enum that does not include news.
+  // Preserve UI state as `news`, but submit `google` as the backend-compatible value.
+  news: 'google',
   twitter: 'twitter',
 };
 

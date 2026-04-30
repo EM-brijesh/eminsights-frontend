@@ -13,7 +13,7 @@ import { useSearchParams } from 'next/navigation';
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] });
 
-const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google', 'instagram'];
+const SUPPORTED_POST_PLATFORMS = ['twitter', 'youtube', 'reddit', 'google', 'instagram' , 'news', 'facebook'];
 
 const MESSAGE_VARIANTS = {
   success: 'bg-emerald-900/40 border-emerald-500/70 text-emerald-100',
@@ -580,6 +580,7 @@ export default function KeywordsPageClient() {
         if (k === 'google') return 'google';
         if (k === 'instagram') return 'instagram';
         if (k === 'facebook') return 'facebook';
+        if (k === 'news') return 'news';
         return 'twitter';
       });
 
@@ -1131,7 +1132,8 @@ export default function KeywordsPageClient() {
                       {selectedFilterChannels.slice(0, 4).map((ch) =>
                         ch === 'youtube' ? (
                           <Image key={ch} src="/youtube-logo.svg" alt="YouTube" width={16} height={16} />
-                        ) : ch === 'twitter' ? (
+                        ) 
+                        : ch === 'twitter' ? (
                           <Image key={ch} src="/x-logo.svg" alt="X" width={14} height={14} />
                         ) : ch === 'reddit' ? (
                           <Image key={ch} src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />
@@ -1157,6 +1159,7 @@ export default function KeywordsPageClient() {
                       { key: 'youtube', label: 'YouTube', src: '/youtube-logo.svg', wh: [16, 16] },
                       { key: 'twitter', label: 'X (Twitter)', src: '/x-logo.svg', wh: [14, 14] },
                       { key: 'reddit', label: 'Reddit', src: '/reddit-logo.svg', wh: [16, 16] },
+                      { key: 'news', label: 'News', src: '/news-logo.svg', wh: [16, 16] },
                       //{ key: 'facebook', label: 'Facebook', src: '/facebook-logo.svg', wh: [16, 16] },
                       { key: 'instagram', label: 'Instagram', src: '/instagram-logo.svg', wh: [16, 16] },
                      // { key: 'quora', label: 'Quora', src: '/quora-logo.svg', wh: [16, 16] },
@@ -1291,6 +1294,7 @@ export default function KeywordsPageClient() {
                         {row.channels?.map((plat, idx) => (
                           <span key={`${plat}-${idx}`} className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-800 border border-gray-700">
                             {plat === 'youtube' && <Image src="/youtube-logo.svg" alt="YouTube" width={16} height={16} />}
+                            {plat === 'news' && <Image src="/news-logo.svg" alt="News" width={16} height={16} />}
                             {plat === 'twitter' && <Image src="/x-logo.svg" alt="X" width={14} height={14} />}
                             {plat === 'reddit' && <Image src="/reddit-logo.svg" alt="Reddit" width={16} height={16} />}
                             {plat === 'instagram' && <Image src="/instagram-logo.svg" alt="Instagram" width={16} height={16} />}
@@ -1423,11 +1427,13 @@ export default function KeywordsPageClient() {
                         {[
                           { key: 'twitter', title: 'Twitter', desc: 'Tweets, Replies, Mentions', logo: '/x-logo.svg', size: 16 },
                           { key: 'instagram', title: 'Instagram', desc: 'Posts', logo: '/instagram-logo.svg', size: 16 },
-                          
+                          { key: 'news', title: 'News', desc: 'Latest News', logo: '/news-logo.svg', size: 16 },
                           { key: 'youtube', title: 'YouTube', desc: 'Video post only', logo: '/youtube-logo.svg', size: 18 },
                           { key: 'reddit', title: 'Reddit', desc: 'Communities & comments', logo: '/reddit-logo.svg', size: 18 },
                           { key: 'google', title: 'Google', desc: 'Web Search', logo: '/google-logo.svg', size: 16 },
                           { key: 'facebook', title: 'Facebook', desc: 'Posts', logo: '/facebook-logo.svg', size: 16 },
+                          { key: 'news', title: 'News', desc: 'Latest News', logo: '/news-logo.svg', size: 16 },
+
                           // { key: 'quora', title: 'Quora', desc: 'Question, Answers, Comment', logo: '/quora-logo.svg', size: 16 },
                         ].map((ch) => {
                           const active = configPlatforms.includes(ch.key);

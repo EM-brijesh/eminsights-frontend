@@ -76,6 +76,44 @@ const axiosInstance = axios.create({
   withCredentials: true, //fix 1-brijesh
 });
 
+const PLATFORM_KEY_TO_BACKEND = {
+  youtube: 'youtube',
+  reddit: 'reddit',
+  quora: 'reddit',
+  google: 'google',
+  instagram: 'instagram',
+  facebook: 'facebook',
+  news: 'google',
+  twitter: 'twitter',
+};
+
+const normalizePlatformsList = (platforms) =>
+  Array.isArray(platforms)
+    ? Array.from(new Set(platforms.map((platform) => PLATFORM_KEY_TO_BACKEND[platform] || platform).filter(Boolean)))
+    : platforms;
+
+const normalizeKeywordGroupsPayload = (data) => {
+  if (!data || typeof data !== 'object') return data;
+
+  if (Array.isArray(data.platforms)) {
+    data.platforms = normalizePlatformsList(data.platforms);
+  }
+
+  if (Array.isArray(data.keywordGroups)) {
+    data.keywordGroups = data.keywordGroups.map((group) => {
+      if (group && typeof group === 'object' && Array.isArray(group.platforms)) {
+        return {
+          ...group,
+          platforms: normalizePlatformsList(group.platforms),
+        };
+      }
+      return group;
+    });
+  }
+
+  return data;
+};
+
 /* ------------------------------------------------------------------
    🔥 GLOBAL FIX ADDED HERE
    Prevent frontend from sending keywordGroups accidentally
@@ -87,6 +125,8 @@ axiosInstance.interceptors.request.use((config) => {
     const allowsKeywordGroups = allowKeywordGroupsEndpoints.some((endpoint) => config.url?.includes(endpoint));
     if (!allowsKeywordGroups) {
       delete config.data.keywordGroups;
+    } else {
+      normalizeKeywordGroupsPayload(config.data);
     }
   }
   return config;

@@ -1449,7 +1449,6 @@ export default function KeywordsPageClient() {
                           { key: 'reddit', title: 'Reddit', desc: 'Communities & comments', logo: '/reddit-logo.svg', size: 18 },
                           { key: 'google', title: 'Google', desc: 'Web Search', logo: '/google-logo.svg', size: 16 },
                           { key: 'facebook', title: 'Facebook', desc: 'Posts', logo: '/facebook-logo.svg', size: 16 },
-                          { key: 'news', title: 'News', desc: 'Latest News', logo: '/news-logo.svg', size: 16 },
 
                           // { key: 'quora', title: 'Quora', desc: 'Question, Answers, Comment', logo: '/quora-logo.svg', size: 16 },
                         ].map((ch) => {

@@ -77,6 +77,19 @@ const normalizeKeywordGroup = (group = {}, fallbackPlatforms = [], fallbackFrequ
 const normalizeGroupsForBrand = (groups = [], fallbackPlatforms = [], fallbackFrequency = '30m') =>
   (groups || []).map((group) => normalizeKeywordGroup(group, fallbackPlatforms, fallbackFrequency));
 
+const PLATFORM_KEY_TO_BACKEND = {
+  youtube: 'youtube',
+  reddit: 'reddit',
+  quora: 'reddit',
+  google: 'google',
+  instagram: 'instagram',
+  facebook: 'facebook',
+  news: 'google',
+  twitter: 'twitter',
+};
+
+const normalizePlatformForBackend = (platformKey) => PLATFORM_KEY_TO_BACKEND[platformKey] || null;
+
 const serializeGroupForBackend = (group, fallbackPlatforms = [], fallbackFrequency = '30m') => {
   const normalized = normalizeKeywordGroup(group, fallbackPlatforms, fallbackFrequency);
   const payload = {
@@ -87,7 +100,13 @@ const serializeGroupForBackend = (group, fallbackPlatforms = [], fallbackFrequen
     includeKeywords: normalized.includeKeywords,
     excludeKeywords: normalized.excludeKeywords,
     assignedUsers: normalized.assignedUsers,
-    platforms: normalized.platforms,
+    platforms: Array.from(
+      new Set(
+        (normalized.platforms || [])
+          .map(normalizePlatformForBackend)
+          .filter(Boolean),
+      ),
+    ),
     country: normalized.countries[0],
     language: normalized.languages[0],
     frequency: normalized.frequency,
@@ -574,15 +593,13 @@ export default function KeywordsPageClient() {
 
     setConfigStatus('saving');
     try {
-      const platformsBackend = (configPlatforms || []).map((k) => {
-        if (k === 'youtube') return 'youtube';
-        if (k === 'reddit' || k === 'quora') return 'reddit';
-        if (k === 'google') return 'google';
-        if (k === 'instagram') return 'instagram';
-        if (k === 'facebook') return 'facebook';
-        if (k === 'news') return 'news';
-        return 'twitter';
-      });
+      const platformsBackend = Array.from(
+        new Set(
+          (configPlatforms || [])
+            .map(normalizePlatformForBackend)
+            .filter(Boolean),
+        ),
+      );
 
       const requestBody = {
         brandName: effectiveBrandName,
@@ -591,7 +608,7 @@ export default function KeywordsPageClient() {
         keywords: andKeywords,
         includeKeywords: orKeywords,
         excludeKeywords: notKeywords,
-        platforms: Array.from(new Set(platformsBackend)),
+        platforms: platformsBackend,
         language: languages.length > 0 ? languages[0] : undefined,
         country: countries.length > 0 ? countries[0] : undefined,
         frequency: configFrequency,

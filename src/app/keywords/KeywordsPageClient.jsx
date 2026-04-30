@@ -84,7 +84,7 @@ const PLATFORM_KEY_TO_BACKEND = {
   google: 'google',
   instagram: 'instagram',
   facebook: 'facebook',
-  news: 'google',
+  news: 'news',
   twitter: 'twitter',
 };
 

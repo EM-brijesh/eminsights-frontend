@@ -53,6 +53,28 @@ const normalizeAssignedUsers = (brand) => {
   return typeof possible === 'string' ? [String(possible).toLowerCase().trim()] : [];
 };
 
+const PLATFORM_KEY_TO_BACKEND = {
+  youtube: 'youtube',
+  reddit: 'reddit',
+  quora: 'reddit',
+  google: 'google',
+  instagram: 'instagram',
+  facebook: 'facebook',
+  news: 'google',
+  twitter: 'twitter',
+};
+
+const normalizePlatformForBackend = (platformKey) => PLATFORM_KEY_TO_BACKEND[platformKey] || null;
+
+const normalizePlatformsForBackend = (platforms = []) =>
+  Array.from(
+    new Set(
+      (platforms || [])
+        .map(normalizePlatformForBackend)
+        .filter(Boolean),
+    ),
+  );
+
 // Utility for safe file upload handling
 const handleFileUpload = (e, onSuccess, options = {}) => {
   const {
@@ -586,12 +608,13 @@ export default function BrandsPage() {
         .split(',')
         .map(k => k.trim())
         .filter(k => k);
+      const selectedPlatformsBackend = normalizePlatformsForBackend(selectedPlatforms);
 
       // Configure brand (keywords, platforms, etc.) - use brand name with correct casing
       await api.brands.configure({
         brandName: brandNameToUse,
         keywords,
-        platforms: selectedPlatforms,
+        platforms: selectedPlatformsBackend,
         frequency: currentConfigDataSnapshot.frequency,
         avatarUrl: currentConfigDataSnapshot.avatarUrl || undefined,
         aiFriendlyName: currentConfigDataSnapshot.aiFriendlyName || undefined,

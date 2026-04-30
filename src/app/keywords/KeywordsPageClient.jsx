@@ -92,6 +92,15 @@ const PLATFORM_KEY_TO_BACKEND = {
 
 const normalizePlatformForBackend = (platformKey) => PLATFORM_KEY_TO_BACKEND[platformKey] || null;
 
+const normalizePlatformsForBackend = (platforms = []) =>
+  Array.from(
+    new Set(
+      (platforms || [])
+        .map(normalizePlatformForBackend)
+        .filter(Boolean),
+    ),
+  );
+
 const serializeGroupForBackend = (group, fallbackPlatforms = [], fallbackFrequency = '30m') => {
   const normalized = normalizeKeywordGroup(group, fallbackPlatforms, fallbackFrequency);
   const payload = {
@@ -595,13 +604,7 @@ export default function KeywordsPageClient() {
 
     setConfigStatus('saving');
     try {
-      const platformsBackend = Array.from(
-        new Set(
-          (configPlatforms || [])
-            .map(normalizePlatformForBackend)
-            .filter(Boolean),
-        ),
-      );
+      const platformsBackend = normalizePlatformsForBackend(configPlatforms);
 
       const requestBody = {
         brandName: effectiveBrandName,
@@ -863,10 +866,11 @@ export default function KeywordsPageClient() {
         brandFrequency,
       );
 
+      const brandPlatformsBackend = normalizePlatformsForBackend(brandPlatforms);
       await api.brands.configure({
         brandName: targetBrandName,
         keywords: updated,
-        platforms: brandPlatforms,
+        platforms: brandPlatformsBackend,
         frequency: brandFrequency,
         keywordGroups: keywordGroupsForBackend,
       });
@@ -1042,10 +1046,11 @@ export default function KeywordsPageClient() {
         brandFrequency,
       );
 
+      const brandPlatformsBackend = normalizePlatformsForBackend(brandPlatforms);
       await api.brands.configure({
         brandName: targetBrandName,
         keywords: brandRecord.keywords || [],
-        platforms: brandPlatforms,
+        platforms: brandPlatformsBackend,
         frequency: brandFrequency,
         keywordGroups: keywordGroupsForBackend,
       });

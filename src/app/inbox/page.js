@@ -57,12 +57,13 @@ const PLATFORM_OPTIONS = [
   { value: 'google', label: 'Google' },
   { value: 'facebook', label: 'Facebook' },
   { value: 'instagram', label: 'Instagram' },
+  { value:  'news', label: 'News' },
 ];
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v'];
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
-const DEFAULT_DURATION = 'all-time';
+const DEFAULT_DURATION = '7';
 const DEFAULT_POSTS_LIMIT = 100;
 const EXTENDED_POSTS_LIMIT = 1000;
 const MAX_RANGE_POSTS_LIMIT = 3000;
@@ -321,6 +322,11 @@ export const PLATFORM_META = {
     label: 'Facebook',
     logo: '/facebook-logo.svg',
     className: 'bg-blue-500/10 text-blue-200 border-blue-400/60',
+  },
+  news: {
+    label: 'News',
+    logo: '/news.png',
+    className: 'bg-green-500/10 text-green-200 border-green-400/60',
   },
 };
 
@@ -1533,7 +1539,7 @@ function MultiSelect({
 function DateRangePicker({ range, onChange, durationValue, onDurationChange, timeRange, onTimeChange }) {
   const [open, setOpen] = useState(false);
   const [draftRange, setDraftRange] = useState(range || createDefaultDateRange());
-  const [selectionMode, setSelectionMode] = useState(durationValue === 'custom' ? 'custom' : 'preset');
+  const [selectionMode, setSelectionMode] = useState(durationValue !== 'custom' ? 'preset' : 'custom');
   const [timeError, setTimeError] = useState('');
   const [lastClickedDate, setLastClickedDate] = useState(null);
   const [viewDateStart, setViewDateStart] = useState(() => {
@@ -2186,7 +2192,7 @@ function InboxPageContent() {
   const [brands, setBrands] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [duration, setDuration] = useState(DEFAULT_DURATION);
-  const [dateRange, setDateRange] = useState(() => createDefaultDateRange());
+  const [dateRange, setDateRange] = useState(() => buildRangeFromDuration(DEFAULT_DURATION));
   const [timeRange, setTimeRange] = useState(() => createDefaultTimeRange());
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');

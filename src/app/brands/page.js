@@ -60,7 +60,7 @@ const PLATFORM_KEY_TO_BACKEND = {
   google: 'google',
   instagram: 'instagram',
   facebook: 'facebook',
-  news: 'google',
+  news: 'news',
   twitter: 'twitter',
 };
 
@@ -1395,7 +1395,7 @@ export default function BrandsPage() {
                               <div>
                                 <Label className="text-sm mb-2 block">Platforms</Label>
                                 <div className="flex gap-3 flex-wrap">
-                                  {['youtube', 'twitter', 'reddit'].map((platform) => {
+                                  {['youtube', 'twitter', 'reddit', 'news'].map((platform) => {
                                     const platformConfig = {
                                       youtube: {
                                         icon: '/youtube-logo.svg',
@@ -1412,6 +1412,12 @@ export default function BrandsPage() {
                                       reddit: {
                                         icon: '/reddit-logo.svg',
                                         name: 'Reddit',
+                                        width: 32,
+                                        height: 32
+                                      },
+                                      news: {
+                                        icon: '/news.png',
+                                        name: 'News',
                                         width: 32,
                                         height: 32
                                       }
